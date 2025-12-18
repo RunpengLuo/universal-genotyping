@@ -1,1 +1,3 @@
-third_party
+third_party/*
+
+scripts/__pycache__*
