@@ -35,7 +35,7 @@ NUM_SAMPLES=${#SAMPLES[@]}
 # prepare bamfiles.txt and samples.txt
 bamfile="${OUTDIR}/bams.txt"
 samplefile="${OUTDIR}/samples.txt"
-for ((i=1; i<${NUM_SAMPLES}; i++)); do
+for ((i=0; i<${NUM_SAMPLES}; i++)); do
     echo "${SAMPLES[i]}" >> ${samplefile}
     echo "${RANGER_DIRS[i]}/possorted_genome_bam.bam" >> ${bamfile}
 done
