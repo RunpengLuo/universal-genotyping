@@ -26,7 +26,7 @@ mkdir -p ${LOGDIR}/phase
 SAMPLES=()
 RANGER_DIRS=()
 BAMS=()
-while IFS=$'\t' read -r sample_name ranger_path; do
+while IFS=$'\t' read -r sample_id ranger_path; do
     echo "${sample_id}: ${ranger_path}"
     SAMPLES+=("$sample_id")
     RANGER_DIRS+=("$ranger_path")
