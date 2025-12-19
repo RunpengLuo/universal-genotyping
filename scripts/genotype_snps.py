@@ -28,6 +28,7 @@ if __name__ == "__main__":
         comment="#",
         usecols=["#CHR", "POS", "ID", "REF", "ALT", "QUAL", "FILTER"],
     )
+    print(f"#SNPs from cellsnp-lite genotyping={len(meta)}")
 
     # counts
     barcodes = read_barcodes(os.path.join(cellsnp_dir, "cellSNP.samples.tsv"))
@@ -54,6 +55,11 @@ if __name__ == "__main__":
     hom_ref = (snp_df["AD"] == 0) & (snp_df["DP"] >= a.min_hom_dp)
 
     keep = het | hom_alt | hom_ref
+    print(
+        f"#SNPs={keep.sum()}/{len(snp_df)}, het={het.sum()}, hom_alt={hom_alt.sum()}, "
+        f"hom_ref={hom_ref.sum()}"
+    )
+
     snp_df = snp_df[keep].copy()
 
     # GT
@@ -93,13 +99,27 @@ if __name__ == "__main__":
 
     g["OTH"] = (g["DP"] - g["AD"] - g["REF_COUNT"]).clip(lower=0)
     g["INFO"] = (
-        "AD=" + g["AD"].astype(str)
-        + ";DP=" + g["DP"].astype(str)
-        + ";OTH=" + g["OTH"].astype(str)
+        "AD="
+        + g["AD"].astype(str)
+        + ";DP="
+        + g["DP"].astype(str)
+        + ";OTH="
+        + g["OTH"].astype(str)
     )
     g["FORMAT"] = "GT"
 
-    cols = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", "SAMPLE"]
+    cols = [
+        "CHROM",
+        "POS",
+        "ID",
+        "REF",
+        "ALT",
+        "QUAL",
+        "FILTER",
+        "INFO",
+        "FORMAT",
+        "SAMPLE",
+    ]
     g = g[cols]
 
     out_dir = os.path.dirname(a.out_vcf)
@@ -109,7 +129,7 @@ if __name__ == "__main__":
     with gzip.open(a.out_vcf, "wt") as fh:
         fh.write("##fileformat=VCFv4.2\n")
         fh.write(
-            "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Pseudobulk genotype\">\n"
+            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Pseudobulk genotype">\n'
         )
         fh.write("#" + "\t".join(cols) + "\n")
         g.to_csv(fh, sep="\t", index=False, header=False)
