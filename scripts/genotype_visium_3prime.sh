@@ -55,7 +55,7 @@ if [[ ! -f "${snp_dir}/cellSNP.base.vcf.gz" ]]; then
         --minCOUNT ${minCOUNT} \
         --UMItag Auto \
         --cellTAG None \
-        --gzip &>"${LOGDIR}/genotype/cellsnp_lite.log" &
+        --gzip &>"${LOGDIR}/genotype/cellsnp_lite.log"
 else
     echo "skip"
 fi
