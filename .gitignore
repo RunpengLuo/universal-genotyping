@@ -1,3 +1,6 @@
-third_party/*
-
-scripts/__pycache__*
+third_party/
+.DS_Store
+.tmp/
+tmp/
+.snakemake/
+.ruff_cache/

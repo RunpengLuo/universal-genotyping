@@ -1,0 +1,3 @@
+SAMPLE	REP_ID	DATA_TYPE	PATH_to_barcodes	PATH_to_10x_bam	PATH_to_10x_ranger
+HT001	U1	GEX	barcodes.tsv.gz	s1.bam	s1/
+HT001	U1	ATAC	barcodes.tsv.gz	s2.bam	s1/

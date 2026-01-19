@@ -1,0 +1,101 @@
+import os, sys, gzip, argparse
+from pathlib import Path
+
+import scipy
+import numpy as np
+import pandas as pd
+
+from snakemake.script import snakemake as sm
+
+from utils import read_VCF
+
+print("postprocess count matrix")
+
+mods = sm.params["mods"]
+rep_ids = sm.params["rep_ids"]
+
+phased_snps = read_VCF(sm.input["snp_file"])
+phased_snps["KEY"] = (
+    phased_snps["CHROM"].astype(str) + "_" + phased_snps["POS"].astype(str)
+)
+
+gt = phased_snps["GT"].astype(str)
+is_phased = gt.str.contains(r"\|", na=False).to_numpy()
+phases = None
+if is_phased.any():
+    phased_snps = phased_snps.loc[is_phased].reset_index(drop=True)
+    phases = phased_snps["GT"].astype(str).str[2].astype(np.int8).to_numpy()[:, None]
+
+parent_keys = pd.Index(phased_snps["KEY"])
+assert not parent_keys.duplicated().any()
+
+M = len(parent_keys)
+
+for mod in mods:
+    barcode_list = []
+    dp_list = []
+    ad_list = []
+    for rep_id in rep_ids:
+        barcodes = pd.read_table(
+            f"pileup/{mod}_{rep_id}/cellSNP.samples.tsv",
+            sep="\t",
+            header=None,
+            names=["BARCODE"],
+        )
+        if len(rep_ids) > 1:
+            barcodes["BARCODE"] = barcodes["BARCODE"].astype(str) + f"_{rep_id}"
+        child_snps = read_VCF(f"pileup/{mod}_{rep_id}/cellSNP.base.vcf.gz")
+        child_snps["KEY"] = (
+            child_snps["CHROM"].astype(str) + "_" + child_snps["POS"].astype(str)
+        )
+        child_keys = pd.Index(child_snps["KEY"])
+        assert not child_keys.duplicated().any()
+        child_loc = child_keys.get_indexer(parent_keys)
+
+        dp_mtx = scipy.io.mmread(f"pileup/{mod}_{rep_id}/cellSNP.tag.DP.mtx").tocsr()
+        ad_mtx = scipy.io.mmread(f"pileup/{mod}_{rep_id}/cellSNP.tag.AD.mtx").tocsr()
+
+        assert dp_mtx.shape == ad_mtx.shape
+        assert dp_mtx.shape[0] == len(child_snps)
+        assert dp_mtx.shape[1] == len(barcodes)
+
+        # map child SNP idx to parent SNP index, build full-set count matrix filled with 0s.
+        present = child_loc >= 0
+        n_cells = dp_mtx.shape[1]
+
+        dp_present = dp_mtx[child_loc[present], :]
+        ad_present = ad_mtx[child_loc[present], :]
+
+        dp_canon = scipy.sparse.csr_matrix((M, n_cells), dtype=dp_mtx.dtype)
+        ad_canon = scipy.sparse.csr_matrix((M, n_cells), dtype=ad_mtx.dtype)
+
+        dp_canon[present, :] = dp_present
+        ad_canon[present, :] = ad_present
+
+        barcode_list.append(barcodes)
+        dp_list.append(dp_canon)
+        ad_list.append(ad_canon)
+
+    # merge replicates
+    all_barcodes = pd.concat(barcode_list, axis=0, ignore_index=True)
+    dp_mtx = scipy.sparse.hstack(dp_list, format="csr")
+    alt_mtx = scipy.sparse.hstack(ad_list, format="csr")
+    ref_mtx = dp_mtx - alt_mtx
+    assert (ref_mtx.data >= 0).all(), "invalid data, DP < AD?"
+    if phases is None:
+        # no phasing, default ALT=A, REF=B
+        a_mtx = alt_mtx
+        b_mtx = ref_mtx
+    else:
+        b_mtx = phases * ref_mtx + (1 - phases) * alt_mtx
+        a_mtx = dp_mtx - b_mtx
+
+    row_dp = np.asarray(dp_mtx.sum(axis=1)).ravel()
+    a_mtx = a_mtx[row_dp > 0, :]
+    b_mtx = b_mtx[row_dp > 0, :]
+    snp_ids = parent_keys[row_dp > 0].to_numpy()
+
+    all_barcodes.to_csv(f"{mod}/barcodes.txt", header=False, index=False)
+    scipy.sparse.save_npz(f"{mod}/cell_snp_Aallele.npz", a_mtx)
+    scipy.sparse.save_npz(f"{mod}/cell_snp_Ballele.npz", b_mtx)
+    np.save(f"{mod}/unique_snp_ids.npy", snp_ids)

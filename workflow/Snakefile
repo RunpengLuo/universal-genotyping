@@ -1,0 +1,110 @@
+import os
+import sys
+import numpy as np
+import pandas as pd
+import scipy
+
+##################################################
+# parse sample file    
+sample_df = pd.read_table(config["sample_file"])
+
+assert sample_df["SAMPLE"].nunique() == 1
+sample = sample_df["SAMPLE"].iloc[0]
+
+mods = sample_df["DATA_TYPE"].unique().tolist()
+rep_ids = sample_df["REP_ID"].unique().tolist()
+get_files = {}
+if len(mods) == 2:
+    assert ("GEX" in mods) and ("ATAC" in mods)
+    assert len(sample_df) == 2, "multiome data should have exactly 2 rows"
+    assert sample_df["PATH_to_barcodes"].nunique() == 1, f"multiome barcode paths differ"
+    assert sample_df["PATH_to_10x_ranger"].nunique() == 1, f"multiome 10x ranger paths differ"
+    assert len(rep_ids) == 1, f"multiome should have one REP_ID, got {rep_ids}"
+
+    rep_id = rep_ids[0]
+    modality = "multiome"
+    barcodes = [sample_df["PATH_to_barcodes"].iloc[0]]
+    bams = [
+        sample_df.loc[sample_df["DATA_TYPE"] == "GEX", "PATH_to_10x_bam"].iloc[0],
+        sample_df.loc[sample_df["DATA_TYPE"] == "ATAC", "PATH_to_10x_bam"].iloc[0],
+    ]
+    rangers = [sample_df["PATH_to_10x_ranger"].iloc[0]]
+    get_files[("GEX", rep_id)] = [barcodes[0], bams[0], rangers[0]]
+    get_files[("ATAC", rep_id)] = [barcodes[0], bams[1], rangers[0]]
+else:
+    assert len(mods) == 1, f"non-multiome sample should have exactly one DATA_TYPE, got {mods}"
+    assert sample_df["REP_ID"].nunique() == len(sample_df), f"non-unique REP_ID not allowed"
+
+    modality = mods[0]
+    barcodes = sample_df["PATH_to_barcodes"].tolist()
+    bams = sample_df["PATH_to_10x_bam"].tolist()
+    rangers = sample_df["PATH_to_10x_ranger"].tolist()
+    for i, rep_id in enumerate(rep_ids):
+        get_files[(mods[0], rep_id)] = [barcodes[i], bams[i], rangers[i]]
+
+assert all(os.path.exists(bam) for bam in bams), "BAM file does not exists"
+assert all(os.path.isdir(ranger) for ranger in rangers), "10x ranger dir does not exists"
+
+print(sample)
+
+##################################################
+ref_snp_file = config.get("ref_snp_file")
+require_genotyping = (
+    ref_snp_file is None
+    or (isinstance(ref_snp_file, str) and ref_snp_file.strip() in {"", "N/A"})
+)
+
+##################################################
+chroms = config["chromosomes"]
+refvers = config["reference_version"]
+require_phasing = require_genotyping
+if require_phasing:
+    # parse phase_snps inputs
+    # define lambda functions that map chrname to genetic map file and phase panel file.
+    phaser = config["phaser"]
+    if phaser == "eagle":
+        gmap_dir = os.path.join(config["eagle_dir"], "tables")
+        assert os.path.isdir(gmap_dir), "failed to locate phaser gmap directory"
+        assert refvers in ["hg17", "hg18", "hg19", "hg38"], "unsupported reference version"
+        get_gmap_file = lambda chrname: os.path.join(gmap_dir, f"genetic_map_{refvers}_withX.txt.gz")
+
+    elif phaser == "shapeit":
+        gmap_dir = os.path.join(config["shapeit_dir"], f"resources/maps")
+        assert os.path.isdir(gmap_dir), "failed to locate phaser gmap directory"
+        assert refvers in ["hg19", "hg38"], "unsupported reference version"
+        refvers2 = {"hg19": "b37", "hg38": "b38"}[refvers]
+        get_gmap_file = lambda chrname: os.path.join(gmap_dir, f"{refvers2}/chr{chrname}.{refvers2}.gmap.gz")
+    else:
+        raise ValueError(f"unsupported phaser: {phaser}")
+    assert all(os.path.exists(get_gmap_file(chrname)) for chrname in chroms), "failed to locate gmap files"
+
+    panel_version = config["panel_version"]
+    phasing_panel = config["phasing_panel"]
+    assert os.path.isdir(phasing_panel), "failed to locate phasing panel"
+    if panel_version == "1000G_hg38":
+        get_phasing_panel = lambda chrname: os.path.join(phasing_panel, f"chr{chrname}.genotypes.bcf")
+    else:
+        raise ValueError(f"unsupported panel_version: {panel_version}")
+    assert all(os.path.exists(get_phasing_panel(chrname)) for chrname in chroms), "failed to locate gmap files"
+
+if require_genotyping:
+    os.makedirs("genotype", exist_ok=True)
+if require_phasing:
+    os.makedirs("phase", exist_ok=True)
+os.makedirs("pileup", exist_ok=True)
+os.makedirs("final_merged", exist_ok=True)
+os.makedirs("logs", exist_ok=True)
+for mod in mods:
+    os.makedirs(mod, exist_ok=True)
+
+##################################################
+# entrypoint
+include: "rules/rules.smk"
+rule all:
+    input:
+        expand("pileup/{mod}_{rep_id}/cellSNP.base.vcf.gz", mod=mods, rep_id=rep_ids),
+        expand("{mod}/barcodes.txt", mod=mods),
+        expand("{mod}/cell_snp_Ballele.npz", mod=mods),
+        expand("{mod}/cell_snp_Ballele.npz", mod=mods),
+        # "final_merged/cell_snp_Ballele.npz",
+    default_target: True
