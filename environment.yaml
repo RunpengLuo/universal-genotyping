@@ -1,0 +1,16 @@
+name: genotyping-env
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python>=3.11
+  - snakemake
+  - cellsnp-lite
+  - bcftools>=1.19
+  - samtools>=1.19
+  - scipy
+  - pandas
+  - numpy
+  - tabix
+  - pip
