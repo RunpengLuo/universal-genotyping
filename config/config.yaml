@@ -1,8 +1,7 @@
 # Path to executables
-cellsnp_lite: /path/to/cellsnp-lite
 bcftools: /path/to/bcftools
+cellsnp_lite: /path/to/cellsnp-lite
 eagle: /path/to/eagle2
-
 shapeit: /path/to/phase_common_static
 
 # Input

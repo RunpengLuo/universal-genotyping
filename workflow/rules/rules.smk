@@ -14,7 +14,7 @@ rule genotype_snps:
     params:
         bcftools=config["bcftools"],
         cellsnp_lite=config["cellsnp_lite"],
-        chroms=",".join(map(str, config["chroms"])),
+        chroms=",".join(map(str, config["chromosomes"])),
         refseq=config["reference"],
         UMItag=config["params_cellsnp_lite"]["UMItag"],
         minMAF=config["params_cellsnp_lite"]["minMAF"],
