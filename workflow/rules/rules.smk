@@ -1,3 +1,5 @@
+from snakemake.io import directory
+
 ##################################################
 rule genotype_snps:
     """
@@ -18,8 +20,8 @@ rule genotype_snps:
         "logs/genotype_snps.log",
     shell:
         r"""
-        echo "genotype SNPs"
-        
+        set -euo pipefail
+        echo "genotype SNPs on pseudobulk sample"
         printf "%s\n" {input.bams} > genotype/bams.lst
         {params.cellsnp_lite} \
             -S genotype/bams.lst \
@@ -56,6 +58,7 @@ rule bgzip_index_snps:
         tbi="genotype/chr{chrname}.vcf.gz.tbi"
     shell: 
         """
+        set -euo pipefail
         bgzip -f {input.vcf}
         tabix -f -p vcf {output.vcfgz}
         """
@@ -82,6 +85,7 @@ rule phase_snps_per_chrom:
         "logs/phase_snps.chr{chrname}.log"
     shell:
         r"""
+        set -euo pipefail
         if [[ "{params.phaser}" == "shapeit" ]]; then
             {params.shapeit} \
                 --input "{input.chrom_vcf_file}" \
@@ -118,6 +122,7 @@ rule concat_phased_snps:
         chroms=config["chromosomes"]
     shell:
         r"""
+        set -euo pipefail
         printf "%s\n" {input} > phase/concat.lst
         bcftools concat -f phase/concat.lst -Ou \
           | bcftools view -g het -Oz -o "{output}"
@@ -136,10 +141,9 @@ rule pileup_snps:
         ranger=lambda wc: get_files[(wc.mod, wc.rep_id)][2],
         snp_file=lambda wc: ("phase/phased.vcf.gz" if require_genotyping else ref_snp_file),
     output:
+        out_dir=directory("pileup/{mod}_{rep_id}"),
         cellsnp_file="pileup/{mod}_{rep_id}/cellSNP.base.vcf.gz",
     params:
-        mod=lambda wc: wc.mod,
-        rep_id=lambda wc: wc.rep_id,
         cellsnp_lite=config["cellsnp_lite"],
         UMItag=config["params_cellsnp_lite"]["UMItag"],
         cellTAG=config["params_cellsnp_lite"]["cellTAG"],
@@ -149,15 +153,15 @@ rule pileup_snps:
     log:
     shell:
         r"""
-        echo "pileup SNPs MOD={mod}, REP_ID={rep_id}"
-        outdir=$(dirname "{output.cellsnp_file}")
-        mkdir -p ${outdir}
+        set -euo pipefail
+        echo "pileup SNPs, out_dir={output.out_dir}"
+        mkdir -p "{output.out_dir}"
 
         {params.cellsnp_lite} \
             -b "{input.barcode}" \
             -s "{input.bam}" \
-            -O ${outdir} \
-            -R {input.snp_file} \
+            -O "{output.out_dir}" \
+            -R "{input.snp_file}" \
             -p {params.nthreads} \
             --minMAF {params.minMAF} \
             --minCOUNT {params.minCOUNT} \

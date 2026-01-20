@@ -1,6 +1,7 @@
 ## Unified Single-cell/Visium Genotyping+Phasing+Pileup Workflow
 ```
-snakemake -p --cores 1 --configfile config/config.yaml --directory <output>
+mamba env create -f ./environment.yaml -p /path/to/envs/genotyping_env
+snakemake -p --cores 1 -s /path/to/workflow/Snakefile --configfile config/config.yaml --directory <output>
 ```
 
 ### Dependencies
@@ -28,7 +29,7 @@ If reference Het SNP file (genotyped from bulk) is provided, skip step 1-3:
 
 ### Sample file
 Sample file has following modes:
-1. multiome (GEX+ATAC) data, shared `PATH_to_barcodes` and `PATH_to_10x_ranger`.
+1. multiome (GEX+ATAC) data, shared `REP_ID`, `PATH_to_barcodes` and `PATH_to_10x_ranger`.
 2. multiple GEX/ATAC/VISIUM replicates. One modality only.
 
 ```
