@@ -34,7 +34,7 @@ rule genotype_snps:
             -S genotype/bams.lst \
             -O genotype \
             -R {input.snp_panel} \
-            --chroms "{params.chroms}" \
+            --chrom "{params.chroms}" \
             --refseq {params.refseq} \
             -p {threads} \
             --minMAF {params.minMAF} \
