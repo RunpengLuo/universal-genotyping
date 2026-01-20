@@ -43,6 +43,7 @@ else:
         get_files[(mods[0], rep_id)] = [barcodes[i], bams[i], rangers[i]]
 
 assert all(os.path.exists(bam) for bam in bams), "BAM file does not exists"
+assert all(os.path.exists(barcode) for barcode in barcodes), "Barcode file does not exists"
 assert all(os.path.isdir(ranger) for ranger in rangers), "10x ranger dir does not exists"
 
 print(sample)

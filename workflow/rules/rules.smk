@@ -145,7 +145,7 @@ rule pileup_snps:
         cellsnp_file="pileup/{mod}_{rep_id}/cellSNP.base.vcf.gz",
     params:
         cellsnp_lite=config["cellsnp_lite"],
-        UMItag=config["params_cellsnp_lite"]["UMItag"],
+        UMItag=lambda wc: (config["params_cellsnp_lite"]["UMItag"] if wc.mod != "ATAC" else "None"),
         cellTAG=config["params_cellsnp_lite"]["cellTAG"],
         minMAF=config["params_cellsnp_lite"]["minMAF"],
         minCOUNT=config["params_cellsnp_lite"]["minCOUNT"],
