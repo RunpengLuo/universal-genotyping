@@ -22,7 +22,7 @@ logging.basicConfig(
 
 logging.info("postprocess count matrix")
 
-mods = sm.params["mods"]
+data_types = sm.params["data_types"]
 rep_ids = sm.params["rep_ids"]
 
 phased_snps = read_VCF(sm.input["snp_file"])
@@ -44,22 +44,22 @@ assert not parent_keys.duplicated().any()
 M = len(parent_keys)
 logging.info(f"total #SNPs={M}")
 
-for mod in mods:
+for data_type in data_types:
     barcode_list = []
     dp_list = []
     ad_list = []
     for rep_id in rep_ids:
         barcodes = pd.read_table(
-            f"pileup/{mod}_{rep_id}/cellSNP.samples.tsv",
+            f"pileup/{data_type}_{rep_id}/cellSNP.samples.tsv",
             sep="\t",
             header=None,
             names=["BARCODE"],
         )
         if len(rep_ids) > 1:
             barcodes["BARCODE"] = barcodes["BARCODE"].astype(str) + f"_{rep_id}"
-        child_snps = read_VCF(f"pileup/{mod}_{rep_id}/cellSNP.base.vcf.gz")
+        child_snps = read_VCF(f"pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz")
         m = len(child_snps)
-        logging.info(f"MOD={mod}, REP_ID={rep_id}, #SNPs={m}")
+        logging.info(f"MOD={data_type}, REP_ID={rep_id}, #SNPs={m}")
         child_snps["KEY"] = (
             child_snps["CHROM"].astype(str) + "_" + child_snps["POS"].astype(str)
         )
@@ -70,8 +70,8 @@ for mod in mods:
         # e.g., [0, *, 1, 2, *], M=5, m=3
         child_loc = child_keys.get_indexer(parent_keys)
 
-        dp_mtx = scipy.io.mmread(f"pileup/{mod}_{rep_id}/cellSNP.tag.DP.mtx").tocsr()
-        ad_mtx = scipy.io.mmread(f"pileup/{mod}_{rep_id}/cellSNP.tag.AD.mtx").tocsr()
+        dp_mtx = scipy.io.mmread(f"pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx").tocsr()
+        ad_mtx = scipy.io.mmread(f"pileup/{data_type}_{rep_id}/cellSNP.tag.AD.mtx").tocsr()
 
         assert dp_mtx.shape == ad_mtx.shape
         assert dp_mtx.shape[0] == len(child_snps)
@@ -136,9 +136,9 @@ for mod in mods:
         f"final matrix: #barcodes={num_barcodes}, #SNPs={num_snps}, sparsity={sparsity:.3f}"
     )
 
-    all_barcodes.to_csv(f"{mod}/barcodes.txt", header=False, index=False)
-    scipy.sparse.save_npz(f"{mod}/cell_snp_Aallele.npz", a_mtx)
-    scipy.sparse.save_npz(f"{mod}/cell_snp_Ballele.npz", b_mtx)
-    np.save(f"{mod}/unique_snp_ids.npy", snp_ids)
+    all_barcodes.to_csv(f"{data_type}/barcodes.txt", header=False, index=False)
+    scipy.sparse.save_npz(f"{data_type}/cell_snp_Aallele.npz", a_mtx)
+    scipy.sparse.save_npz(f"{data_type}/cell_snp_Ballele.npz", b_mtx)
+    np.save(f"{data_type}/unique_snp_ids.npy", snp_ids)
 
 logging.info("finished postprocess_matrix")

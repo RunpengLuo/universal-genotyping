@@ -146,23 +146,23 @@ rule pileup_snps:
     Pile-up cell/spot by feature allele count matrices via cellsnp-lite mode1a
     """
     input:
-        barcode=lambda wc: get_files[(wc.mod, wc.rep_id)][0],
-        bam=lambda wc: get_files[(wc.mod, wc.rep_id)][1],
-        ranger=lambda wc: get_files[(wc.mod, wc.rep_id)][2],
+        barcode=lambda wc: get_files[(wc.data_type, wc.rep_id)][0],
+        bam=lambda wc: get_files[(wc.data_type, wc.rep_id)][1],
+        ranger=lambda wc: get_files[(wc.data_type, wc.rep_id)][2],
         snp_file=lambda wc: ("phase/phased.vcf.gz" if require_genotyping else ref_snp_file),
     output:
-        out_dir=directory("pileup/{mod}_{rep_id}"),
-        cellsnp_file="pileup/{mod}_{rep_id}/cellSNP.base.vcf.gz",
+        out_dir=directory("pileup/{data_type}_{rep_id}"),
+        cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
     threads: config["threads"]["pileup"]
     params:
         cellsnp_lite=config["cellsnp_lite"],
-        UMItag=lambda wc: (config["params_cellsnp_lite"]["UMItag"] if wc.mod != "ATAC" else "None"),
+        UMItag=lambda wc: (config["params_cellsnp_lite"]["UMItag"] if wc.data_type != "ATAC" else "None"),
         cellTAG=config["params_cellsnp_lite"]["cellTAG"],
         minMAF=config["params_cellsnp_lite"]["minMAF"],
         minCOUNT=config["params_cellsnp_lite"]["minCOUNT"],
         bcftools=config["bcftools"],
     log:
-        "logs/pileup_snps.{mod}_{rep_id}.log"
+        "logs/pileup_snps.{data_type}_{rep_id}.log"
     shell:
         r"""
         set -euo pipefail
@@ -185,15 +185,15 @@ rule pileup_snps:
 ##################################################
 rule postprocess_matrix:
     input:
-        vcfs=expand("pileup/{mod}_{rep_id}/cellSNP.base.vcf.gz", mod=mods, rep_id=rep_ids),
+        vcfs=expand("pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz", data_type=data_types, rep_id=rep_ids),
         snp_file=("phase/phased.vcf.gz" if require_genotyping else ref_snp_file)
     output:
-        bc_mod=expand("{mod}/barcodes.txt", mod=mods),
-        A_mod=expand("{mod}/cell_snp_Aallele.npz", mod=mods),
-        B_mod=expand("{mod}/cell_snp_Ballele.npz", mod=mods),
+        bc_mod=expand("{data_type}/barcodes.txt", data_type=data_types),
+        A_mod=expand("{data_type}/cell_snp_Aallele.npz", data_type=data_types),
+        B_mod=expand("{data_type}/cell_snp_Ballele.npz", data_type=data_types),
     threads: config["threads"]["postprocess"]
     params:
-        mods=mods,
+        data_types=data_types,
         rep_ids=rep_ids,
     log:
         "logs/postprocess_matrix.log"

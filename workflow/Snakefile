@@ -4,18 +4,23 @@ import numpy as np
 import pandas as pd
 import scipy
 
+mode = config["mode"]
+assert mode in ["sc_rna", "sc_atac", "sc_multiome", "visium", "visium_3prime"], f"unsupported mode: {mode}"
+
 ##################################################
-# parse sample file    
+# parse sample file
+# required columns: [SAMPLE, REP_ID, DATA_TYPE, PATH_to_barcodes, PATH_to_10x_bam, PATH_to_10x_ranger]
+# DATA_TYPE: [ATAC, GEX, VISIUM, VISIUM_3PRIME]
 sample_df = pd.read_table(config["sample_file"])
 
 assert sample_df["SAMPLE"].nunique() == 1
 sample = sample_df["SAMPLE"].iloc[0]
 
-mods = sample_df["DATA_TYPE"].unique().tolist()
+data_types = sample_df["DATA_TYPE"].unique().tolist()
 rep_ids = sample_df["REP_ID"].unique().tolist()
 get_files = {}
-if len(mods) == 2:
-    assert ("GEX" in mods) and ("ATAC" in mods)
+if len(data_types) == 2:
+    assert ("GEX" in data_types) and ("ATAC" in data_types)
     assert len(sample_df) == 2, "multiome data should have exactly 2 rows"
     assert sample_df["PATH_to_barcodes"].nunique() == 1, f"multiome barcode paths differ"
     assert sample_df["PATH_to_10x_ranger"].nunique() == 1, f"multiome 10x ranger paths differ"
@@ -32,21 +37,19 @@ if len(mods) == 2:
     get_files[("GEX", rep_id)] = [barcodes[0], bams[0], rangers[0]]
     get_files[("ATAC", rep_id)] = [barcodes[0], bams[1], rangers[0]]
 else:
-    assert len(mods) == 1, f"non-multiome sample should have exactly one DATA_TYPE, got {mods}"
+    assert len(data_types) == 1, f"non-multiome sample should have exactly one DATA_TYPE, got {data_types}"
     assert sample_df["REP_ID"].nunique() == len(sample_df), f"non-unique REP_ID not allowed"
 
-    modality = mods[0]
+    modality = data_types[0]
     barcodes = sample_df["PATH_to_barcodes"].tolist()
     bams = sample_df["PATH_to_10x_bam"].tolist()
     rangers = sample_df["PATH_to_10x_ranger"].tolist()
     for i, rep_id in enumerate(rep_ids):
-        get_files[(mods[0], rep_id)] = [barcodes[i], bams[i], rangers[i]]
+        get_files[(data_types[0], rep_id)] = [barcodes[i], bams[i], rangers[i]]
 
 assert all(os.path.exists(bam) for bam in bams), "BAM file does not exists"
 assert all(os.path.exists(barcode) for barcode in barcodes), "Barcode file does not exists"
 assert all(os.path.isdir(ranger) for ranger in rangers), "10x ranger dir does not exists"
-
-print(sample)
 
 ##################################################
 ref_snp_file = config.get("ref_snp_file")
@@ -94,16 +97,16 @@ if require_phasing:
     os.makedirs("phase", exist_ok=True)
 os.makedirs("pileup", exist_ok=True)
 os.makedirs("logs", exist_ok=True)
-for mod in mods:
-    os.makedirs(mod, exist_ok=True)
+for data_type in data_types:
+    os.makedirs(data_type, exist_ok=True)
 
 ##################################################
 # entrypoint
 include: "rules/rules.smk"
 rule all:
     input:
-        expand("pileup/{mod}_{rep_id}/cellSNP.base.vcf.gz", mod=mods, rep_id=rep_ids),
-        expand("{mod}/barcodes.txt", mod=mods),
-        expand("{mod}/cell_snp_Ballele.npz", mod=mods),
-        expand("{mod}/cell_snp_Ballele.npz", mod=mods),
+        expand("pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz", data_type=data_types, rep_id=rep_ids),
+        expand("{data_type}/barcodes.txt", data_type=data_types),
+        expand("{data_type}/cell_snp_Ballele.npz", data_type=data_types),
+        expand("{data_type}/cell_snp_Ballele.npz", data_type=data_types),
     default_target: True
