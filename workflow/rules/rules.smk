@@ -16,6 +16,7 @@ rule genotype_snps:
         UMItag=config["params_cellsnp_lite"]["UMItag"],
         minMAF=config["params_cellsnp_lite"]["minMAF"],
         minCOUNT=config["params_cellsnp_lite"]["minCOUNT"],
+        bcftools=config["bcftools"],
     log:
         "logs/genotype_snps.log",
     shell:
@@ -23,6 +24,10 @@ rule genotype_snps:
         set -euo pipefail
         echo "genotype SNPs on pseudobulk sample"
         printf "%s\n" {input.bams} > genotype/bams.lst
+
+        echo "[QC] {input.snp_panel} record #SNPs:" >> "{log}"
+        {params.bcftools} view -H {input.snp_panel} | wc -l >> "{log}"
+
         {params.cellsnp_lite} \
             -S genotype/bams.lst \
             -O genotype \
@@ -32,7 +37,10 @@ rule genotype_snps:
             --minCOUNT {params.minCOUNT} \
             --UMItag {params.UMItag} \
             --cellTAG None \
-            --gzip > "{log}" 2>&1
+            --gzip >> "{log}" 2>&1
+        
+        echo "[QC] genotype/cellSNP.base.vcf.gz record #SNPs:" >> "{log}"
+        {params.bcftools} view -H genotype/cellSNP.base.vcf.gz | wc -l >> "{log}"
         """
 
 ##################################################
@@ -95,7 +103,7 @@ rule phase_snps_per_chrom:
                 --reference "{input.phasing_panel_file}" \
                 --region "{params.chrom}" \
                 --thread "{threads}" \
-                --output "phase/phased.{params.chrom}.vcf" > "{log}" 2>&1
+                --output "phase/phased.{params.chrom}.vcf" >> "{log}" 2>&1
             {params.bcftools} view -Oz \
                 -o "{output}" "phase/phased.{params.chrom}.vcf"
             rm "phase/phased.{params.chrom}.vcf"
@@ -106,10 +114,7 @@ rule phase_snps_per_chrom:
                 --vcfRef "{input.phasing_panel_file}" \
                 --vcfOutFormat z \
                 --numThreads "{threads}" \
-                --outPrefix "phase/phased.{params.chrom}" > "{log}" 2>&1
-        else
-            echo "undefined phase method: {params.phaser}" >&2
-            exit 1
+                --outPrefix "phase/phased.{params.chrom}" >> "{log}" 2>&1
         fi
         tabix -f -p vcf {output}
         bcftools index -f "{output}"
@@ -151,6 +156,7 @@ rule pileup_snps:
         cellTAG=config["params_cellsnp_lite"]["cellTAG"],
         minMAF=config["params_cellsnp_lite"]["minMAF"],
         minCOUNT=config["params_cellsnp_lite"]["minCOUNT"],
+        bcftools=config["bcftools"],
     log:
         "logs/pileup_snps.{mod}_{rep_id}.log"
     shell:
@@ -169,7 +175,7 @@ rule pileup_snps:
             --minCOUNT {params.minCOUNT} \
             --UMItag {params.UMItag} \
             --cellTAG {params.cellTAG} \
-            --gzip > "{log}" 2>&1
+            --gzip >> "{log}" 2>&1
         """
 
 ##################################################

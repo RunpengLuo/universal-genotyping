@@ -9,8 +9,8 @@ snakemake -p --cores 1 -s /path/to/workflow/Snakefile --configfile config/config
 2. bcftools
 3. cellsnp-lite
 4. HetDetect `https://github.com/raphael-group/hetdetect.git`
-5. Eagle2
-6. Shapeit5
+5. Eagle2 `https://storage.googleapis.com/broad-alkesgroup-public/Eagle/downloads/Eagle_v2.4.1.tar.gz`
+6. Shapeit5 `https://github.com/odelaneau/shapeit5.git`
 
 ### Aux files
 Required: reference panel SNPs VCF file and BAM files.
