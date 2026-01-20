@@ -76,7 +76,7 @@ rule phase_snps_per_chrom:
         gmap_file=lambda wc: get_gmap_file(wc.chrname),
     output:
         "phase/phased.chr{chrname}.vcf.gz"
-    threads: config["nthreads"]["phase"]
+    threads: config["threads"]["phase"]
     params:
         chrom="chr{chrname}",
         phaser=config["phaser"],
