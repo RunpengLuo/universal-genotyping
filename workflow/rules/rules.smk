@@ -10,12 +10,12 @@ rule genotype_snps:
         snp_panel=config["snp_panel"],
     output:
         raw_snp_file="genotype/cellSNP.base.vcf.gz",
+    threads: config["threads"]["genotype"]
     params:
         cellsnp_lite=config["cellsnp_lite"],
         UMItag=config["params_cellsnp_lite"]["UMItag"],
         minMAF=config["params_cellsnp_lite"]["minMAF"],
         minCOUNT=config["params_cellsnp_lite"]["minCOUNT"],
-        nthreads=config["nthreads"],
     log:
         "logs/genotype_snps.log",
     shell:
@@ -27,7 +27,7 @@ rule genotype_snps:
             -S genotype/bams.lst \
             -O genotype \
             -R {input.snp_panel} \
-            -p {params.nthreads} \
+            -p {threads} \
             --minMAF {params.minMAF} \
             --minCOUNT {params.minCOUNT} \
             --UMItag {params.UMItag} \
@@ -45,6 +45,7 @@ rule annotate_snps:
         raw_snp_file="genotype/cellSNP.base.vcf.gz",
     output:
         expand("genotype/chr{chrname}.vcf", chrname=config["chromosomes"]),
+    threads: 1
     log:
         "logs/annotate_snps.log"
     script:
@@ -56,6 +57,7 @@ rule bgzip_index_snps:
     output: 
         vcfgz="genotype/chr{chrname}.vcf.gz",
         tbi="genotype/chr{chrname}.vcf.gz.tbi"
+    threads: 1
     shell: 
         """
         set -euo pipefail
@@ -74,13 +76,13 @@ rule phase_snps_per_chrom:
         gmap_file=lambda wc: get_gmap_file(wc.chrname),
     output:
         "phase/phased.chr{chrname}.vcf.gz"
+    threads: config["nthreads"]["phase"]
     params:
         chrom="chr{chrname}",
         phaser=config["phaser"],
         eagle=config["eagle"],
         shapeit=config["shapeit"],
         bcftools=config["bcftools"],
-        nthreads=config["nthreads"]
     log:
         "logs/phase_snps.chr{chrname}.log"
     shell:
@@ -92,7 +94,7 @@ rule phase_snps_per_chrom:
                 --map "{input.gmap_file}" \
                 --reference "{input.phasing_panel_file}" \
                 --region "{params.chrom}" \
-                --thread "{params.nthreads}" \
+                --thread "{threads}" \
                 --output "phase/phased.{params.chrom}.vcf" > "{log}" 2>&1
             {params.bcftools} view -Oz \
                 -o "{output}" "phase/phased.{params.chrom}.vcf"
@@ -103,7 +105,7 @@ rule phase_snps_per_chrom:
                 --geneticMapFile "{input.gmap_file}" \
                 --vcfRef "{input.phasing_panel_file}" \
                 --vcfOutFormat z \
-                --numThreads "{params.nthreads}" \
+                --numThreads "{threads}" \
                 --outPrefix "phase/phased.{params.chrom}" > "{log}" 2>&1
         else
             echo "undefined phase method: {params.phaser}" >&2
@@ -118,8 +120,7 @@ rule concat_phased_snps:
         expand("phase/phased.chr{chrname}.vcf.gz", chrname=config["chromosomes"])
     output:
         "phase/phased.vcf.gz"
-    params:
-        chroms=config["chromosomes"]
+    threads: 1
     shell:
         r"""
         set -euo pipefail
@@ -143,13 +144,13 @@ rule pileup_snps:
     output:
         out_dir=directory("pileup/{mod}_{rep_id}"),
         cellsnp_file="pileup/{mod}_{rep_id}/cellSNP.base.vcf.gz",
+    threads: config["threads"]["pileup"]
     params:
         cellsnp_lite=config["cellsnp_lite"],
         UMItag=lambda wc: (config["params_cellsnp_lite"]["UMItag"] if wc.mod != "ATAC" else "None"),
         cellTAG=config["params_cellsnp_lite"]["cellTAG"],
         minMAF=config["params_cellsnp_lite"]["minMAF"],
         minCOUNT=config["params_cellsnp_lite"]["minCOUNT"],
-        nthreads=config["nthreads"],
     log:
         "logs/pileup_snps.{mod}_{rep_id}.log"
     shell:
@@ -163,7 +164,7 @@ rule pileup_snps:
             -s "{input.bam}" \
             -O "{output.out_dir}" \
             -R "{input.snp_file}" \
-            -p {params.nthreads} \
+            -p {threads} \
             --minMAF {params.minMAF} \
             --minCOUNT {params.minCOUNT} \
             --UMItag {params.UMItag} \
@@ -180,6 +181,7 @@ rule postprocess_matrix:
         bc_mod=expand("{mod}/barcodes.txt", mod=mods),
         A_mod=expand("{mod}/cell_snp_Aallele.npz", mod=mods),
         B_mod=expand("{mod}/cell_snp_Ballele.npz", mod=mods),
+    threads: config["threads"]["postprocess"]
     params:
         mods=mods,
         rep_ids=rep_ids,

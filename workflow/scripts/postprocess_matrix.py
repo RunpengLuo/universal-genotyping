@@ -1,14 +1,18 @@
-import os, sys, gzip
-import logging
-from pathlib import Path
+import os, sys, gzip, logging
+from snakemake.script import snakemake as sm
+
+t = int(getattr(sm, "threads", 1))
+os.environ["OMP_NUM_THREADS"] = str(t)
+os.environ["OPENBLAS_NUM_THREADS"] = str(t)
+os.environ["MKL_NUM_THREADS"] = str(t)
+os.environ["VECLIB_MAXIMUM_THREADS"] = str(t)
+os.environ["NUMEXPR_NUM_THREADS"] = str(t)
 
 import scipy
 import numpy as np
 import pandas as pd
 
 from utils import read_VCF
-
-from snakemake.script import snakemake as sm
 
 logging.basicConfig(
     filename=sm.log[0],

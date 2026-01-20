@@ -31,9 +31,6 @@ phaser: "eagle"
 eagle_dir:
 shapeit_dir:
 
-
-nthreads: 16
-
 # Parameters
 params_cellsnp_lite:
   UMItag: "Auto"
@@ -50,20 +47,8 @@ params_eagle:
 
 params_shapeit:
 
-
-# # running parameters
-# # samtools sort (only used when joingly calling from multiple slices)
-# samtools_sorting_mem: "4G"
-# # cellsnp-lite
-# UMItag: "Auto"
-# cellTAG: "CB"
-# nthreads_cellsnp_lite: 20
-# region_vcf: <Replace with downloaded SNP panel path>
-# # Eagle phasing
-# phasing_panel: <Replace with downloaded phasing panel directory>
-
-# # input
-# spaceranger_dir: <Replace with Spaceranger directory>
-
-# # output
-# output_snpinfo: <Replace with output directory of preprocessing>
+threads:
+  genotype: 8
+  phase: 2
+  pileup: 16
+  postprocess: 2
