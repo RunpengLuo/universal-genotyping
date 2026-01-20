@@ -32,7 +32,7 @@ rule genotype_snps:
             --minCOUNT {params.minCOUNT} \
             --UMItag {params.UMItag} \
             --cellTAG None \
-            --gzip
+            --gzip > "{log}" 2>&1
         """
 
 ##################################################
@@ -93,7 +93,7 @@ rule phase_snps_per_chrom:
                 --reference "{input.phasing_panel_file}" \
                 --region "{params.chrom}" \
                 --thread "{params.nthreads}" \
-                --output "phase/phased.{params.chrom}.vcf"
+                --output "phase/phased.{params.chrom}.vcf" > "{log}" 2>&1
             {params.bcftools} view -Oz \
                 -o "{output}" "phase/phased.{params.chrom}.vcf"
             rm "phase/phased.{params.chrom}.vcf"
@@ -104,7 +104,7 @@ rule phase_snps_per_chrom:
                 --vcfRef "{input.phasing_panel_file}" \
                 --vcfOutFormat z \
                 --numThreads "{params.nthreads}" \
-                --outPrefix "phase/phased.{params.chrom}"
+                --outPrefix "phase/phased.{params.chrom}" > "{log}" 2>&1
         else
             echo "undefined phase method: {params.phaser}" >&2
             exit 1
@@ -168,7 +168,7 @@ rule pileup_snps:
             --minCOUNT {params.minCOUNT} \
             --UMItag {params.UMItag} \
             --cellTAG {params.cellTAG} \
-            --gzip
+            --gzip > "{log}" 2>&1
         """
 
 ##################################################

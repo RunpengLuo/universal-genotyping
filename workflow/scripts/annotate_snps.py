@@ -1,17 +1,21 @@
-import os, sys, gzip, argparse
+import os, sys, gzip, logging
 from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
+from utils import read_VCF
+
 from snakemake.script import snakemake as sm
 
-from utils import read_VCF
+logging.basicConfig(
+    filename=sm.log[0],
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+logging.info("start annotate_snps")
 
 raw_snps = read_VCF(sm.input["raw_snp_file"])
 chroms = sm.config["chromosomes"]
-
-print("start annotate_snps")
 assert all(c in raw_snps.columns for c in ["AD", "DP", "OTH"]), (
     "invalid cellsnp-lite format"
 )
@@ -41,7 +45,7 @@ hom_alt = (raw_snps["AD"] == raw_snps["DP"]) & (raw_snps["DP"] >= min_hom_dp)
 hom_ref = (raw_snps["AD"] == 0) & (raw_snps["DP"] >= min_hom_dp)
 
 keep = het | hom_alt | hom_ref
-print(
+logging.info(
     f"#SNPs={keep.sum()}/{len(raw_snps)}, het={het.sum()}, hom_alt={hom_alt.sum()}, "
     f"hom_ref={hom_ref.sum()}"
 )
@@ -81,4 +85,4 @@ for chrname in chroms:
         raw_snps[raw_snps["CHROM"] == chrom].to_csv(
             fd, sep="\t", index=False, header=False
         )
-print("finished annotate_snps")
+logging.info("finished annotate_snps")

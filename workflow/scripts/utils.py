@@ -48,9 +48,7 @@ def read_VCF(vcf_file: str, addchr=True):
     info_wide = info_kvs.pivot_table(
         index="row", columns="key", values="val", aggfunc="first"
     )
-    snps = snps.drop(columns=["INFO"]).join(
-        info_wide
-    )
+    snps = snps.drop(columns=["INFO"]).join(info_wide)
 
     # parse FORMAT column
     if "FORMAT" in snps.columns:

@@ -1,15 +1,22 @@
-import os, sys, gzip, argparse
+import os, sys, gzip
+import logging
 from pathlib import Path
 
 import scipy
 import numpy as np
 import pandas as pd
 
-from snakemake.script import snakemake as sm
-
 from utils import read_VCF
 
-print("postprocess count matrix")
+from snakemake.script import snakemake as sm
+
+logging.basicConfig(
+    filename=sm.log[0],
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+
+logging.info("postprocess count matrix")
 
 mods = sm.params["mods"]
 rep_ids = sm.params["rep_ids"]
@@ -87,7 +94,9 @@ for mod in mods:
         a_mtx = alt_mtx
         b_mtx = ref_mtx
     else:
-        b_mtx = ref_mtx.multiply(phases[:, None]) + alt_mtx.multiply(1 - phases[:, None])
+        b_mtx = ref_mtx.multiply(phases[:, None]) + alt_mtx.multiply(
+            1 - phases[:, None]
+        )
         a_mtx = dp_mtx - b_mtx
 
     row_dp = np.asarray(dp_mtx.sum(axis=1)).ravel()
@@ -99,3 +108,5 @@ for mod in mods:
     scipy.sparse.save_npz(f"{mod}/cell_snp_Aallele.npz", a_mtx)
     scipy.sparse.save_npz(f"{mod}/cell_snp_Ballele.npz", b_mtx)
     np.save(f"{mod}/unique_snp_ids.npy", snp_ids)
+
+logging.info("finished postprocess_matrix")
