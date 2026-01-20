@@ -24,7 +24,7 @@ is_phased = gt.str.contains(r"\|", na=False).to_numpy()
 phases = None
 if is_phased.any():
     phased_snps = phased_snps.loc[is_phased].reset_index(drop=True)
-    phases = phased_snps["GT"].astype(str).str[2].astype(np.int8).to_numpy()[:, None]
+    phases = phased_snps["GT"].astype(str).str[2].astype(np.int8).to_numpy()
 
 parent_keys = pd.Index(phased_snps["KEY"])
 assert not parent_keys.duplicated().any()
@@ -87,7 +87,7 @@ for mod in mods:
         a_mtx = alt_mtx
         b_mtx = ref_mtx
     else:
-        b_mtx = phases * ref_mtx + (1 - phases) * alt_mtx
+        b_mtx = ref_mtx.multiply(phases[:, None]) + alt_mtx.multiply(1 - phases[:, None])
         a_mtx = dp_mtx - b_mtx
 
     row_dp = np.asarray(dp_mtx.sum(axis=1)).ravel()

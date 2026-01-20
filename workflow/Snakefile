@@ -92,7 +92,6 @@ if require_genotyping:
 if require_phasing:
     os.makedirs("phase", exist_ok=True)
 os.makedirs("pileup", exist_ok=True)
-os.makedirs("final_merged", exist_ok=True)
 os.makedirs("logs", exist_ok=True)
 for mod in mods:
     os.makedirs(mod, exist_ok=True)
@@ -106,5 +105,4 @@ rule all:
         expand("{mod}/barcodes.txt", mod=mods),
         expand("{mod}/cell_snp_Ballele.npz", mod=mods),
         expand("{mod}/cell_snp_Ballele.npz", mod=mods),
-        # "final_merged/cell_snp_Ballele.npz",
     default_target: True
