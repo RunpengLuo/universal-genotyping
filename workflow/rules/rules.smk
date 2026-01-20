@@ -12,11 +12,13 @@ rule genotype_snps:
         raw_snp_file="genotype/cellSNP.base.vcf.gz",
     threads: config["threads"]["genotype"]
     params:
+        bcftools=config["bcftools"],
         cellsnp_lite=config["cellsnp_lite"],
+        chroms=",".join(map(str, config["chroms"])),
+        refseq=config["reference"],
         UMItag=config["params_cellsnp_lite"]["UMItag"],
         minMAF=config["params_cellsnp_lite"]["minMAF"],
         minCOUNT=config["params_cellsnp_lite"]["minCOUNT"],
-        bcftools=config["bcftools"],
     log:
         "logs/genotype_snps.log",
     shell:
@@ -32,6 +34,8 @@ rule genotype_snps:
             -S genotype/bams.lst \
             -O genotype \
             -R {input.snp_panel} \
+            --chroms "{params.chroms}" \
+            --refseq {params.refseq} \
             -p {threads} \
             --minMAF {params.minMAF} \
             --minCOUNT {params.minCOUNT} \
