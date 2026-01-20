@@ -73,7 +73,7 @@ rule phase_snps_per_chrom:
         "phase/phased.chr{chrname}.vcf.gz"
     params:
         chrom="chr{chrname}",
-        phaser=config["phase_method"],
+        phaser=config["phaser"],
         eagle=config["eagle"],
         shapeit=config["shapeit"],
         bcftools=config["bcftools"],
