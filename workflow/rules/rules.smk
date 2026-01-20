@@ -151,6 +151,7 @@ rule pileup_snps:
         minCOUNT=config["params_cellsnp_lite"]["minCOUNT"],
         nthreads=config["nthreads"],
     log:
+        "logs/pileup_snps.{mod}_{rep_id}.log"
     shell:
         r"""
         set -euo pipefail
