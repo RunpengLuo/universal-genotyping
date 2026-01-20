@@ -53,18 +53,19 @@ def read_VCF(vcf_file: str, addchr=True):
     )
 
     # parse FORMAT column
-    fmt_keys = snps["FORMAT"].fillna("").str.split(":")
-    samp_vals = snps["SAMPLE"].fillna("").str.split(":")
+    if "FORMAT" in snps.columns:
+        fmt_keys = snps["FORMAT"].fillna("").str.split(":")
+        samp_vals = snps["SAMPLE"].fillna("").str.split(":")
 
-    fmt_long = pd.DataFrame(
-        {"key": fmt_keys.explode(), "val": samp_vals.explode()}
-    ).dropna(subset=["key"])
-    fmt_long["row"] = fmt_keys.explode().index  # original variant row index
+        fmt_long = pd.DataFrame(
+            {"key": fmt_keys.explode(), "val": samp_vals.explode()}
+        ).dropna(subset=["key"])
+        fmt_long["row"] = fmt_keys.explode().index  # original variant row index
 
-    fmt_wide = fmt_long.pivot_table(
-        index="row", columns="key", values="val", aggfunc="first"
-    )
-    snps = snps.drop(columns=["FORMAT", "SAMPLE"]).join(fmt_wide)
+        fmt_wide = fmt_long.pivot_table(
+            index="row", columns="key", values="val", aggfunc="first"
+        )
+        snps = snps.drop(columns=["FORMAT", "SAMPLE"]).join(fmt_wide)
 
     snps = snps.reset_index(drop=True)
     return snps
