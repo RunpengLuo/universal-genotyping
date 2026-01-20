@@ -52,11 +52,15 @@ for mod in mods:
         if len(rep_ids) > 1:
             barcodes["BARCODE"] = barcodes["BARCODE"].astype(str) + f"_{rep_id}"
         child_snps = read_VCF(f"pileup/{mod}_{rep_id}/cellSNP.base.vcf.gz")
+        m = len(child_snps)
         child_snps["KEY"] = (
             child_snps["CHROM"].astype(str) + "_" + child_snps["POS"].astype(str)
         )
         child_keys = pd.Index(child_snps["KEY"])
         assert not child_keys.duplicated().any()
+        
+        # child slice SNP location in parent, -1 if not presented in child (M,)
+        # e.g., [0, *, 1, 2, *], M=5, m=3
         child_loc = child_keys.get_indexer(parent_keys)
 
         dp_mtx = scipy.io.mmread(f"pileup/{mod}_{rep_id}/cellSNP.tag.DP.mtx").tocsr()
@@ -66,18 +70,28 @@ for mod in mods:
         assert dp_mtx.shape[0] == len(child_snps)
         assert dp_mtx.shape[1] == len(barcodes)
 
-        # map child SNP idx to parent SNP index, build full-set count matrix filled with 0s.
         present = child_loc >= 0
         n_cells = dp_mtx.shape[1]
 
-        dp_present = dp_mtx[child_loc[present], :]
-        ad_present = ad_mtx[child_loc[present], :]
+        # parent-row indices that exist in child slice
+        row_new = np.flatnonzero(present)          # indices in [0..M), 
+        row_old = child_loc[present]              # corresponding indices in child [0..n_child)
 
-        dp_canon = scipy.sparse.csr_matrix((M, n_cells), dtype=dp_mtx.dtype)
-        ad_canon = scipy.sparse.csr_matrix((M, n_cells), dtype=ad_mtx.dtype)
+        # DP
+        dp_present = dp_mtx[row_old, :].tocoo()
+        dp_canon = scipy.sparse.csr_matrix(
+            (dp_present.data, (row_new[dp_present.row], dp_present.col)),
+            shape=(M, n_cells),
+            dtype=dp_mtx.dtype,
+        )
 
-        dp_canon[present, :] = dp_present
-        ad_canon[present, :] = ad_present
+        # AD
+        ad_present = ad_mtx[row_old, :].tocoo()
+        ad_canon = scipy.sparse.csr_matrix(
+            (ad_present.data, (row_new[ad_present.row], ad_present.col)),
+            shape=(M, n_cells),
+            dtype=ad_mtx.dtype,
+        )
 
         barcode_list.append(barcodes)
         dp_list.append(dp_canon)
