@@ -1,5 +1,5 @@
 # Path to executables
-cellsnplite: /path/to/cellsnp-lite
+cellsnp_lite: /path/to/cellsnp-lite
 bcftools: /path/to/bcftools
 eagle: /path/to/eagle2
 
@@ -57,7 +57,7 @@ params_shapeit:
 # # cellsnp-lite
 # UMItag: "Auto"
 # cellTAG: "CB"
-# nthreads_cellsnplite: 20
+# nthreads_cellsnp_lite: 20
 # region_vcf: <Replace with downloaded SNP panel path>
 # # Eagle phasing
 # phasing_panel: <Replace with downloaded phasing panel directory>
