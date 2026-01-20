@@ -30,6 +30,7 @@ gt = phased_snps["GT"].astype(str)
 is_phased = gt.str.contains(r"\|", na=False).to_numpy()
 phases = None
 if is_phased.any():
+    logging.info("SNP file is phased")
     phased_snps = phased_snps.loc[is_phased].reset_index(drop=True)
     phases = phased_snps["GT"].astype(str).str[2].astype(np.int8).to_numpy()
 
@@ -37,6 +38,7 @@ parent_keys = pd.Index(phased_snps["KEY"])
 assert not parent_keys.duplicated().any()
 
 M = len(parent_keys)
+logging.info(f"total #SNPs={M}")
 
 for mod in mods:
     barcode_list = []
@@ -53,12 +55,13 @@ for mod in mods:
             barcodes["BARCODE"] = barcodes["BARCODE"].astype(str) + f"_{rep_id}"
         child_snps = read_VCF(f"pileup/{mod}_{rep_id}/cellSNP.base.vcf.gz")
         m = len(child_snps)
+        logging.info(f"MOD={mod}, REP_ID={rep_id}, #SNPs={m}")
         child_snps["KEY"] = (
             child_snps["CHROM"].astype(str) + "_" + child_snps["POS"].astype(str)
         )
         child_keys = pd.Index(child_snps["KEY"])
         assert not child_keys.duplicated().any()
-        
+
         # child slice SNP location in parent, -1 if not presented in child (M,)
         # e.g., [0, *, 1, 2, *], M=5, m=3
         child_loc = child_keys.get_indexer(parent_keys)
@@ -71,11 +74,14 @@ for mod in mods:
         assert dp_mtx.shape[1] == len(barcodes)
 
         present = child_loc >= 0
+        logging.info(
+            f"matched SNPs in parent={present.sum()}/{M} (child #SNPs={len(child_keys)})"
+        )
         n_cells = dp_mtx.shape[1]
 
         # parent-row indices that exist in child slice
-        row_new = np.flatnonzero(present)          # indices in [0..M), 
-        row_old = child_loc[present]              # corresponding indices in child [0..n_child)
+        row_new = np.flatnonzero(present)  # indices in [0..M),
+        row_old = child_loc[present]  # corresponding indices in child [0..n_child)
 
         # DP
         dp_present = dp_mtx[row_old, :].tocoo()
@@ -117,6 +123,14 @@ for mod in mods:
     a_mtx = a_mtx[row_dp > 0, :]
     b_mtx = b_mtx[row_dp > 0, :]
     snp_ids = parent_keys[row_dp > 0].to_numpy()
+
+    dp_mtx = dp_mtx[row_dp > 0, :]
+    num_snps = dp_mtx.shape[0]
+    num_barcodes = len(all_barcodes)
+    sparsity = 1.0 - dp_mtx.nnz / (num_barcodes * num_snps)
+    logging.info(
+        f"final matrix: #barcodes={num_barcodes}, #SNPs={num_snps}, sparsity={sparsity:.3f}"
+    )
 
     all_barcodes.to_csv(f"{mod}/barcodes.txt", header=False, index=False)
     scipy.sparse.save_npz(f"{mod}/cell_snp_Aallele.npz", a_mtx)
