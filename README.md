@@ -10,14 +10,20 @@ snakemake -p --cores 1 -s /path/to/workflow/Snakefile --configfile config/config
 3. cellsnp-lite
 4. HetDetect `https://github.com/raphael-group/hetdetect.git`
 5. Eagle2 `https://storage.googleapis.com/broad-alkesgroup-public/Eagle/downloads/Eagle_v2.4.1.tar.gz`
-6. Shapeit5 `https://github.com/odelaneau/shapeit5.git`
+6. Shapeit5 `https://github.com/odelaneau/shapeit5.git`, `https://github.com/odelaneau/shapeit5/releases`
 
 ### Aux files
-Required: reference panel SNPs VCF file and BAM files.
+#### SNP panel files
 1. https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf.gz
     * used by Numbat, ~92MB
 2. https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e4.chr1toX.hg38.vcf.gz
     * used by CalicoST, ~568MB
+#### phasing panel files
+1. http://pklab.med.harvard.edu/teng/data/1000G_hg38.zip
+
+gnomAD HGDP + 1KG panel (n=4,099). You can download the reference files using gsutil: gs://gcp-public-data--gnomad/resources/hgdp_1kg/phased_haplotypes.
+
+TOPMed panel (n=97,256). You can upload your VCF to the TOPMed imputation server.
 
 ### Steps
 If reference Het SNP file (genotyped from bulk) is provided, skip step 1-3:
