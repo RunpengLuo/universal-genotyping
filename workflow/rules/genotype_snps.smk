@@ -79,7 +79,7 @@ elif genotype_mode == "pseudobulk_tumor":
             echo "[QC] {input.snp_panel} record #SNPs: ${{nsnps_panel}}" >> "{log}"
             {params.cellsnp_lite} \
                 -S {output.lst_file} \
-                -O ${cellsnp_dir} \
+                -O ${{cellsnp_dir}} \
                 -R {input.snp_panel} \
                 --chrom "{params.chroms}" \
                 --refseq {params.refseq} \
