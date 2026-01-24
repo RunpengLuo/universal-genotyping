@@ -3,7 +3,7 @@ rule pileup_snps_cellsnp_lite_cell:
         barcode=lambda wc: get_data[(wc.data_type, wc.rep_id)][0],
         bam=lambda wc: get_data[(wc.data_type, wc.rep_id)][1],
         ranger=lambda wc: get_data[(wc.data_type, wc.rep_id)][2],
-        snp_file=lambda wc: ("phase/phased_het_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
+        snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
     output:
         cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
     wildcard_constraints:
@@ -38,7 +38,7 @@ rule pileup_snps_cellsnp_lite_cell:
 rule pileup_snps_cellsnp_lite_bulk:
     input:
         bam=lambda wc: get_data[(wc.data_type, wc.rep_id)][1],
-        snp_file=lambda wc: ("phase/phased_het_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
+        snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
     output:
         cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
     wildcard_constraints:
@@ -71,7 +71,7 @@ rule pileup_snps_cellsnp_lite_bulk:
 # rule pileup_snps_bcftools_bulk:
 #     input:
 #         bam=lambda wc: get_data[(wc.data_type, wc.rep_id)][1],
-#         snp_file=lambda wc: ("phase/phased_het_snps.vcf.gz" if run_genotype_snps else ref_snp_file),
+#         snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else ref_snp_file),
 #     output:
 #         vcf_file="pileup/{data_type}_{rep_id}/allele_counts.vcf.gz",
 #     shell:
