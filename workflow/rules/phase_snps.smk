@@ -79,7 +79,6 @@ rule extract_phased_het_snps:
         phased_vcf="phase/phased.vcf.gz"
     output:
         phased_het_vcf="phase/phased_snps.vcf.gz",
-        phased_het_vcfgz="phase/phased_snps.vcf.gz.tbi"
     threads: 1
     params:
         bcftools=config["bcftools"],

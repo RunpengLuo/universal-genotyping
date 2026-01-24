@@ -144,6 +144,7 @@ if run_genotype_snps:
         raise ValueError(f"unsupported phasing_panel_version: {phasing_panel_version}")
     assert all(os.path.exists(get_phasing_panel(chrname)) for chrname in chroms), "failed to locate panel files"
     targets.append(f"phase/phased.vcf.gz")
+    targets.append(f"phase/phased_snps.vcf.gz")
 
 ##################################################
 # additional target files
