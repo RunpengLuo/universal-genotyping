@@ -95,18 +95,18 @@ if run_genotype_snps:
             print("multiple normal BAM file is provided, taking first one: " + str(bulk_nbams[0]))
         bulk_nbams = [bulk_nbams[0]]
         genotype_mode = "bulk_normal"
-        genotype_dtypes = ["bulk"]
+        genotype_dtypes = ["bulk_DNA"]
     elif len(bulk_tbams) > 0:
         genotype_mode = "bulk_tumor"
-        genotype_dtypes = ["bulk"]
+        genotype_dtypes = ["bulk_DNA"]
     else:
         genotype_mode = "pseudobulk_tumor"
         if len(gex_tbams) > 0 and len(atac_tbams) > 0:
-            genotype_dtypes = ["GEX", "ATAC"]
-        elif len(gex_tbams) > 0:
-            genotype_dtypes = ["GEX"]
+            genotype_dtypes = ["sc_GEX", "sc_ATAC"]
         elif len(atac_tbams) > 0:
-            genotype_dtypes = ["ATAC"]
+            genotype_dtypes = ["sc_ATAC"]
+        elif len(gex_tbams) > 0:
+            genotype_dtypes = ["sc_GEX"]
         else:
             raise ValueError("require genotyping, but no bam file provided!")
     targets.extend([f"snps/.{genotype_mode}.chr{chrname}.done" for chrname in chroms])
