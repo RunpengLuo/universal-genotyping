@@ -34,12 +34,12 @@ rule postprocess_matrix_aggregate_one_data_type:
         region_bed=lambda wc: config["region_bed"],
     output:
         sample_file="allele/{data_type}/samples_ids.tsv",
-        all_barcodes="allele/{data_type}/barcodes.txt",
         info_file="allele/{data_type}/snp_info.tsv.gz",
-        unique_snp_ids="allele/{data_type}/unique_snp_ids.npy",
         dp_mtx="allele/{data_type}/snp_matrix.dp.npz",
         alt_mtx="allele/{data_type}/snp_matrix.alt.npz",
         ref_mtx="allele/{data_type}/snp_matrix.ref.npz",
+        all_barcodes="allele/{data_type}/barcodes.txt",
+        unique_snp_ids="allele/{data_type}/unique_snp_ids.npy",
         a_mtx="allele/{data_type}/cell_snp_Aallele.npz",
         b_mtx="allele/{data_type}/cell_snp_Ballele.npz",
     wildcard_constraints:

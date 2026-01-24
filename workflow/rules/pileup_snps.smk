@@ -21,10 +21,11 @@ rule pileup_snps_cellsnp_lite_cell:
     shell:
         r"""
         set -euo pipefail
+        cellsnp_dir=$(dirname "{output.cellsnp_file}")
         {params.cellsnp_lite} \
             -b "{input.barcode}" \
             -s "{input.bam}" \
-            -O "pileup/{data_type}_{rep_id}" \
+            -O ${cellsnp_dir} \
             -R "{input.snp_file}" \
             -p {threads} \
             --minMAF {params.minMAF} \
@@ -54,9 +55,10 @@ rule pileup_snps_cellsnp_lite_bulk:
     shell:
         r"""
         set -euo pipefail
+        cellsnp_dir=$(dirname "{output.cellsnp_file}")
         {params.cellsnp_lite} \
             -s "{input.bam}" \
-            -O "pileup/{data_type}_{rep_id}" \
+            -O ${cellsnp_dir} \
             -R "{input.snp_file}" \
             -p {threads} \
             --minMAF {params.minMAF} \

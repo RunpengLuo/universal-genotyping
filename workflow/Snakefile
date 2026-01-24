@@ -20,10 +20,11 @@ assert all(dt in allowed_data_types for dt in all_data_types)
 
 if "bulk_DNA" in all_data_types:
     assert len(all_data_types) == 1, "mode 1 cannot have non-bulk samples, run the workflow in 2 steps"
-    print("run genotyping with mode 1")
+    print("run genotyping with mode=bulk")
+    mode = "bulk"
 else:
-    print("run genotyping with mode 2")
-
+    print("run genotyping with mode=single_cell")
+    mode = "single_cell"
 
 rep_ids = sample_df["REP_ID"].unique().tolist()
 get_data = {}
