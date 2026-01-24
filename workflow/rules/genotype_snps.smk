@@ -56,7 +56,6 @@ elif genotype_mode == "pseudobulk_tumor":
             bams=lambda wc: {"sc_GEX": gex_tbams, "sc_ATAC": atac_tbams}[wc.data_type],
             snp_panel=config["snp_panel"],
         output:
-            cellsnp_dir=directory("snps/{data_type}"),
             snp_file="snps/{data_type}/cellSNP.base.vcf.gz",
             lst_file=temp("snps/{data_type}_bams.lst"),
         log: "logs/genotype_snps.{data_type}.log",
@@ -74,13 +73,13 @@ elif genotype_mode == "pseudobulk_tumor":
             set -euo pipefail
             echo "genotype SNPs on pseudobulk {data_type} sample"
             printf "%s\n" {input.bams} > {output.lst_file}
-            mkdir -p {output.cellsnp_dir}
+            cellsnp_dir=$(dirname "{output.snp_file}")
 
             nsnps_panel=$({params.bcftools} view -H {input.snp_panel} | wc -l)
             echo "[QC] {input.snp_panel} record #SNPs: ${nsnps_panel}" >> "{log}"
             {params.cellsnp_lite} \
                 -S {output.lst_file} \
-                -O {output.cellsnp_dir} \
+                -O ${cellsnp_dir} \
                 -R {input.snp_panel} \
                 --chrom "{params.chroms}" \
                 --refseq {params.refseq} \
