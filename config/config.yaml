@@ -6,11 +6,9 @@ shapeit: /path/to/phase_common_static
 
 # Input
 sample_file: ./config/sample.tsv
-# sc_rna, sc_atac, sc_multiome, visium, visium_3prime
-mode: N/A
 chromosomes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
 
-# Het SNPs provided from matched bulk sample, if available
+# Het SNPs genotyped from matched bulk sample, skip genotyping if available
 ref_snp_file: N/A
 
 # reference file
@@ -20,32 +18,47 @@ genome_size: N/A
 region_bed: N/A
 
 # 1000GP SNP panel (bcf.gz) or dbSNPv155.vcf.gz
+snp_panel_version: 1000GP
 snp_panel: N/A
 
 # hg38: http://pklab.med.harvard.edu/teng/data/1000G_hg38.zip
-panel_version: 1000G_hg38
+phasing_panel_version: 1000G_hg38
 phasing_panel:
 
+params_annotate_snps:
+  # set <min_het_reads> to 0 to replicate numbat criteria.
+  min_het_reads: 2
+  min_hom_dp: 10
+  min_vaf_thres: 0.1
+  filter_nz_OTH: true
+
 # phase_snps
+# [eagle, shapeit, ...]
 phaser: "eagle"
 eagle_dir:
+params_eagle:
 shapeit_dir:
+params_shapeit:
 
-# Parameters
+# genotype_snps
 params_cellsnp_lite:
   UMItag: "Auto"
   cellTAG: "CB"
   minMAF: 0
-  minCOUNT: 1
+  minCOUNT_genotype: 2
+  minCOUNT_pileup: 1
 
-params_annotate_snps:
-  min_het_reads: 2
-  min_hom_dp: 10
-  min_vaf_thres: 0.1
+params_bcftools:
+  min_mapq: 0
+  min_baseq: 11
+  min_dp: 5
+  max_depth: 300
 
-params_eagle:
-
-params_shapeit:
+params_postprocess:
+  mask_out_of_region: true
+  # bulk-only
+  min_depth: 1
+  gamma: 0.05
 
 threads:
   genotype: 8

@@ -1,0 +1,3 @@
+SAMPLE	REP_ID	DATA_TYPE	PATH_to_bam	PATH_to_barcodes	PATH_to_10x_ranger
+HT001	U1	sc_RNA	s1.bam	/path/to/barcodes.tsv.gz	N/A
+HT001	U1	sc_ATAC	s2.bam	/path/to/barcodes.tsv.gz	N/A

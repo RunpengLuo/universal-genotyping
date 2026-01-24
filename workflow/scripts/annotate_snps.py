@@ -1,4 +1,4 @@
-import os, sys, gzip, logging
+import os, sys, gzip, logging, subprocess
 from snakemake.script import snakemake as sm
 
 t = int(getattr(sm, "threads", 1))
@@ -14,6 +14,13 @@ import pandas as pd
 
 from utils import read_VCF
 
+##################################################
+"""
+Annotate genotpyed SNPs from pseudobulk samples.
+Merge SNPs across VCFs from multiple sources.
+
+After annotation, only unique bi-allelic Het or Hom-Alt SNPs are kept.
+"""
 logging.basicConfig(
     filename=sm.log[0],
     level=logging.INFO,
@@ -21,53 +28,96 @@ logging.basicConfig(
 )
 logging.info("start annotate_snps")
 
-raw_snps = read_VCF(sm.input["raw_snp_file"])
 chroms = sm.config["chromosomes"]
-assert all(c in raw_snps.columns for c in ["AD", "DP", "OTH"]), (
-    "invalid cellsnp-lite format"
-)
-raw_snps["AD"] = raw_snps["AD"].astype(int)
-raw_snps["DP"] = raw_snps["DP"].astype(int)
-raw_snps["OTH"] = raw_snps["OTH"].astype(int)
-raw_snps["REF_COUNT"] = raw_snps["DP"] - (raw_snps["AD"] + raw_snps["OTH"])
-
-# filter sex-chromosome SNPs
-raw_snps = raw_snps[
-    raw_snps["#CHR"].astype(str).isin([f"chr{chrname}" for chrname in chroms])
-]
-
-raw_snps["VAF"] = raw_snps["AD"] / raw_snps["DP"]
-raw_snps["REF_AGG"] = raw_snps["DP"] - raw_snps["AD"]
-
-
+filter_nz_OTH = sm.params["params_annotate_snps"]["filter_nz_OTH"]
 min_het_reads = sm.config["params_annotate_snps"]["min_het_reads"]
 min_hom_dp = sm.config["params_annotate_snps"]["min_hom_dp"]
 min_vaf_thres = sm.config["params_annotate_snps"]["min_vaf_thres"]
-het = (
-    (raw_snps["AD"] >= min_het_reads)
-    & (raw_snps["REF_AGG"] >= min_het_reads)
-    & (raw_snps["VAF"].between(min_vaf_thres, 1 - min_vaf_thres))
+snp_lists = []
+KEY = ["#CHROM", "POS", "REF", "ALT"]
+CNT = ["DP", "AD", "OTH"]
+
+
+def get_gt(row):
+    if row["is_het"]:
+        return "0/1"
+    elif row["is_hom_alt"]:
+        return "1/1"
+    elif row["is_hom_ref"]:
+        return "0/0"
+    else:
+        return "./."
+
+##################################################
+for data_type, raw_snp_file in zip(sm.params["data_types"], sm.input["raw_snp_files"]):
+    raw_snps = read_VCF(raw_snp_file)
+    assert all(c in raw_snps.columns for c in CNT), "invalid cellsnp-lite format"
+    num_raw_snps = len(raw_snps)
+    raw_snps["SOURCE"] = data_type
+    raw_snps["FORMAT"] = "GT"
+    raw_snps["AD"] = raw_snps["AD"].astype(int)
+    raw_snps["DP"] = raw_snps["DP"].astype(int)
+    raw_snps["OTH"] = raw_snps["OTH"].astype(int)
+    raw_snps["REF_COUNT"] = raw_snps["DP"] - raw_snps["AD"]
+    raw_snps["AR"] = raw_snps["AD"] / raw_snps["DP"]
+
+    # genotyping criteria
+    raw_snps["is_het"] = (
+        raw_snps[["AD", "REF_COUNT"]].min(axis=1) >= min_het_reads
+    ) & raw_snps["AR"].between(min_vaf_thres, 1 - min_vaf_thres)
+    raw_snps["is_hom_alt"] = (raw_snps["AD"] == raw_snps["DP"]) & (
+        raw_snps["DP"] >= min_hom_dp
+    )
+    raw_snps["is_hom_ref"] = (raw_snps["AD"] == 0) & (raw_snps["DP"] >= min_hom_dp)
+    raw_snps["SAMPLE"] = raw_snps.apply(get_gt, axis=1)
+
+    # only keep het and hom_alt SNPs
+    raw_snps = raw_snps[raw_snps["SAMPLE"].isin(["0/1", "1/1"])].reset_index(drop=True)
+
+    # filter SNPs by chromosomes
+    raw_snps = raw_snps[
+        raw_snps["#CHROM"].astype(str).isin([f"chr{chrname}" for chrname in chroms])
+    ]
+
+    # filter multi-allelic SNPs, ~0.1%
+    if filter_nz_OTH:
+        raw_snps = raw_snps[raw_snps["OTH"] == 0]
+
+    # filter duplicated SNPs
+    raw_snps = raw_snps.drop_duplicates(subset=KEY, keep="first").reset_index(drop=True)
+
+    num_het = (raw_snps["SAMPLE"] == "0/1").sum()
+    num_hom_ref = (raw_snps["SAMPLE"] == "0/0").sum()
+    num_hom_alt = (raw_snps["SAMPLE"] == "1/1").sum()
+    logging.info(
+        f"{data_type}, #kept SNPs={len(raw_snps)}/{num_raw_snps}, #het={num_het}, #hom_alt={num_hom_alt}, #hom_ref={num_hom_ref}"
+    )
+    snp_lists.append(raw_snps)
+
+##################################################
+final_snps = snp_lists[0]
+if len(snp_lists) > 1:
+    # merge SNP file over multiple sources
+    final_snps = pd.concat(snp_lists, axis=0, ignore_index=True)
+
+    # 1. filter duplicated SNPs common in multiple sources
+    final_snps = final_snps.drop_duplicates(subset=KEY, keep="first").reset_index(drop=True)
+
+    # 3. filter multi-allelic SNPs.
+    is_dup = final_snps.duplicated(subset=["#CHROM", "POS"], keep=False)
+    final_snps = final_snps[~is_dup].reset_index(drop=True)
+
+final_snps["#CHROM"] = pd.Categorical(
+    final_snps["#CHROM"].astype(str),
+    categories=[f"chr{c}" for c in chroms],
+    ordered=True,
 )
-hom_alt = (raw_snps["AD"] == raw_snps["DP"]) & (raw_snps["DP"] >= min_hom_dp)
-hom_ref = (raw_snps["AD"] == 0) & (raw_snps["DP"] >= min_hom_dp)
-
-keep = het | hom_alt | hom_ref
-logging.info(
-    f"#SNPs={keep.sum()}/{len(raw_snps)}, het={het.sum()}, hom_alt={hom_alt.sum()}, "
-    f"hom_ref={hom_ref.sum()}"
+final_snps = final_snps.sort_values(["#CHROM", "POS"], kind="mergesort").reset_index(
+    drop=True
 )
-
-raw_snps = raw_snps[keep].copy()
-
-# GT
-gt = np.full(len(raw_snps), "0/0", dtype=object)
-gt[hom_alt.loc[raw_snps.index]] = "1/1"
-gt[het.loc[raw_snps.index]] = "0/1"
-raw_snps["FORMAT"] = "GT"
-raw_snps["SAMPLE"] = gt
 
 cols = [
-    "CHROM",
+    "#CHROM",
     "POS",
     "ID",
     "REF",
@@ -78,18 +128,24 @@ cols = [
     "FORMAT",
     "SAMPLE",
 ]
-raw_snps = raw_snps[cols]
+final_snps = final_snps[cols]
 
-for chrname in chroms:
+final_snps_chs = final_snps.groupby("#CHROM", sort=False)
+for chrname, out_snp_file in zip(chroms, sm.output["snp_files"]):
     chrom = f"chr{chrname}"
-    out_snp_file = f"genotype/{chrom}.vcf"
-    with open(out_snp_file, "w") as fd:
+    with open(out_snp_file[:-3], "w") as fd:
         fd.write("##fileformat=VCFv4.2\n")
-        fd.write(
-            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Pseudobulk genotype">\n'
-        )
-        fd.write("#" + "\t".join(cols) + "\n")
-        raw_snps[raw_snps["CHROM"] == chrom].to_csv(
-            fd, sep="\t", index=False, header=False
-        )
+        fd.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Pseudobulk genotype">\n')
+        fd.write("\t".join(cols) + "\n")
+        if chrom in final_snps_chs.groups:
+            final_snps_chs.get_group(chrom)[cols].to_csv(fd, sep="\t", index=False, header=False)
+
+    # out_snp_file[:-3] will be removed by bgzip.
+    subprocess.run(["bgzip", "-f", out_snp_file[:-3]], check=True)
+    subprocess.run(["tabix", "-f", "-p", "vcf", out_snp_file], check=True)
+
+with open(sm.output["done_file"], "w") as fd:
+    fd.write("done")
+    fd.close()
+
 logging.info("finished annotate_snps")

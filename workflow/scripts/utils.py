@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 
-def read_VCF(vcf_file: str, addchr=True):
+def read_VCF(vcf_file: str, addchr=True, addkey=False):
     """
     load VCF file as dataframe.
     If phased, parse GT[0] as USEREF, check PS
@@ -17,18 +17,15 @@ def read_VCF(vcf_file: str, addchr=True):
         return None
     ncols = snps.shape[1]
     assert ncols == 8 or ncols >= 10, "invalid VCF file"
-    colnames = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"]
+    colnames = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"]
     if ncols >= 10:
         colnames += ["FORMAT", "SAMPLE"]
         snps = snps.iloc[:, :10].copy()
     snps.columns = colnames
 
-    if addchr and not str(snps["CHROM"].iloc[0]).startswith("chr"):
-        snps["CHROM"] = "chr" + snps["CHROM"].astype(str)
-    snps["#CHR"] = snps["CHROM"]
-
-    snp_pos = snps["CHROM"].astype(str) + "_" + snps["POS"].astype(str)
-    assert not snp_pos.duplicated().any(), "invalid VCF file, found duplicated SNPs"
+    if addchr and not str(snps["#CHROM"].iloc[0]).startswith("chr"):
+        snps["#CHROM"] = "chr" + snps["#CHROM"].astype(str)
+    snps["#CHR"] = snps["#CHROM"]
 
     # parse INFO column
     info_kvs = (
@@ -48,7 +45,7 @@ def read_VCF(vcf_file: str, addchr=True):
     info_wide = info_kvs.pivot_table(
         index="row", columns="key", values="val", aggfunc="first"
     )
-    snps = snps.drop(columns=["INFO"]).join(info_wide)
+    snps = snps.join(info_wide)
 
     # parse FORMAT column
     if "FORMAT" in snps.columns:
@@ -64,6 +61,18 @@ def read_VCF(vcf_file: str, addchr=True):
             index="row", columns="key", values="val", aggfunc="first"
         )
         snps = snps.drop(columns=["FORMAT", "SAMPLE"]).join(fmt_wide)
-
+    
+    if "GT" in snps.columns and "PS" not in snps.columns:
+        # global phased block if PS information N/A
+        snps["PS"] = 1
+    if addkey:
+        snps["KEY"] = snps["#CHROM"].astype(str) + "_" + snps["POS"].astype(str)
     snps = snps.reset_index(drop=True)
     return snps
+
+def symlink_force(src, dst):
+    try:
+        os.remove(dst)
+    except FileNotFoundError:
+        pass
+    os.symlink(os.path.abspath(src), os.path.abspath(dst))

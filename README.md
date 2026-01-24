@@ -18,6 +18,8 @@ snakemake -p --cores 1 -s /path/to/workflow/Snakefile --configfile config/config
     * used by Numbat, ~92MB
 2. https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e4.chr1toX.hg38.vcf.gz
     * used by CalicoST, ~568MB
+3. dbSNPv155
+    1. https://s3-us-west-2.amazonaws.com/human-pangenomics/index.html?prefix=T2T/CHM13/assemblies/annotation/liftover/*
 #### phasing panel files
 1. http://pklab.med.harvard.edu/teng/data/1000G_hg38.zip
 
@@ -25,13 +27,20 @@ gnomAD HGDP + 1KG panel (n=4,099). You can download the reference files using gs
 
 TOPMed panel (n=97,256). You can upload your VCF to the TOPMed imputation server.
 
-### Steps
-If reference Het SNP file (genotyped from bulk) is provided, skip step 1-3:
-1. pseudobulk (ignore barcode file) and genotype SNPs via cellsnp-lite mode1b.
-2. select Het/Hom SNPs, via AF thresholding or HetDetect HMM
-3. phase SNPs via population-based phasing methods
-4. pile-up allele counts via cellsnp-lite mode1a.
-5. postprocess allele count matrices.
+### Mode 1. bulk sample
+If reference Het SNP file from same patient is provided, skip step 1-2.
+1. genotype SNPs via bcftools mpileup+call and keep bi-allelic SNPs.
+    1. normal sample or tumor sample.
+2. phase SNPs via population-based phasing methods
+3. pile-up allele counts via cellsnp-lite mode 1b.
+4. postprocess allele count matrices.
+
+### Mode 2. single-cell/Visium sample
+If reference Het SNP file from same patient is provided, skip step 1-2.
+1. genotype SNPs via cellsnp-lite on pseudobulk sample.
+2. phase SNPs via population-based phasing methods
+3. pile-up allele counts via cellsnp-lite mode 1a.
+4. postprocess allele count matrices.
 
 ### Sample file
 Sample file has following modes:

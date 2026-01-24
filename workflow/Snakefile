@@ -2,111 +2,187 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-import scipy
-
-mode = config["mode"]
-assert mode in ["sc_rna", "sc_atac", "sc_multiome", "visium", "visium_3prime"], f"unsupported mode: {mode}"
 
 ##################################################
-# parse sample file
-# required columns: [SAMPLE, REP_ID, DATA_TYPE, PATH_to_barcodes, PATH_to_10x_bam, PATH_to_10x_ranger]
-# DATA_TYPE: [ATAC, GEX, VISIUM, VISIUM_3PRIME]
-sample_df = pd.read_table(config["sample_file"])
+chroms = config["chromosomes"]
+refvers = config["reference_version"]
 
-assert sample_df["SAMPLE"].nunique() == 1
-sample = sample_df["SAMPLE"].iloc[0]
+# parse sample_file
+# required columns: [SAMPLE, REP_ID, DATA_TYPE, PATH_to_bam, PATH_to_barcodes, PATH_to_10x_ranger]
+# DATA_TYPE: [bulk_DNA, sc_ATAC, sc_GEX, VISIUM]
+sample_df = pd.read_table(config["sample_file"]).fillna("")
+assert sample_df["SAMPLE"].nunique() == 1, "only one patient supported"
+SAMPLE_ID = sample_df["SAMPLE"].iloc[0]
 
-data_types = sample_df["DATA_TYPE"].unique().tolist()
-rep_ids = sample_df["REP_ID"].unique().tolist()
-get_files = {}
-if len(data_types) == 2:
-    assert ("GEX" in data_types) and ("ATAC" in data_types)
-    assert len(sample_df) == 2, "multiome data should have exactly 2 rows"
-    assert sample_df["PATH_to_barcodes"].nunique() == 1, f"multiome barcode paths differ"
-    assert sample_df["PATH_to_10x_ranger"].nunique() == 1, f"multiome 10x ranger paths differ"
-    assert len(rep_ids) == 1, f"multiome should have one REP_ID, got {rep_ids}"
+all_data_types = sample_df["DATA_TYPE"].unique().tolist()
+allowed_data_types = ["bulk_DNA", "sc_ATAC", "sc_GEX", "VISIUM", "VISIUM_3PRIME"]
+assert all(dt in allowed_data_types for dt in all_data_types)
 
-    rep_id = rep_ids[0]
-    modality = "multiome"
-    barcodes = [sample_df["PATH_to_barcodes"].iloc[0]]
-    bams = [
-        sample_df.loc[sample_df["DATA_TYPE"] == "GEX", "PATH_to_10x_bam"].iloc[0],
-        sample_df.loc[sample_df["DATA_TYPE"] == "ATAC", "PATH_to_10x_bam"].iloc[0],
-    ]
-    rangers = [sample_df["PATH_to_10x_ranger"].iloc[0]]
-    get_files[("GEX", rep_id)] = [barcodes[0], bams[0], rangers[0]]
-    get_files[("ATAC", rep_id)] = [barcodes[0], bams[1], rangers[0]]
+if "bulk_DNA" in all_data_types:
+    assert len(all_data_types) == 1, "mode 1 cannot have non-bulk samples, run the workflow in 2 steps"
+    print("run genotyping with mode 1")
 else:
-    assert len(data_types) == 1, f"non-multiome sample should have exactly one DATA_TYPE, got {data_types}"
-    assert sample_df["REP_ID"].nunique() == len(sample_df), f"non-unique REP_ID not allowed"
+    print("run genotyping with mode 2")
 
-    modality = data_types[0]
-    barcodes = sample_df["PATH_to_barcodes"].tolist()
-    bams = sample_df["PATH_to_10x_bam"].tolist()
-    rangers = sample_df["PATH_to_10x_ranger"].tolist()
-    for i, rep_id in enumerate(rep_ids):
-        get_files[(data_types[0], rep_id)] = [barcodes[i], bams[i], rangers[i]]
 
-assert all(os.path.exists(bam) for bam in bams), "BAM file does not exists"
-assert all(os.path.exists(barcode) for barcode in barcodes), "Barcode file does not exists"
-assert all(os.path.isdir(ranger) for ranger in rangers), "10x ranger dir does not exists"
+rep_ids = sample_df["REP_ID"].unique().tolist()
+get_data = {}
+mod2reps = {}
 
+bulk_nbams = []
+bulk_tbams = []
+gex_tbams = []
+atac_tbams = []
+for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
+    rep_data_types = rep_df["DATA_TYPE"].unique().tolist()
+    barcodes = rep_df["PATH_to_barcodes"].iloc[0]
+    rangers = rep_df["PATH_to_10x_ranger"].iloc[0]
+    assert len(rep_data_types) <= 2, "at most 2 data types allowed per replicate"
+    if len(rep_data_types) == 2:
+        assert ("sc_GEX" in rep_data_types) and ("sc_ATAC" in rep_data_types)
+        assert len(rep_df) == 2, "multiome data should have exactly 2 rows"
+        assert rep_df["PATH_to_barcodes"].nunique() == 1, f"multiome barcode paths differ"
+        assert rep_df["PATH_to_10x_ranger"].nunique() == 1, f"multiome 10x-ranger paths differ"
+
+        modality = "multiome"
+        gex_bam = rep_df.loc[rep_df["DATA_TYPE"] == "sc_GEX", "PATH_to_bam"].iloc[0]
+        atac_bam = rep_df.loc[rep_df["DATA_TYPE"] == "sc_ATAC", "PATH_to_bam"].iloc[0]
+        gex_tbams.append(gex_bam)
+        atac_tbams.append(atac_bam)
+        # bams = [gex_bam, atac_bam]
+        get_data[("sc_GEX", rep_id)] = [barcodes, gex_bam, rangers]
+        get_data[("sc_ATAC", rep_id)] = [barcodes, atac_bam, rangers]
+    else:
+        data_type = rep_data_types[0]
+        modality = data_type
+        bam = rep_df["PATH_to_bam"].iloc[0]
+        get_data[(data_type, rep_id)] = [barcodes, bam, rangers]
+        # bams = [bam]
+        if data_type == "bulk_DNA":
+            assert rep_id == "normal" or rep_id[0] == "T", "bulk REP_ID must be either normal or starts with T"
+            if rep_id == "normal":
+                bulk_nbams.append(bam)
+            else:
+                bulk_tbams.append(bam)
+        else:
+            if data_type in ["sc_GEX", "VISIUM", "VISIUM_3PRIME"]:
+                gex_tbams.append(bam)
+            else:
+                atac_tbams.append(bam)
+    # rep_id2data[rep_id] = [modality, bams, barcodes, rangers]
+    # for dt in rep_data_types:
+    #     data_type2rep_ids[dt].append(rep_id)
+    if modality not in mod2reps:
+        mod2reps[modality] = []
+    mod2reps[modality].append(rep_id)
+
+targets = []
 ##################################################
 ref_snp_file = config.get("ref_snp_file")
-require_genotyping = (
+run_genotype_snps = (
     ref_snp_file is None
     or (isinstance(ref_snp_file, str) and ref_snp_file.strip() in {"", "N/A"})
 )
 
 ##################################################
-chroms = config["chromosomes"]
-refvers = config["reference_version"]
-require_phasing = require_genotyping
-if require_phasing:
+# genotype_snps rules: bulk normal > bulk tumor > single-cell
+genotype_dtypes = []
+genotype_mode = ""
+if run_genotype_snps:
+    # targets.append(f"snps/snps.vcf.gz")
+    if len(bulk_nbams) > 0:
+        if len(bulk_nbams) > 1:
+            print("multiple normal BAM file is provided, taking first one: " + str(bulk_nbams[0]))
+        bulk_nbams = [bulk_nbams[0]]
+        genotype_mode = "bulk_normal"
+        genotype_dtypes = ["bulk"]
+    elif len(bulk_tbams) > 0:
+        genotype_mode = "bulk_tumor"
+        genotype_dtypes = ["bulk"]
+    else:
+        genotype_mode = "pseudobulk_tumor"
+        if len(gex_tbams) > 0 and len(atac_tbams) > 0:
+            genotype_dtypes = ["GEX", "ATAC"]
+        elif len(gex_tbams) > 0:
+            genotype_dtypes = ["GEX"]
+        elif len(atac_tbams) > 0:
+            genotype_dtypes = ["ATAC"]
+        else:
+            raise ValueError("require genotyping, but no bam file provided!")
+    targets.extend([f"snps/.{genotype_mode}.chr{chrname}.done" for chrname in chroms])
+    targets.extend([f"snps/chr{chrname}.vcf.gz" for chrname in chroms])
+
+    ##################################################
     # parse phase_snps inputs
     # define lambda functions that map chrname to genetic map file and phase panel file.
     phaser = config["phaser"]
     if phaser == "eagle":
+        assert config.get("eagle_dir") is not None
         gmap_dir = os.path.join(config["eagle_dir"], "tables")
-        assert os.path.isdir(gmap_dir), "failed to locate phaser gmap directory"
+        assert os.path.isdir(gmap_dir), "failed to locate gmap directory"
         assert refvers in ["hg17", "hg18", "hg19", "hg38"], "unsupported reference version"
         get_gmap_file = lambda chrname: os.path.join(gmap_dir, f"genetic_map_{refvers}_withX.txt.gz")
 
     elif phaser == "shapeit":
+        assert config.get("shapeit_dir") is not None
         gmap_dir = os.path.join(config["shapeit_dir"], f"resources/maps")
-        assert os.path.isdir(gmap_dir), "failed to locate phaser gmap directory"
+        assert os.path.isdir(gmap_dir), "failed to locate gmap directory"
         assert refvers in ["hg19", "hg38"], "unsupported reference version"
         refvers2 = {"hg19": "b37", "hg38": "b38"}[refvers]
         get_gmap_file = lambda chrname: os.path.join(gmap_dir, f"{refvers2}/chr{chrname}.{refvers2}.gmap.gz")
     else:
+        # TODO Top-MED server
         raise ValueError(f"unsupported phaser: {phaser}")
     assert all(os.path.exists(get_gmap_file(chrname)) for chrname in chroms), "failed to locate gmap files"
 
-    panel_version = config["panel_version"]
+    phasing_panel_version = config["phasing_panel_version"]
     phasing_panel = config["phasing_panel"]
     assert os.path.isdir(phasing_panel), "failed to locate phasing panel"
-    if panel_version == "1000G_hg38":
+    if phasing_panel_version == "1000G_hg38":
         get_phasing_panel = lambda chrname: os.path.join(phasing_panel, f"chr{chrname}.genotypes.bcf")
     else:
-        raise ValueError(f"unsupported panel_version: {panel_version}")
-    assert all(os.path.exists(get_phasing_panel(chrname)) for chrname in chroms), "failed to locate gmap files"
+        raise ValueError(f"unsupported phasing_panel_version: {phasing_panel_version}")
+    assert all(os.path.exists(get_phasing_panel(chrname)) for chrname in chroms), "failed to locate panel files"
+    targets.extend([f"phase/.{phaser}.chr{chrname}.done" for chrname in chroms])
+    targets.append(f"phase/phased.vcf.gz")
 
-if require_genotyping:
-    os.makedirs("genotype", exist_ok=True)
-if require_phasing:
-    os.makedirs("phase", exist_ok=True)
-os.makedirs("pileup", exist_ok=True)
-os.makedirs("logs", exist_ok=True)
-for data_type in data_types:
-    os.makedirs(data_type, exist_ok=True)
+##################################################
+# additional target files
+for mod, rep_ids in mod2reps.items():
+    data_types = ["sc_GEX", "sc_ATAC"] if mod == "multiome" else [mod]
+    for data_type in data_types:
+        targets.extend([f"pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz" for rep_id in rep_ids])
+    
+    # postprocess pile-up data
+    if mod == "bulk_DNA":
+        # HATCHet input
+        targets.append(f"allele/{mod}/samples_ids.tsv")
+        targets.append(f"allele/{mod}/snp_info.tsv.gz")
+        targets.append(f"allele/{mod}/snp_matrix.dp.npz")
+        targets.append(f"allele/{mod}/snp_matrix.alt.npz")
+        targets.append(f"allele/{mod}/snp_matrix.ref.npz")
+    elif mod == "multiome":
+        targets.extend([f"allele/{mod}_{rep_id}/barcodes.txt" for rep_id in rep_ids])
+        for data_type in data_types:
+            targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.dp.npz" for rep_id in rep_ids])
+            targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.alt.npz" for rep_id in rep_ids])
+            targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.ref.npz" for rep_id in rep_ids])
+            targets.extend([f"allele/{mod}_{rep_id}/cell_snp_Aallele.{data_type}.npz" for rep_id in rep_ids])
+            targets.extend([f"allele/{mod}_{rep_id}/cell_snp_Ballele.{data_type}.npz" for rep_id in rep_ids])
+    else:
+        targets.append(f"allele/{mod}/barcodes.txt")
+        targets.append(f"allele/{mod}/snp_matrix.dp.npz")
+        targets.append(f"allele/{mod}/snp_matrix.alt.npz")
+        targets.append(f"allele/{mod}/snp_matrix.ref.npz")
+        targets.append(f"allele/{mod}/cell_snp_Aallele.npz")
+        targets.append(f"allele/{mod}/cell_snp_Ballele.npz")
 
 ##################################################
 # entrypoint
-include: "rules/rules.smk"
+include: "rules/genotype_snps.smk"
+include: "rules/phase_snps.smk"
+include: "rules/pileup_snps.smk"
+include: "rules/postprocess.smk"
 rule all:
-    input:
-        expand("pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz", data_type=data_types, rep_id=rep_ids),
-        expand("{data_type}/barcodes.txt", data_type=data_types),
-        expand("{data_type}/cell_snp_Ballele.npz", data_type=data_types),
-        expand("{data_type}/cell_snp_Ballele.npz", data_type=data_types),
+    input: targets
     default_target: True
