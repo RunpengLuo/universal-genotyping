@@ -65,8 +65,6 @@ rule concat_phased_snps:
         vcf_files=expand("phase/phased.chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
     output:
         phased_vcf="phase/phased.vcf.gz",
-        phased_vcf_tbi="phase/phased.vcf.gz.tbi",
-        phased_vcf_tbi="phase/phased.vcf.gz.csi",
         lst_file=temp("phase/phased_snps.lst"),
     threads: 1
     params:
