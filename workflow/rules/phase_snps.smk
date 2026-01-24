@@ -5,7 +5,6 @@ if config["phaser"] == "shapeit":
             phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
             gmap_file=lambda wc: get_gmap_file(wc.chrname),
         output:
-            done_file="phase/.shapeit.chr{chrname}.done",
             phased_file="phase/phased.chr{chrname}.vcf.gz",
         threads: config["threads"]["phase"]
         params:
@@ -27,7 +26,6 @@ if config["phaser"] == "shapeit":
             
             bgzip -f "phase/phased.{params.chrom}.vcf"
             tabix -f -p vcf "{output.phased_file}"
-            touch "{output.done_file}"
             """
 elif config["phaser"] == "eagle":
     rule phase_snps_eagle:
@@ -36,7 +34,6 @@ elif config["phaser"] == "eagle":
             phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
             gmap_file=lambda wc: get_gmap_file(wc.chrname),
         output:
-            done_file="phase/.eagle.chr{chrname}.done",
             phased_file="phase/phased.chr{chrname}.vcf.gz",
         threads: config["threads"]["phase"]
         params:
@@ -56,7 +53,6 @@ elif config["phaser"] == "eagle":
                 --numThreads "{threads}" \
                 --outPrefix "phase/phased.{params.chrom}" >> "{log}" 2>&1
             tabix -f -p vcf "{output.phased_file}"
-            touch "{output.done_file}"      
             """
 
 

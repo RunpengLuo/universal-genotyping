@@ -109,7 +109,6 @@ if run_genotype_snps:
             genotype_dtypes = ["sc_GEX"]
         else:
             raise ValueError("require genotyping, but no bam file provided!")
-    targets.extend([f"snps/.{genotype_mode}.chr{chrname}.done" for chrname in chroms])
     targets.extend([f"snps/chr{chrname}.vcf.gz" for chrname in chroms])
 
     ##################################################
@@ -143,7 +142,6 @@ if run_genotype_snps:
     else:
         raise ValueError(f"unsupported phasing_panel_version: {phasing_panel_version}")
     assert all(os.path.exists(get_phasing_panel(chrname)) for chrname in chroms), "failed to locate panel files"
-    targets.extend([f"phase/.{phaser}.chr{chrname}.done" for chrname in chroms])
     targets.append(f"phase/phased.vcf.gz")
 
 ##################################################
