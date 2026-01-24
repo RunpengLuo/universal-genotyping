@@ -9,7 +9,7 @@ refvers = config["reference_version"]
 
 # parse sample_file
 # required columns: [SAMPLE, REP_ID, DATA_TYPE, PATH_to_bam, PATH_to_barcodes, PATH_to_10x_ranger]
-# DATA_TYPE: [bulkDNA, scATAC, scRNA, VISIUM]
+# DATA_TYPE: [bulkDNA, scATAC, scRNA, VISIUM, VISIUM3PRIME]
 sample_df = pd.read_table(config["sample_file"]).fillna("")
 assert sample_df["SAMPLE"].nunique() == 1, "only one patient supported"
 SAMPLE_ID = sample_df["SAMPLE"].iloc[0]

@@ -75,8 +75,8 @@ elif genotype_mode == "pseudobulk_tumor":
             printf "%s\n" {input.bams} > {output.lst_file}
             cellsnp_dir=$(dirname "{output.snp_file}")
 
-            nsnps_panel=$({params.bcftools} view -H {input.snp_panel} | wc -l)
-            echo "[QC] {input.snp_panel} record #SNPs: ${nsnps_panel}" >> "{log}"
+            nsnps_panel=$({params.bcftools} view -H "{input.snp_panel}" | wc -l)
+            echo "[QC] {input.snp_panel} record #SNPs: ${{nsnps_panel}}" >> "{log}"
             {params.cellsnp_lite} \
                 -S {output.lst_file} \
                 -O ${cellsnp_dir} \
@@ -91,7 +91,7 @@ elif genotype_mode == "pseudobulk_tumor":
                 --gzip >> "{log}" 2>&1
             
             nsnps_cellsnp=$({params.bcftools} view -H "{output.snp_file}" | wc -l)
-            echo "[QC] {output} record #SNPs: ${nsnps_cellsnp}" >> "{log}"
+            echo "[QC] {output} record #SNPs: ${{nsnps_cellsnp}}" >> "{log}"
             """
 
     rule annotate_snps_pseudobulk:
