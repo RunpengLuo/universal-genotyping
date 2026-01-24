@@ -1,63 +1,63 @@
-
-rule phase_snps_shapeit:
-    input:
-        chrom_vcf_file=lambda wc: f"snps/chr{wc.chrname}.vcf.gz",
-        phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
-        gmap_file=lambda wc: get_gmap_file(wc.chrname),
-    output:
-        done_file="phase/.shapeit.chr{chrname}.done",
-        phased_file="phase/phased.chr{chrname}.vcf.gz",
-    threads: config["threads"]["phase"]
-    params:
-        chrom="chr{chrname}",
-        shapeit=config["shapeit"],
-        bcftools=config["bcftools"],
-    log:
-        "logs/phase_snps.chr{chrname}.log"
-    shell:
-        r"""
-        set -euo pipefail
-        {params.shapeit} \
-            --input "{input.chrom_vcf_file}" \
-            --map "{input.gmap_file}" \
-            --reference "{input.phasing_panel_file}" \
-            --region "{params.chrom}" \
-            --thread "{threads}" \
-            --output "phase/phased.{params.chrom}.vcf" >> "{log}" 2>&1
-        
-        bgzip -f "phase/phased.{params.chrom}.vcf"
-        tabix -f -p vcf "{output.phased_file}"
-        touch "{output.done_file}"
-        """
-
-rule phase_snps_eagle:
-    input:
-        chrom_vcf_file=lambda wc: f"snps/chr{wc.chrname}.vcf.gz",
-        phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
-        gmap_file=lambda wc: get_gmap_file(wc.chrname),
-    output:
-        done_file="phase/.eagle.chr{chrname}.done",
-        phased_file="phase/phased.chr{chrname}.vcf.gz",
-    threads: config["threads"]["phase"]
-    params:
-        chrom="chr{chrname}",
-        eagle=config["eagle"],
-        bcftools=config["bcftools"],
-    log:
-        "logs/phase_snps.chr{chrname}.log"
-    shell:
-        r"""
-        set -euo pipefail
-        {params.eagle} \
-            --vcfTarget "{input.chrom_vcf_file}" \
-            --geneticMapFile "{input.gmap_file}" \
-            --vcfRef "{input.phasing_panel_file}" \
-            --vcfOutFormat z \
-            --numThreads "{threads}" \
-            --outPrefix "phase/phased.{params.chrom}" >> "{log}" 2>&1
-        tabix -f -p vcf "{output.phased_file}"
-        touch "{output.done_file}"      
-        """
+if config["phaser"] == "shapeit":
+    rule phase_snps_shapeit:
+        input:
+            chrom_vcf_file=lambda wc: f"snps/chr{wc.chrname}.vcf.gz",
+            phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
+            gmap_file=lambda wc: get_gmap_file(wc.chrname),
+        output:
+            done_file="phase/.shapeit.chr{chrname}.done",
+            phased_file="phase/phased.chr{chrname}.vcf.gz",
+        threads: config["threads"]["phase"]
+        params:
+            chrom="chr{chrname}",
+            shapeit=config["shapeit"],
+            bcftools=config["bcftools"],
+        log:
+            "logs/phase_snps.chr{chrname}.log"
+        shell:
+            r"""
+            set -euo pipefail
+            {params.shapeit} \
+                --input "{input.chrom_vcf_file}" \
+                --map "{input.gmap_file}" \
+                --reference "{input.phasing_panel_file}" \
+                --region "{params.chrom}" \
+                --thread "{threads}" \
+                --output "phase/phased.{params.chrom}.vcf" >> "{log}" 2>&1
+            
+            bgzip -f "phase/phased.{params.chrom}.vcf"
+            tabix -f -p vcf "{output.phased_file}"
+            touch "{output.done_file}"
+            """
+elif config["phaser"] == "eagle":
+    rule phase_snps_eagle:
+        input:
+            chrom_vcf_file=lambda wc: f"snps/chr{wc.chrname}.vcf.gz",
+            phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
+            gmap_file=lambda wc: get_gmap_file(wc.chrname),
+        output:
+            done_file="phase/.eagle.chr{chrname}.done",
+            phased_file="phase/phased.chr{chrname}.vcf.gz",
+        threads: config["threads"]["phase"]
+        params:
+            chrom="chr{chrname}",
+            eagle=config["eagle"],
+            bcftools=config["bcftools"],
+        log:
+            "logs/phase_snps.chr{chrname}.log"
+        shell:
+            r"""
+            set -euo pipefail
+            {params.eagle} \
+                --vcfTarget "{input.chrom_vcf_file}" \
+                --geneticMapFile "{input.gmap_file}" \
+                --vcfRef "{input.phasing_panel_file}" \
+                --vcfOutFormat z \
+                --numThreads "{threads}" \
+                --outPrefix "phase/phased.{params.chrom}" >> "{log}" 2>&1
+            tabix -f -p vcf "{output.phased_file}"
+            touch "{output.done_file}"      
+            """
 
 
 rule concat_phased_snps:

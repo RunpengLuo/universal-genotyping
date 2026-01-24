@@ -6,7 +6,7 @@ rule genotype_snps_bulk_normal:
     from bulk-DNA normal sample via bcftools
     """
     input:
-        bams=lambda wc: bulk_nbams[0],
+        bams=lambda wc: bulk_nbams[0] if len(bulk_nbams) > 0 else [],
         snp_panel=config["snp_panel"],
         reference=config["reference"]
     output:
