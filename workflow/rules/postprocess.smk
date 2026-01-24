@@ -16,7 +16,7 @@ rule postprocess_matrix_bulk:
         sample_name=SAMPLE_ID,
         modality="bulk_DNA",
         data_types=["bulk_DNA"],
-        rep_ids=mod2reps["bulk_DNA"],
+        rep_ids=mod2reps.get("bulk_DNA", None),
         mask_out_of_region=config["params_postprocess"]["mask_out_of_region"],
         min_depth=config["params_postprocess"]["min_depth"],
         gamma=config["params_postprocess"]["gamma"],
@@ -48,7 +48,7 @@ rule postprocess_matrix_aggregate_one_data_type:
         sample_name=SAMPLE_ID,
         modality=lambda wc: wc.data_type,
         data_types=lambda wc: [wc.data_type],
-        rep_ids=lambda wc: mod2reps[wc.data_type],
+        rep_ids=lambda wc: mod2reps.get(wc.data_type, None),
         mask_out_of_region=config["params_postprocess"]["mask_out_of_region"],
     script:
         """../scripts/postprocess_nonbulk.py"""
