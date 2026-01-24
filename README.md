@@ -44,13 +44,13 @@ If reference Het SNP file from same patient is provided, skip step 1-2.
 
 ### Sample file
 Sample file has following modes:
-1. multiome (GEX+ATAC) data, shared `REP_ID`, `PATH_to_barcodes` and `PATH_to_10x_ranger`.
-2. multiple GEX/ATAC/VISIUM replicates. One modality only.
+1. multiome (scRNA+scATAC) data, shared `REP_ID`, `PATH_to_barcodes` and `PATH_to_10x_ranger`.
+2. multiple scRNA/scATAC/VISIUM replicates. One modality only.
 
 ```
 SAMPLE	REP_ID	DATA_TYPE	PATH_to_barcodes	PATH_to_10x_bam	PATH_to_10x_ranger
-HT001	U1	GEX	barcodes.tsv.gz	s1.bam	s1/
-HT001	U1	ATAC	barcodes.tsv.gz	s2.bam	s1/
+HT001	U1	scRNA	barcodes.tsv.gz	s1.bam	s1/
+HT001	U1	scATAC	barcodes.tsv.gz	s2.bam	s1/
 ```
 
 ### TODO

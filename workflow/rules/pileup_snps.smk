@@ -7,11 +7,11 @@ rule pileup_snps_cellsnp_lite_cell:
     output:
         cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
     wildcard_constraints:
-        data_type="^(sc_GEX|sc_ATAC|VISIUM|VISIUM_3PRIME)$",
+        data_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
     threads: config["threads"]["pileup"]
     params:
         cellsnp_lite=config["cellsnp_lite"],
-        UMItag=lambda wc: ("None" if wc.data_type == "sc_ATAC" else config["params_cellsnp_lite"]["UMItag"]),
+        UMItag=lambda wc: ("None" if wc.data_type == "scATAC" else config["params_cellsnp_lite"]["UMItag"]),
         cellTAG=config["params_cellsnp_lite"]["cellTAG"],
         minMAF=0.0,
         minCOUNT=0,
@@ -42,7 +42,7 @@ rule pileup_snps_cellsnp_lite_bulk:
     output:
         cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
     wildcard_constraints:
-        data_type="^(bulk_DNA)$"
+        data_type="bulkDNA"
     threads: config["threads"]["pileup"]
     params:
         cellsnp_lite=config["cellsnp_lite"],

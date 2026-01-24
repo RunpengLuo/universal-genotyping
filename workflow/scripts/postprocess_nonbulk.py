@@ -95,7 +95,7 @@ if modality == "multiome":
     snps[snp_cols].to_csv(sm.output["info_file"], sep="\t", header=True, index=False)
     np.save(sm.output["unique_snp_ids"], snps["KEY"].to_numpy())
     barcodes.to_csv(sm.output["barcode_file"], sep="\t", header=False, index=False)
-    for i, data_type in enumerate(["sc_GEX", "sc_ATAC"]):
+    for i, data_type in enumerate(["scRNA", "scATAC"]):
         dp_mtx = dp_mtx_list[i][snp_mask, :]
         ref_mtx = ref_mtx_list[i][snp_mask, :]
         alt_mtx = alt_mtx_list[i][snp_mask, :]

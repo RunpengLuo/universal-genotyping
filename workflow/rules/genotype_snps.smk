@@ -53,7 +53,7 @@ elif genotype_mode == "bulk_tumor":
 elif genotype_mode == "pseudobulk_tumor":
     rule genotype_snps_pseudobulk:
         input:
-            bams=lambda wc: {"sc_GEX": gex_tbams, "sc_ATAC": atac_tbams}[wc.data_type],
+            bams=lambda wc: {"scRNA": gex_tbams, "scATAC": atac_tbams}[wc.data_type],
             snp_panel=config["snp_panel"],
         output:
             snp_file="snps/{data_type}/cellSNP.base.vcf.gz",
@@ -65,7 +65,7 @@ elif genotype_mode == "pseudobulk_tumor":
             cellsnp_lite=config["cellsnp_lite"],
             chroms=",".join(map(str, config["chromosomes"])),
             refseq=config["reference"],
-            UMItag=lambda wc: ("None" if wc.data_type == "sc_ATAC" else config["params_cellsnp_lite"]["UMItag"]),
+            UMItag=lambda wc: ("None" if wc.data_type == "scATAC" else config["params_cellsnp_lite"]["UMItag"]),
             minMAF=config["params_cellsnp_lite"]["minMAF"],
             minCOUNT=config["params_cellsnp_lite"]["minCOUNT_genotype"],
         shell:
