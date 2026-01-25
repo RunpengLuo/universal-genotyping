@@ -61,17 +61,16 @@ rule concat_phased_snps:
         vcf_files=expand("phase/phased.chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
     output:
         phased_vcf="phase/phased.vcf.gz",
-        lst_file=temp("phase/phased_snps.lst"),
     threads: 1
     params:
         bcftools=config["bcftools"],
     shell:
         r"""
         set -euo pipefail
-        printf "%s\n" {input.vcf_files} > "{output.lst_file}"
-        {params.bcftools} concat -f "{output.lst_file}" -Ou \
-        | {params.bcftools} view -g het -Oz -o "{output.phased_vcf}"
+        printf "%s\n" {input.vcf_files} > "phase/phased_snps.lst"
+        {params.bcftools} concat -f "phase/phased_snps.lst" -Oz -o "{output.phased_vcf}"
         tabix -f -p vcf "{output.phased_vcf}"
+        rm "phase/phased_snps.lst"
         """
 
 rule extract_phased_het_snps:
@@ -85,8 +84,7 @@ rule extract_phased_het_snps:
     shell:
         r"""
         set -euo pipefail
-        {params.bcftools} view -Ou {input.phased_vcf} \
-            -v snps -m2 -M2 -i 'GT="0|1" || GT="1|0"' \
-        | {params.bcftools} view -Oz -o "{output.phased_het_vcf}"
+        {params.bcftools} view "{input.phased_vcf}" -Oz -m2 -M2 \
+            -i 'GT="0|1" || GT="1|0"' -o "{output.phased_het_vcf}"
         tabix -f -p vcf "{output.phased_het_vcf}"
         """
