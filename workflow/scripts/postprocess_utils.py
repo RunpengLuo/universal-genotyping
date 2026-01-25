@@ -100,10 +100,11 @@ def get_mask_by_region(snps: pd.DataFrame, region_bed_file: str) -> np.ndarray:
         header=None,
         usecols=[0, 1, 2],
         names=["Chromosome", "Start", "End"],
+        dtype={0: "string"}
     )
-
-    if "#CHR" not in snps.columns or "POS" not in snps.columns:
-        raise KeyError("snps must contain columns ['#CHR', 'POS']")
+    if not str(regions["Chromosome"].iloc[0]).startswith("chr"):
+        if str(snps["#CHR"].iloc[0]).startswith("chr"):
+            regions["Chromosome"] = "chr" + regions["Chromosome"].astype(str)
 
     snp_positions = snps[["#CHR", "POS"]].copy()
     snp_positions["Start"] = snp_positions["POS"].astype(np.int64) - 1
@@ -114,16 +115,11 @@ def get_mask_by_region(snps: pd.DataFrame, region_bed_file: str) -> np.ndarray:
 
     overlapping = pr_snps.overlap(pr_regions).df.rename(columns={"Chromosome": "#CHR"})
 
-    overlapping["in_region"] = True
     mask = (
-        snp_positions[["#CHR", "POS"]]
-        .merge(
-            overlapping[["#CHR", "POS", "in_region"]],
-            on=["#CHR", "POS"],
-            how="left",
-            sort=False,
-        )["in_region"]
-        .fillna(False)
+        snp_positions[["#CHR","POS"]]
+        .merge(overlapping[["#CHR","POS"]],
+            on=["#CHR","POS"], how="left", indicator=True)
+        ["_merge"].eq("both")
         .to_numpy(dtype=bool)
     )
 
