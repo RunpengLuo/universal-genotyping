@@ -143,9 +143,4 @@ for chrname, out_snp_file in zip(chroms, sm.output["snp_files"]):
     # out_snp_file[:-3] will be removed by bgzip.
     subprocess.run(["bgzip", "-f", out_snp_file[:-3]], check=True)
     subprocess.run(["tabix", "-f", "-p", "vcf", out_snp_file], check=True)
-
-with open(sm.output["done_file"], "w") as fd:
-    fd.write("done")
-    fd.close()
-
 logging.info("finished annotate_snps")
