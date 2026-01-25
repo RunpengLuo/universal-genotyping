@@ -4,7 +4,7 @@ rule postprocess_matrix_bulk:
         vcfs=lambda wc: expand("pileup/bulk_DNA_{rep_id}/cellSNP.base.vcf.gz", rep_id=mod2reps["bulkDNA"]),
         dp_mats=lambda wc: expand("pileup/bulk_DNA_{rep_id}/cellSNP.tag.DP.mtx", rep_id=mod2reps["bulkDNA"]),
         ad_mats=lambda wc: expand("pileup/bulk_DNA_{rep_id}/cellSNP.tag.AD.mtx", rep_id=mod2reps["bulkDNA"]),
-        snp_file=lambda wc: ("phase/phased_het_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
+        snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
         region_bed=lambda wc: config["region_bed"],
     output:
         sample_file="allele/bulkDNA/samples_ids.tsv",
@@ -30,7 +30,7 @@ rule postprocess_matrix_aggregate_one_data_type:
         sample_tsvs=lambda wc: expand("pileup/{data_type}_{rep_id}/cellSNP.samples.tsv", data_type=wc.data_type, rep_id=mod2reps[wc.data_type]),
         dp_mats=lambda wc: expand("pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx", data_type=wc.data_type, rep_id=mod2reps[wc.data_type]),
         ad_mats=lambda wc: expand("pileup/{data_type}_{rep_id}/cellSNP.tag.AD.mtx", data_type=wc.data_type, rep_id=mod2reps[wc.data_type]),
-        snp_file=lambda wc: ("phase/phased_het_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
+        snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
         region_bed=lambda wc: config["region_bed"],
     output:
         sample_file="allele/{data_type}/samples_ids.tsv",
@@ -60,7 +60,7 @@ rule postprocess_matrix_multiome_per_replicate:
         sample_tsvs=lambda wc: [f"pileup/{data_type}_{wc.rep_id}/cellSNP.samples.tsv" for data_type in ["scRNA", "scATAC"]],
         dp_mats=lambda wc: [f"pileup/{data_type}_{wc.rep_id}/cellSNP.tag.DP.mtx" for data_type in ["scRNA", "scATAC"]],
         ad_mats=lambda wc: [f"pileup/{data_type}_{wc.rep_id}/cellSNP.tag.AD.mtx" for data_type in ["scRNA", "scATAC"]],
-        snp_file=lambda wc: ("phase/phased_het_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
+        snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
         region_bed=lambda wc: config["region_bed"],
     output:
         sample_file="allele/multiome_{rep_id}/samples_ids.tsv",
