@@ -146,8 +146,9 @@ else:
     alt_mtx = alt_mtx[snp_mask, :]
 
     # save outputs
-    snps[snp_cols].to_csv(sm.output["info_file"], sep="\t", header=True, index=False)
-    np.save(sm.output["unique_snp_ids"], snps["KEY"].to_numpy())
+    snps.to_csv(sm.output["info_file"], sep="\t", header=True, index=False)
+    snp_ids = snps["#CHROM"].astype(str) + "_" + snps["POS"].astype(str)
+    np.save(sm.output["unique_snp_ids"], snp_ids.to_numpy())
     all_barcodes.to_csv(sm.output["all_barcodes"], sep="\t", header=False, index=False)
     
     save_npz(sm.output["dp_mtx"], dp_mtx)
