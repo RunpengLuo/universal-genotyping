@@ -14,3 +14,5 @@ dependencies:
   - numpy
   - tabix
   - pip
+  - pip:
+    - pyranges
