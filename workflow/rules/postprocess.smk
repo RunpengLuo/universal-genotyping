@@ -43,7 +43,7 @@ rule postprocess_matrix_aggregate_one_data_type:
         a_mtx="allele/{data_type}/cell_snp_Aallele.npz",
         b_mtx="allele/{data_type}/cell_snp_Ballele.npz",
     wildcard_constraints:
-        data_type="(scRNA|scATAC|VISIUM|VISIUM3PRIME)",
+        data_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
     params:
         sample_name=SAMPLE_ID,
         modality=lambda wc: wc.data_type,
