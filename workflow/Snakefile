@@ -7,11 +7,18 @@ import pandas as pd
 chroms = config["chromosomes"]
 refvers = config["reference_version"]
 
-# parse sample_file
-# required columns: [SAMPLE, REP_ID, DATA_TYPE, PATH_to_bam, PATH_to_barcodes, PATH_to_10x_ranger]
-# DATA_TYPE: [bulkDNA, scATAC, scRNA, VISIUM, VISIUM3prime]
-sample_df = pd.read_table(config["sample_file"]).fillna("")
-assert sample_df["SAMPLE"].nunique() == 1, "only one patient supported"
+sample_df = pd.read_table(config["sample_file"])
+
+required = ["SAMPLE", "REP_ID", "DATA_TYPE", "PATH_to_bam"]
+optional = ["PATH_to_barcodes", "PATH_to_10x_ranger"]
+
+missing = [c for c in required if c not in sample_df.columns]
+assert not missing, f"missing columns: {missing}"
+
+for c in optional:
+    if c not in sample_df.columns:
+        sample_df[c] = "N/A"
+
 SAMPLE_ID = sample_df["SAMPLE"].iloc[0]
 
 all_data_types = sample_df["DATA_TYPE"].unique().tolist()
@@ -48,7 +55,6 @@ for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
         atac_bam = rep_df.loc[rep_df["DATA_TYPE"] == "scATAC", "PATH_to_bam"].iloc[0]
         gex_tbams.append(gex_bam)
         atac_tbams.append(atac_bam)
-        # bams = [gex_bam, atac_bam]
         get_data[("scRNA", rep_id)] = [barcodes, gex_bam, rangers]
         get_data[("scATAC", rep_id)] = [barcodes, atac_bam, rangers]
     else:
@@ -68,14 +74,10 @@ for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
                 gex_tbams.append(bam)
             else:
                 atac_tbams.append(bam)
-    # rep_id2data[rep_id] = [modality, bams, barcodes, rangers]
-    # for dt in rep_data_types:
-    #     data_type2rep_ids[dt].append(rep_id)
     if modality not in mod2reps:
         mod2reps[modality] = []
     mod2reps[modality].append(rep_id)
 
-targets = []
 ##################################################
 ref_snp_file = config.get("ref_snp_file")
 run_genotype_snps = (
@@ -106,7 +108,6 @@ if run_genotype_snps:
             genotype_dtypes = ["scRNA"]
         else:
             raise ValueError("require genotyping, but no bam file provided!")
-    targets.extend([f"snps/chr{chrname}.vcf.gz" for chrname in chroms])
 
     ##################################################
     # parse phase_snps inputs
@@ -139,39 +140,34 @@ if run_genotype_snps:
     else:
         raise ValueError(f"unsupported phasing_panel_version: {phasing_panel_version}")
     assert all(os.path.exists(get_phasing_panel(chrname)) for chrname in chroms), "failed to locate panel files"
-    targets.append(f"phase/phased.vcf.gz")
-    targets.append(f"phase/phased_snps.vcf.gz")
 
 ##################################################
-# additional target files
+# final target files
+final_targets = []
 for mod, rep_ids in mod2reps.items():
     data_types = ["scRNA", "scATAC"] if mod == "multiome" else [mod]
-    for data_type in data_types:
-        targets.extend([f"pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz" for rep_id in rep_ids])
-    
-    # postprocess pile-up data
     if mod == "bulkDNA":
         # HATCHet input
-        targets.append(f"allele/{mod}/samples_ids.tsv")
-        targets.append(f"allele/{mod}/snp_info.tsv.gz")
-        targets.append(f"allele/{mod}/snp_matrix.dp.npz")
-        targets.append(f"allele/{mod}/snp_matrix.alt.npz")
-        targets.append(f"allele/{mod}/snp_matrix.ref.npz")
+        final_targets.append(f"allele/{mod}/samples_ids.tsv")
+        final_targets.append(f"allele/{mod}/snp_info.tsv.gz")
+        final_targets.append(f"allele/{mod}/snp_matrix.dp.npz")
+        final_targets.append(f"allele/{mod}/snp_matrix.alt.npz")
+        final_targets.append(f"allele/{mod}/snp_matrix.ref.npz")
     elif mod == "multiome":
-        targets.extend([f"allele/{mod}_{rep_id}/barcodes.txt" for rep_id in rep_ids])
+        final_targets.extend([f"allele/{mod}_{rep_id}/barcodes.txt" for rep_id in rep_ids])
         for data_type in data_types:
-            targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.dp.npz" for rep_id in rep_ids])
-            targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.alt.npz" for rep_id in rep_ids])
-            targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.ref.npz" for rep_id in rep_ids])
-            targets.extend([f"allele/{mod}_{rep_id}/cell_snp_Aallele.{data_type}.npz" for rep_id in rep_ids])
-            targets.extend([f"allele/{mod}_{rep_id}/cell_snp_Ballele.{data_type}.npz" for rep_id in rep_ids])
+            final_targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.dp.npz" for rep_id in rep_ids])
+            final_targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.alt.npz" for rep_id in rep_ids])
+            final_targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.ref.npz" for rep_id in rep_ids])
+            final_targets.extend([f"allele/{mod}_{rep_id}/cell_snp_Aallele.{data_type}.npz" for rep_id in rep_ids])
+            final_targets.extend([f"allele/{mod}_{rep_id}/cell_snp_Ballele.{data_type}.npz" for rep_id in rep_ids])
     else:
-        targets.append(f"allele/{mod}/barcodes.txt")
-        targets.append(f"allele/{mod}/snp_matrix.dp.npz")
-        targets.append(f"allele/{mod}/snp_matrix.alt.npz")
-        targets.append(f"allele/{mod}/snp_matrix.ref.npz")
-        targets.append(f"allele/{mod}/cell_snp_Aallele.npz")
-        targets.append(f"allele/{mod}/cell_snp_Ballele.npz")
+        final_targets.append(f"allele/{mod}/barcodes.txt")
+        final_targets.append(f"allele/{mod}/snp_matrix.dp.npz")
+        final_targets.append(f"allele/{mod}/snp_matrix.alt.npz")
+        final_targets.append(f"allele/{mod}/snp_matrix.ref.npz")
+        final_targets.append(f"allele/{mod}/cell_snp_Aallele.npz")
+        final_targets.append(f"allele/{mod}/cell_snp_Ballele.npz")
 
 ##################################################
 # entrypoint
@@ -180,5 +176,5 @@ include: "rules/phase_snps.smk"
 include: "rules/pileup_snps.smk"
 include: "rules/postprocess.smk"
 rule all:
-    input: targets
+    input: final_targets
     default_target: True

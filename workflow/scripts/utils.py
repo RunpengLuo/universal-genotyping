@@ -12,7 +12,7 @@ def read_VCF(vcf_file: str, addchr=True, addkey=False):
     load VCF file as dataframe.
     If phased, parse GT[0] as USEREF, check PS
     """
-    snps = pd.read_csv(vcf_file, comment="#", sep="\t", header=None)
+    snps = pd.read_csv(vcf_file, comment="#", sep="\t", header=None, dtype={0: "string"})
     if snps.empty:
         return None
     ncols = snps.shape[1]
