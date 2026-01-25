@@ -92,8 +92,9 @@ if modality == "multiome":
     snps = snps.loc[snp_mask, :].reset_index(drop=True)
 
     # save outputs
-    snps[snp_cols].to_csv(sm.output["info_file"], sep="\t", header=True, index=False)
-    np.save(sm.output["unique_snp_ids"], snps["KEY"].to_numpy())
+    snps.to_csv(sm.output["info_file"], sep="\t", header=True, index=False)
+    snp_ids = snps["#CHROM"].astype(str) + "_" + snps["POS"].astype(str)
+    np.save(sm.output["unique_snp_ids"], snp_ids.to_numpy())
     barcodes.to_csv(sm.output["barcode_file"], sep="\t", header=False, index=False)
     for i, data_type in enumerate(["scRNA", "scATAC"]):
         dp_mtx = dp_mtx_list[i][snp_mask, :]
