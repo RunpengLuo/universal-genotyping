@@ -86,39 +86,48 @@ def apply_phase_to_mat(dp_mtx, ref_mtx, alt_mtx, phases):
     return a_mtx, b_mtx
 
 ##################################################
-def get_mask_by_region(
-    snps: pd.DataFrame,
-    region_bed_file: str,
-):
+def get_mask_by_region(snps: pd.DataFrame, region_bed_file: str) -> np.ndarray:
+    """
+    Return a boolean mask (len == len(snps)) indicating whether each SNP (CHR, POS)
+    overlaps any interval in a BED-like file (Chromosome, Start, End), using 0-based
+    half-open intervals [Start, End).
+
+    Assumes SNP POS is 1-based. Converts each SNP to an interval [POS-1, POS).
+    """
     regions = pd.read_table(
         region_bed_file,
         sep="\t",
         header=None,
-        usecols=range(3),
+        usecols=[0, 1, 2],
         names=["Chromosome", "Start", "End"],
     )
-    snp_positions = snps[["#CHR", "POS"]].reset_index(drop=True)
-    # 0-indexed [Start, End) region
-    snp_positions["Start"] = snp_positions["POS"] - 1
-    snp_positions["End"] = snp_positions["POS"]
+
+    if "#CHR" not in snps.columns or "POS" not in snps.columns:
+        raise KeyError("snps must contain columns ['#CHR', 'POS']")
+
+    snp_positions = snps[["#CHR", "POS"]].copy()
+    snp_positions["Start"] = snp_positions["POS"].astype(np.int64) - 1
+    snp_positions["End"] = snp_positions["POS"].astype(np.int64)
 
     pr_snps = pr.PyRanges(snp_positions.rename(columns={"#CHR": "Chromosome"}))
     pr_regions = pr.PyRanges(regions)
 
-    overlapping_snps = pr_snps.overlap(pr_regions).df
-    overlapping_snps = overlapping_snps.rename(columns={"Chromosome": "#CHR"})
+    overlapping = pr_snps.overlap(pr_regions).df.rename(columns={"Chromosome": "#CHR"})
+
+    overlapping["in_region"] = True
     mask = (
-        pd.merge(
-            left=snp_positions,
-            right=overlapping_snps,
+        snp_positions[["#CHR", "POS"]]
+        .merge(
+            overlapping[["#CHR", "POS", "in_region"]],
             on=["#CHR", "POS"],
             how="left",
             sort=False,
-        )["Start"]
-        .notna()
-        .to_numpy()
+        )["in_region"]
+        .fillna(False)
+        .to_numpy(dtype=bool)
     )
-    logging.info(f"filter by regions, #passed SNPs={np.sum(mask)}/{len(snps)}")
+
+    logging.info(f"filter by regions, #passed SNPs={int(mask.sum())}/{len(snps)}")
     return mask
 
 
