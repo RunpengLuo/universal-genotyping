@@ -1,9 +1,9 @@
 ##################################################
 rule postprocess_matrix_bulk:
     input:
-        vcfs=lambda wc: expand("pileup/bulk_DNA_{rep_id}/cellSNP.base.vcf.gz", rep_id=mod2reps["bulkDNA"]),
-        dp_mats=lambda wc: expand("pileup/bulk_DNA_{rep_id}/cellSNP.tag.DP.mtx", rep_id=mod2reps["bulkDNA"]),
-        ad_mats=lambda wc: expand("pileup/bulk_DNA_{rep_id}/cellSNP.tag.AD.mtx", rep_id=mod2reps["bulkDNA"]),
+        vcfs=lambda wc: expand("pileup/bulkDNA_{rep_id}/cellSNP.base.vcf.gz", rep_id=mod2reps["bulkDNA"]),
+        dp_mats=lambda wc: expand("pileup/bulkDNA_{rep_id}/cellSNP.tag.DP.mtx", rep_id=mod2reps["bulkDNA"]),
+        ad_mats=lambda wc: expand("pileup/bulkDNA_{rep_id}/cellSNP.tag.AD.mtx", rep_id=mod2reps["bulkDNA"]),
         snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
         region_bed=lambda wc: config["region_bed"],
     output:
@@ -20,6 +20,8 @@ rule postprocess_matrix_bulk:
         mask_out_of_region=config["params_postprocess"]["mask_out_of_region"],
         min_depth=config["params_postprocess"]["min_depth"],
         gamma=config["params_postprocess"]["gamma"],
+    log:
+        "logs/postprocess.bulkDNA.log"
     script:
         """../scripts/postprocess_bulk.py"""
 
@@ -50,6 +52,8 @@ rule postprocess_matrix_aggregate_one_data_type:
         data_types=lambda wc: [wc.data_type],
         rep_ids=lambda wc: mod2reps.get(wc.data_type, None),
         mask_out_of_region=config["params_postprocess"]["mask_out_of_region"],
+    log:
+        "logs/postprocess.{data_type}.log"
     script:
         """../scripts/postprocess_nonbulk.py"""
 
@@ -78,5 +82,7 @@ rule postprocess_matrix_multiome_per_replicate:
         data_types=["scRNA", "scATAC"],
         rep_ids=lambda wc: [wc.rep_id],
         mask_out_of_region=config["params_postprocess"]["mask_out_of_region"],
+    log:
+        "logs/postprocess.multiome_{rep_id}.log"
     script:
         """../scripts/postprocess_nonbulk.py"""
