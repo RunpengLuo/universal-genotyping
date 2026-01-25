@@ -102,10 +102,10 @@ elif genotype_mode == "pseudobulk_tumor":
             snp_files_tbi=expand("snps/chr{chrname}.vcf.gz.tbi", chrname=config["chromosomes"]),
         params:
             data_types=genotype_dtypes,
-            filter_nz_OTH=config["params_annotate_snps"]["filter_nz_OTH"]
-            min_het_reads=config["params_annotate_snps"]["min_het_reads"]
-            min_hom_dp=config["params_annotate_snps"]["min_hom_dp"]
-            min_vaf_thres=config["params_annotate_snps"]["min_vaf_thres"]
+            filter_nz_OTH=config["params_annotate_snps"]["filter_nz_OTH"],
+            min_het_reads=config["params_annotate_snps"]["min_het_reads"],
+            min_hom_dp=config["params_annotate_snps"]["min_hom_dp"],
+            min_vaf_thres=config["params_annotate_snps"]["min_vaf_thres"],
         threads: 1
         log:
             "logs/annotate_snps.log"
