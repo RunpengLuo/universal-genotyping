@@ -29,10 +29,10 @@ logging.basicConfig(
 logging.info("start annotate_snps")
 
 chroms = sm.config["chromosomes"]
-filter_nz_OTH = sm.params["params_annotate_snps"]["filter_nz_OTH"]
-min_het_reads = sm.config["params_annotate_snps"]["min_het_reads"]
-min_hom_dp = sm.config["params_annotate_snps"]["min_hom_dp"]
-min_vaf_thres = sm.config["params_annotate_snps"]["min_vaf_thres"]
+filter_nz_OTH = sm.params["filter_nz_OTH"]
+min_het_reads = sm.params["min_het_reads"]
+min_hom_dp = sm.params["min_hom_dp"]
+min_vaf_thres = sm.params["min_vaf_thres"]
 snp_lists = []
 KEY = ["#CHROM", "POS", "REF", "ALT"]
 CNT = ["DP", "AD", "OTH"]
