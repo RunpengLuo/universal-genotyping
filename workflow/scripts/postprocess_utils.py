@@ -97,21 +97,21 @@ def get_mask_by_region(
         usecols=range(3),
         names=["Chromosome", "Start", "End"],
     )
-    snp_positions = snps[["#CHROM", "POS"]].reset_index(drop=True)
+    snp_positions = snps[["#CHR", "POS"]].reset_index(drop=True)
     # 0-indexed [Start, End) region
     snp_positions["Start"] = snp_positions["POS"] - 1
     snp_positions["End"] = snp_positions["POS"]
 
-    pr_snps = pr.PyRanges(snp_positions.rename(columns={"#CHROM": "Chromosome"}))
+    pr_snps = pr.PyRanges(snp_positions.rename(columns={"#CHR": "Chromosome"}))
     pr_regions = pr.PyRanges(regions)
 
     overlapping_snps = pr_snps.overlap(pr_regions).df
-    overlapping_snps = overlapping_snps.rename(columns={"Chromosome": "#CHROM"})
+    overlapping_snps = overlapping_snps.rename(columns={"Chromosome": "#CHR"})
     mask = (
         pd.merge(
             left=snp_positions,
             right=overlapping_snps,
-            on=["#CHROM", "POS"],
+            on=["#CHR", "POS"],
             how="left",
             sort=False,
         )["Start"]
