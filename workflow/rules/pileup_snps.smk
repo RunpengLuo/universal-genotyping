@@ -6,6 +6,9 @@ rule pileup_snps_cellsnp_lite_cell:
         snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
     output:
         cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
+        sample_file="pileup/{data_type}_{rep_id}/cellSNP.samples.tsv",
+        dp_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx",
+        ad_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.AD.mtx",
     wildcard_constraints:
         data_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
     threads: config["threads"]["pileup"]
@@ -41,6 +44,9 @@ rule pileup_snps_cellsnp_lite_bulk:
         snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
     output:
         cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
+        sample_file="pileup/{data_type}_{rep_id}/cellSNP.samples.tsv",
+        dp_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx",
+        ad_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.AD.mtx",
     wildcard_constraints:
         data_type="bulkDNA"
     threads: config["threads"]["pileup"]
