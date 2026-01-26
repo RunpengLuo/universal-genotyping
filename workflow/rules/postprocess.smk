@@ -104,15 +104,18 @@ if workflow_mode == "single_cell":
             genome_size=lambda wc: config["genome_size"],
         output:
             sample_file="allele/{data_type}/samples_ids.tsv",
-            all_barcodes="allele/{data_type}/barcodes.txt",
             info_file="allele/{data_type}/snp_info.tsv.gz",
             bed_file="allele/{data_type}/snp_positions.bed.gz",
-            unique_snp_ids="allele/{data_type}/unique_snp_ids.npy",
+            all_barcodes="allele/{data_type}/barcodes.txt",
             tot_mtx="allele/{data_type}/snp_matrix.tot.npz",
             alt_mtx="allele/{data_type}/snp_matrix.alt.npz",
             ref_mtx="allele/{data_type}/snp_matrix.ref.npz",
-            a_mtx="allele/{data_type}/cell_snp_Aallele.npz",
-            b_mtx="allele/{data_type}/cell_snp_Ballele.npz",
+            a_mtx="allele/{data_type}/snp_matrix.A.npz",
+            b_mtx="allele/{data_type}/snp_matrix.B.npz",
+            # legacy CalicoST outputs
+            unique_snp_ids_legacy="allele/{data_type}/unique_snp_ids.npy",
+            a_mtx_legacy="allele/{data_type}/cell_snp_Aallele.npz",
+            b_mtx_legacy="allele/{data_type}/cell_snp_Ballele.npz",
         wildcard_constraints:
             data_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
         params:
@@ -138,10 +141,9 @@ if workflow_mode == "single_cell":
             genome_size=lambda wc: config["genome_size"],
         output:
             sample_file="allele/multiome_{rep_id}/samples_ids.tsv",
-            all_barcodes="allele/multiome_{rep_id}/barcodes.txt",
             info_file="allele/multiome_{rep_id}/snp_info.tsv.gz",
             bed_file="allele/multiome_{rep_id}/snp_positions.bed.gz",
-            unique_snp_ids="allele/multiome_{rep_id}/unique_snp_ids.npy",
+            all_barcodes="allele/multiome_{rep_id}/barcodes.txt",
             tot_mtx=["allele/multiome_{rep_id}/" + f"{data_type}_snp_matrix.tot.npz" for data_type in ["scRNA", "scATAC"]],
             alt_mtx=["allele/multiome_{rep_id}/" + f"{data_type}_snp_matrix.alt.npz" for data_type in ["scRNA", "scATAC"]],
             ref_mtx=["allele/multiome_{rep_id}/" + f"{data_type}_snp_matrix.ref.npz" for data_type in ["scRNA", "scATAC"]],
