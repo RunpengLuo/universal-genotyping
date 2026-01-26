@@ -15,6 +15,5 @@ dependencies:
   - numpy
   - tabix
   - pip
-  - pip:
-    - pyranges
-    - matplotlib
+  - pyranges
+  - matplotlib-base
