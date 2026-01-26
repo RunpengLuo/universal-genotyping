@@ -1,6 +1,7 @@
 ## Unified Single-cell/Visium Genotyping+Phasing+Pileup Workflow
 ```
 mamba env create -f ./environment.yaml -p /path/to/envs/genotyping_env
+conda activate /path/to/envs/genotyping_env
 snakemake -p --cores 1 -s /path/to/workflow/Snakefile --configfile config/config.yaml --directory <output>
 ```
 
@@ -20,38 +21,31 @@ snakemake -p --cores 1 -s /path/to/workflow/Snakefile --configfile config/config
     * used by CalicoST, ~568MB
 3. dbSNPv155
     1. https://s3-us-west-2.amazonaws.com/human-pangenomics/index.html?prefix=T2T/CHM13/assemblies/annotation/liftover/*
+
 #### phasing panel files
-1. http://pklab.med.harvard.edu/teng/data/1000G_hg38.zip
+1. 1000GP HG38 phasing panel: http://pklab.med.harvard.edu/teng/data/1000G_hg38.zip
+2. gnomAD HGDP + 1KG panel (n=4,099): download the reference files using gsutil: gs://gcp-public-data--gnomad/resources/hgdp_1kg/phased_haplotypes
+3. TOPMed imputation server (n=97,256)
 
-gnomAD HGDP + 1KG panel (n=4,099). You can download the reference files using gsutil: gs://gcp-public-data--gnomad/resources/hgdp_1kg/phased_haplotypes.
+### Running options
+User can either run with mode 1 (bulk WGS/WES genotyping) or mode 2 (single-cell/visium genotyping). Refer to mode1 and mode2 DAG workflow for all involved rules.
+* For mode 1, sample file should only contain bulk samples.
+* For mode 2, sample file only only contain non-bulk samples.
+* In either mode, if reference het SNP file genotyped from same patient is provided, genotyping and phasign step are skipped, only pile-up and postprocessing will run.
 
-TOPMed panel (n=97,256). You can upload your VCF to the TOPMed imputation server.
+#### Sample file
+Sample file is tsv-format and has following columns to describe all samples from same patient:
+* (Required columns): SAMPLE, REP_ID, DATA_TYPE, PATH_to_bam
+* (Optional columns): PATH_to_barcodes, PATH_to_10x_ranger
 
-### Mode 1. bulk sample
-If reference Het SNP file from same patient is provided, skip step 1-2.
-1. genotype SNPs via bcftools mpileup+call and keep bi-allelic SNPs.
-    1. normal sample or tumor sample.
-2. phase SNPs via population-based phasing methods
-3. pile-up allele counts via cellsnp-lite mode 1b.
-4. postprocess allele count matrices.
+Some requirements on sample files:
+* All rows should have same `SAMPLE` field, replicates can be distinguished based on replicate ID `REP_ID`
+* Paired scMultiome can be described by two rows with same `REP_ID` and two `DATA_TYPE` values: `scRNA` and `scATAC`.
+* For mode 1, specify `bulkDNA` under `DATA_TYPE`, and use `REP_ID`=`normal` to label the matched-normal sample if available.
+* For mode 2, `DATA_TYPE` can be chosen from `scRNA`, `scATAC`, `VISIUM`, `VISIUM3PRIME`.
 
-### Mode 2. single-cell/Visium sample
-If reference Het SNP file from same patient is provided, skip step 1-2.
-1. genotype SNPs via cellsnp-lite on pseudobulk sample.
-2. phase SNPs via population-based phasing methods
-3. pile-up allele counts via cellsnp-lite mode 1a.
-4. postprocess allele count matrices.
+### Output
 
-### Sample file
-Sample file has following modes:
-1. multiome (scRNA+scATAC) data, shared `REP_ID`, `PATH_to_barcodes` and `PATH_to_10x_ranger`.
-2. multiple scRNA/scATAC/VISIUM replicates. One modality only.
-
-```
-SAMPLE	REP_ID	DATA_TYPE	PATH_to_barcodes	PATH_to_10x_bam	PATH_to_10x_ranger
-HT001	U1	scRNA	barcodes.tsv.gz	s1.bam	s1/
-HT001	U1	scATAC	barcodes.tsv.gz	s2.bam	s1/
-```
 
 ### TODO
 1. Detecting clonal LOH, from Numbat
@@ -59,8 +53,4 @@ HT001	U1	scATAC	barcodes.tsv.gz	s2.bam	s1/
 In samples with high tumor purity (e.g., tumor cell lines) without matched normal cells, heterozygous SNPs are challenging to identify in regions of LoH, leading to decreased power of CNV detection. Regions of clonal LoH have decreased SNP density and can be identified by a specialized HMM (see detect_clonal_loh in function reference).
 ```
 2. mapping resolutions, 2um to Xum?
-3. remove genotype information in output file. Done
-
-
-Rule of thumb from the docs: input/output/log/benchmark are relative to the working directory (--directory), while “other directives” (including script: and include:) are relative to the defining Snakefile.  
-
+3. divides post het SNPs into haplotype blocks, compute RDR, then aggregate to form phased blocks.
