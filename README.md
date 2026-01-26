@@ -43,6 +43,8 @@ Requirements on sample files:
 * Paired scMultiome can be described by two rows with same `REP_ID` and two `DATA_TYPE` values: `scRNA` and `scATAC`.
 * For mode 1, specify `bulkDNA` under `DATA_TYPE`, and use `REP_ID`=`normal` to label the matched-normal sample if available.
 * For mode 2, `DATA_TYPE` can be chosen from `scRNA`, `scATAC`, `VISIUM`, `VISIUM3prime`.
+* provide two separate sample files for mode 1 and mode 2, respectively. Don't interleave bulk and non-bulk samples in same sample file.
+* when both bulk and non-bulk samples from same patient are provided, user should first run mode 1 using bulk samples, set `ref_snp_file=phase/phased_snps.vcf.gz` in config file, and run mode 2 on non-bulk samples.
 
 ### Output
 * `snps/<chromosome>.vcf.gz*`: annotated bi-allelic Het/Hom-Alt SNPs.
