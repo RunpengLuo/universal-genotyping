@@ -107,6 +107,32 @@ def compute_af(dp_mtx, b_mtx, apply_pseudobulk=False):
     return af
 
 
+def compute_af_per_sample(dp_mtx, b_mtx, i: int):
+    dp_col = dp_mtx[:, i]
+    b_col = b_mtx[:, i]
+
+    den = dp_col.toarray().ravel() if issparse(dp_col) else np.asarray(dp_col).ravel()
+    num = b_col.toarray().ravel() if issparse(b_col) else np.asarray(b_col).ravel()
+
+    out = np.full_like(den, np.nan, dtype=np.float32)
+    return np.divide(num, den, out=out, where=(den > 0))
+
+
+def compute_af_pseudobulk(dp_mtx, b_mtx):
+    if issparse(dp_mtx):
+        den = np.asarray(dp_mtx.sum(axis=1)).ravel()
+    else:
+        den = dp_mtx.sum(axis=1)
+
+    if issparse(b_mtx):
+        num = np.asarray(b_mtx.sum(axis=1)).ravel()
+    else:
+        num = b_mtx.sum(axis=1)
+
+    out = np.full(den.shape[0], np.nan, dtype=np.float32)
+    return np.divide(num, den, out=out, where=(den > 0))
+
+
 ##################################################
 def get_mask_by_region(snps: pd.DataFrame, region_bed_file: str) -> np.ndarray:
     """
@@ -195,15 +221,19 @@ def plot_snps_allele_freqs(
     apply_pseudobulk=False,
     allele="ref",
 ):
-    af = compute_af(dp_mtx, b_mtx, apply_pseudobulk)
+    logging.info(
+        f"QC analysis - plot SNPs Allele-frequency, allele={allele}, apply_pseudobulk={apply_pseudobulk}"
+    )
     if apply_pseudobulk:
+        af = compute_af_pseudobulk(dp_mtx, b_mtx)
         plot_file = os.path.join(plot_dir, f"af_{allele}_allele.pseudobulk.pdf")
         plot_snps_allele_freqs_sample(snps, af, genome_file, plot_file)
     else:
+        dp_csc = dp_mtx.tocsc()
+        b_csc = b_mtx.tocsc()
         for i, rep_id in enumerate(rep_ids):
-            plot_file = os.path.join(
-                plot_dir, f"af_{allele}_allele.pseudobulk.{rep_id}.pdf"
-            )
+            plot_file = os.path.join(plot_dir, f"af_{allele}_allele.{rep_id}.pdf")
+            af = compute_af_per_sample(dp_csc, b_csc, i)
             plot_snps_allele_freqs_sample(snps, af[:, i], genome_file, plot_file)
     return
 

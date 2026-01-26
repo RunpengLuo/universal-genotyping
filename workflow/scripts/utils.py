@@ -38,6 +38,16 @@ def read_VCF(vcf_file: str, addchr=True, addkey=False):
 
     if addchr and not str(snps["#CHROM"].iloc[0]).startswith("chr"):
         snps["#CHROM"] = "chr" + snps["#CHROM"].astype(str)
+
+    # sort snps by #CHROM and POS
+    chrom_order = [f"chr{i}" for i in range(1, 23)] + ["chrX", "chrY", "chrM", "chrMT"]
+    snps["#CHROM"] = snps["#CHROM"].str.replace("^chrMT$", "chrM", regex=True)
+    snps["#CHROM"] = pd.Categorical(
+        snps["#CHROM"], categories=chrom_order, ordered=True
+    )
+    snps = snps.sort_values(["#CHROM", "POS"], kind="mergesort")
+
+    # copy #CHR field
     snps["#CHR"] = snps["#CHROM"]
 
     # parse INFO column
