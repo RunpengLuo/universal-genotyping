@@ -48,6 +48,7 @@ def get_gt(row):
     else:
         return "./."
 
+
 ##################################################
 for data_type, raw_snp_file in zip(sm.params["data_types"], sm.input["raw_snp_files"]):
     raw_snps = read_VCF(raw_snp_file)
@@ -101,7 +102,9 @@ if len(snp_lists) > 1:
     final_snps = pd.concat(snp_lists, axis=0, ignore_index=True)
 
     # 1. filter duplicated SNPs common in multiple sources
-    final_snps = final_snps.drop_duplicates(subset=KEY, keep="first").reset_index(drop=True)
+    final_snps = final_snps.drop_duplicates(subset=KEY, keep="first").reset_index(
+        drop=True
+    )
 
     # 3. filter multi-allelic SNPs.
     is_dup = final_snps.duplicated(subset=["#CHROM", "POS"], keep=False)
@@ -135,10 +138,14 @@ for chrname, out_snp_file in zip(chroms, sm.output["snp_files"]):
     chrom = f"chr{chrname}"
     with open(out_snp_file[:-3], "w") as fd:
         fd.write("##fileformat=VCFv4.2\n")
-        fd.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Pseudobulk genotype">\n')
+        fd.write(
+            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Pseudobulk genotype">\n'
+        )
         fd.write("\t".join(cols) + "\n")
         if chrom in final_snps_chs.groups:
-            final_snps_chs.get_group(chrom)[cols].to_csv(fd, sep="\t", index=False, header=False)
+            final_snps_chs.get_group(chrom)[cols].to_csv(
+                fd, sep="\t", index=False, header=False
+            )
 
     # out_snp_file[:-3] will be removed by bgzip.
     subprocess.run(["bgzip", "-f", out_snp_file[:-3]], check=True)

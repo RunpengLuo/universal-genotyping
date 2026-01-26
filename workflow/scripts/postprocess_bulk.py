@@ -10,6 +10,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = str(t)
 
 import numpy as np
 import pandas as pd
+from scipy import sparse
 
 from utils import read_VCF, symlink_force
 from postprocess_utils import *
@@ -30,6 +31,7 @@ vcf_files = sm.input["vcfs"]
 dp_mat_files = sm.input["dp_mats"]
 ad_mat_files = sm.input["ad_mats"]
 region_bed_file = sm.input["region_bed"]
+genome_file = sm.input["genome_size"]
 
 sample_name = sm.params["sample_name"]
 rep_ids = sm.params["rep_ids"]
@@ -40,9 +42,7 @@ min_depth = int(sm.params["min_depth"])
 gamma = float(sm.params["gamma"])
 
 ##################################################
-logging.info(
-    f"postprocess bulk data, sample name={sample_name}"
-)
+logging.info(f"postprocess bulk data, sample name={sample_name}")
 snps = read_VCF(sm.input["snp_file"], addkey=True)
 M = len(snps)
 parent_keys = pd.Index(snps["KEY"])
@@ -128,3 +128,31 @@ if is_phased:
 else:
     symlink_force(sm.output["alt_mtx"], sm.output["a_mtx"])
     symlink_force(sm.output["ref_mtx"], sm.output["b_mtx"])
+
+##################################################
+# QC analysis
+qc_dir = os.path.join(os.path.dirname(sm.output["dp_mtx"]), "qc")
+os.makedirs(qc_dir, exist_ok=True)
+plot_snps_allele_freqs(
+    snps,
+    rep_ids,
+    dp_mtx,
+    ref_mtx,
+    genome_file,
+    qc_dir,
+    apply_pseudobulk=False,
+    allele="ref",
+)
+if is_phased:
+    plot_snps_allele_freqs(
+        snps,
+        rep_ids,
+        dp_mtx,
+        b_mtx,
+        genome_file,
+        qc_dir,
+        apply_pseudobulk=False,
+        allele="B",
+    )
+
+logging.info(f"finished postprocessing bulk data.")

@@ -32,6 +32,7 @@ barcode_files = sm.input["sample_tsvs"]
 dp_mat_files = sm.input["dp_mats"]
 ad_mat_files = sm.input["ad_mats"]
 region_bed_file = sm.input["region_bed"]
+genome_file = sm.input["genome_size"]
 
 sample_name = sm.params["sample_name"]
 modality = sm.params["modality"]
@@ -115,6 +116,31 @@ if modality == "multiome":
         else:
             symlink_force(sm.output["alt_mtx"][i], sm.output["a_mtx"][i])
             symlink_force(sm.output["ref_mtx"][i], sm.output["b_mtx"][i])
+
+        # QC analysis
+        qc_dir = os.path.join(os.path.dirname(sm.output["dp_mtx"][i]), "qc")
+        os.makedirs(qc_dir, exist_ok=True)
+        plot_snps_allele_freqs(
+            snps,
+            rep_ids,
+            dp_mtx,
+            ref_mtx,
+            genome_file,
+            qc_dir,
+            apply_pseudobulk=True,
+            allele="ref",
+        )
+        if is_phased:
+            plot_snps_allele_freqs(
+                snps,
+                rep_ids,
+                dp_mtx,
+                b_mtx,
+                genome_file,
+                qc_dir,
+                apply_pseudobulk=True,
+                allele="B",
+            )
 else:
     num_samples = len(rep_ids)
     barcode_list = []
@@ -150,7 +176,7 @@ else:
     snp_ids = snps["#CHR"].astype(str) + "_" + snps["POS"].astype(str)
     np.save(sm.output["unique_snp_ids"], snp_ids.to_numpy())
     all_barcodes.to_csv(sm.output["all_barcodes"], sep="\t", header=False, index=False)
-    
+
     save_npz(sm.output["dp_mtx"], dp_mtx)
     save_npz(sm.output["ref_mtx"], ref_mtx)
     save_npz(sm.output["alt_mtx"], alt_mtx)
@@ -163,6 +189,31 @@ else:
     else:
         symlink_force(sm.output["alt_mtx"], sm.output["a_mtx"])
         symlink_force(sm.output["ref_mtx"], sm.output["b_mtx"])
+
+    # QC analysis
+    qc_dir = os.path.join(os.path.dirname(sm.output["dp_mtx"]), "qc")
+    os.makedirs(qc_dir, exist_ok=True)
+    plot_snps_allele_freqs(
+        snps,
+        rep_ids,
+        dp_mtx,
+        ref_mtx,
+        genome_file,
+        qc_dir,
+        apply_pseudobulk=True,
+        allele="ref",
+    )
+    if is_phased:
+        plot_snps_allele_freqs(
+            snps,
+            rep_ids,
+            dp_mtx,
+            b_mtx,
+            genome_file,
+            qc_dir,
+            apply_pseudobulk=True,
+            allele="B",
+        )
 
 sample_df = pd.DataFrame({"SAMPLE": [f"{sample_name}_{rep_id}" for rep_id in rep_ids]})
 sample_df["SAMPLE_NAME"] = sample_name

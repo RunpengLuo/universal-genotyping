@@ -1,3 +1,4 @@
+import os
 import logging
 
 import numpy as np
@@ -9,7 +10,11 @@ from scipy.stats import beta
 
 import pyranges as pr
 
-from utils import read_VCF
+import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
+from matplotlib.backends.backend_pdf import PdfPages
+
+from utils import read_VCF, get_chr_sizes
 
 
 ##################################################
@@ -75,6 +80,7 @@ def merge_mats(dp_list: list, ad_list: list):
     ref_mtx = dp_mtx - alt_mtx
     return dp_mtx, ref_mtx, alt_mtx
 
+
 def apply_phase_to_mat(dp_mtx, ref_mtx, alt_mtx, phases):
     p = phases[:, None]
     if issparse(ref_mtx):
@@ -84,6 +90,22 @@ def apply_phase_to_mat(dp_mtx, ref_mtx, alt_mtx, phases):
         b_mtx = ref_mtx * p + alt_mtx * (1 - p)
         a_mtx = dp_mtx - b_mtx
     return a_mtx, b_mtx
+
+
+def compute_af(dp_mtx, b_mtx, apply_pseudobulk=False):
+    dp = dp_mtx.toarray() if issparse(dp_mtx) else dp_mtx
+    b = b_mtx.toarray() if issparse(b_mtx) else b_mtx
+    nsnps = dp.shape[0]
+    if apply_pseudobulk:
+        af = np.divide(
+            np.sum(b, axis=1),
+            np.sum(dp, axis=1),
+            out=np.full(nsnps, np.nan, dtype=np.float32),
+        )
+    else:
+        af = np.divide(b, dp, out=np.full(dp.shape, np.nan, dtype=np.float32))
+    return af
+
 
 ##################################################
 def get_mask_by_region(snps: pd.DataFrame, region_bed_file: str) -> np.ndarray:
@@ -100,7 +122,7 @@ def get_mask_by_region(snps: pd.DataFrame, region_bed_file: str) -> np.ndarray:
         header=None,
         usecols=[0, 1, 2],
         names=["Chromosome", "Start", "End"],
-        dtype={0: "string"}
+        dtype={0: "string"},
     )
     if not str(regions["Chromosome"].iloc[0]).startswith("chr"):
         if str(snps["#CHR"].iloc[0]).startswith("chr"):
@@ -116,10 +138,11 @@ def get_mask_by_region(snps: pd.DataFrame, region_bed_file: str) -> np.ndarray:
     overlapping = pr_snps.overlap(pr_regions).df.rename(columns={"Chromosome": "#CHR"})
 
     mask = (
-        snp_positions[["#CHR","POS"]]
-        .merge(overlapping[["#CHR","POS"]],
-            on=["#CHR","POS"], how="left", indicator=True)
-        ["_merge"].eq("both")
+        snp_positions[["#CHR", "POS"]]
+        .merge(
+            overlapping[["#CHR", "POS"]], on=["#CHR", "POS"], how="left", indicator=True
+        )["_merge"]
+        .eq("both")
         .to_numpy(dtype=bool)
     )
 
@@ -136,7 +159,11 @@ def get_mask_by_depth(snps: pd.DataFrame, dp_mtx: csr_matrix, min_dp=1):
 
 
 def get_mask_by_het_balanced(
-    snps: pd.DataFrame, ref_mtx: csr_matrix, alt_mtx: csr_matrix, gamma: float, normal_idx=0
+    snps: pd.DataFrame,
+    ref_mtx: csr_matrix,
+    alt_mtx: csr_matrix,
+    gamma: float,
+    normal_idx=0,
 ):
     """
     mask SNPs if normal sample failed beta-posterior credible interval test with beta(1, 1) prior.
@@ -146,10 +173,86 @@ def get_mask_by_het_balanced(
     p_upper = 1.0 - p_lower
     q = np.array([p_lower, p_upper])
     het_cred_ints = beta.ppf(
-        q[None, :], ref_mtx[:, normal_idx][:, None] + 1, alt_mtx[:, normal_idx][:, None] + 1
+        q[None, :],
+        ref_mtx[:, normal_idx][:, None] + 1,
+        alt_mtx[:, normal_idx][:, None] + 1,
     )
     mask = (het_cred_ints[:, 0] <= 0.5) & (0.5 <= het_cred_ints[:, 1])
     logging.info(
         f"filter by balanced Het-SNPs on normal sample, gamma={gamma}, #passed SNPs={np.sum(mask)}/{len(snps)}"
     )
     return mask
+
+
+##################################################
+def plot_snps_allele_freqs(
+    snps,
+    rep_ids,
+    dp_mtx,
+    b_mtx,
+    genome_file,
+    plot_dir,
+    apply_pseudobulk=False,
+    allele="ref",
+):
+    af = compute_af(dp_mtx, b_mtx, apply_pseudobulk)
+    if apply_pseudobulk:
+        plot_file = os.path.join(plot_dir, f"af_{allele}_allele.pseudobulk.pdf")
+        plot_snps_allele_freqs_sample(snps, af, genome_file, plot_file)
+    else:
+        for i, rep_id in enumerate(rep_ids):
+            plot_file = os.path.join(
+                plot_dir, f"af_{allele}_allele.pseudobulk.{rep_id}.pdf"
+            )
+            plot_snps_allele_freqs_sample(snps, af[:, i], genome_file, plot_file)
+    return
+
+
+def plot_snps_allele_freqs_sample(
+    snps: pd.DataFrame,
+    af: np.ndarray,
+    genome_file: str,
+    out_file: str,
+    s=4,
+    dpi=150,
+):
+    logging.info(f"plot 1D per-SNP B-allele frequency, out_file={out_file}")
+    chrom_sizes = get_chr_sizes(genome_file)
+
+    ch = snps["#CHR"].to_numpy()
+    pos = snps["POS"].to_numpy()
+    # find contiguous chromosome blocks
+    change = np.flatnonzero(ch[1:] != ch[:-1]) + 1
+    starts = np.r_[0, change]
+    ends = np.r_[change, len(snps)]
+    chroms = ch[starts]
+
+    pdf_fd = PdfPages(out_file)
+    for chrom, lo, hi in zip(chroms, starts, ends):
+        chr_end = chrom_sizes.get(chrom)
+        if chr_end is None:
+            logging.warning(f"{chrom}: not found in {genome_file}")
+            continue
+
+        x = pos[lo:hi]
+        y = af[lo:hi]
+        m = np.isfinite(y)
+
+        n_all = hi - lo
+        n_plot = int(m.sum())
+        if n_plot == 0:
+            logging.warning(f"{chrom}: all SNPs have non-finite AF")
+            continue
+
+        logging.info(f"plot {chrom} with #SNP={n_plot}/{n_all}")
+        fig, ax = plt.subplots(1, 1, figsize=(40, 3))
+        ax.scatter(x[m], y[m], s=s, alpha=0.6, rasterized=True)
+        ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
+        ax.set_ylim(-0.05, 1.05)
+        ax.set_xlim(0, chr_end)
+        ax.grid(alpha=0.2)
+        ax.set_title(f"allele-frequency plot - {chrom}")
+        pdf_fd.savefig(fig, dpi=dpi)
+        plt.close(fig)
+    pdf_fd.close()
+    return

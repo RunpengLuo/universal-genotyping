@@ -2,9 +2,20 @@ import os
 import sys
 import subprocess
 from io import StringIO
+from collections import OrderedDict
 
 import pandas as pd
 import numpy as np
+
+
+def get_chr_sizes(sz_file: str):
+    chr_sizes = OrderedDict()
+    with open(sz_file, "r") as rfd:
+        for line in rfd.readlines():
+            ch, sizes = line.strip().split()
+            chr_sizes[ch] = int(sizes)
+        rfd.close()
+    return chr_sizes
 
 
 def read_VCF(vcf_file: str, addchr=True, addkey=False):
@@ -12,7 +23,9 @@ def read_VCF(vcf_file: str, addchr=True, addkey=False):
     load VCF file as dataframe.
     If phased, parse GT[0] as USEREF, check PS
     """
-    snps = pd.read_csv(vcf_file, comment="#", sep="\t", header=None, dtype={0: "string"})
+    snps = pd.read_csv(
+        vcf_file, comment="#", sep="\t", header=None, dtype={0: "string"}
+    )
     if snps.empty:
         return None
     ncols = snps.shape[1]
@@ -61,7 +74,7 @@ def read_VCF(vcf_file: str, addchr=True, addkey=False):
             index="row", columns="key", values="val", aggfunc="first"
         )
         snps = snps.drop(columns=["FORMAT", "SAMPLE"]).join(fmt_wide)
-    
+
     if "GT" in snps.columns and "PS" not in snps.columns:
         # global phased block if PS information N/A
         snps["PS"] = 1
@@ -69,6 +82,7 @@ def read_VCF(vcf_file: str, addchr=True, addkey=False):
         snps["KEY"] = snps["#CHROM"].astype(str) + "_" + snps["POS"].astype(str)
     snps = snps.reset_index(drop=True)
     return snps
+
 
 def symlink_force(src, dst):
     try:

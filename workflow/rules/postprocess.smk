@@ -6,12 +6,15 @@ rule postprocess_matrix_bulk:
         ad_mats=lambda wc: expand("pileup/bulkDNA_{rep_id}/cellSNP.tag.AD.mtx", rep_id=mod2reps["bulkDNA"]),
         snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
         region_bed=lambda wc: config["region_bed"],
+        genome_size=lambda wc: config["genome_size"],
     output:
         sample_file="allele/bulkDNA/samples_ids.tsv",
         info_file="allele/bulkDNA/snp_info.tsv.gz",
         dp_mtx="allele/bulkDNA/snp_matrix.dp.npz",
         alt_mtx="allele/bulkDNA/snp_matrix.alt.npz",
         ref_mtx="allele/bulkDNA/snp_matrix.ref.npz",
+        a_mtx="allele/bulkDNA/snp_matrix.A.npz",
+        b_mtx="allele/bulkDNA/snp_matrix.B.npz",
     params:
         sample_name=SAMPLE_ID,
         modality="bulkDNA",
@@ -34,6 +37,7 @@ rule postprocess_matrix_aggregate_one_data_type:
         ad_mats=lambda wc: expand("pileup/{data_type}_{rep_id}/cellSNP.tag.AD.mtx", data_type=wc.data_type, rep_id=mod2reps[wc.data_type]),
         snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
         region_bed=lambda wc: config["region_bed"],
+        genome_size=lambda wc: config["genome_size"],
     output:
         sample_file="allele/{data_type}/samples_ids.tsv",
         info_file="allele/{data_type}/snp_info.tsv.gz",
@@ -66,16 +70,17 @@ rule postprocess_matrix_multiome_per_replicate:
         ad_mats=lambda wc: [f"pileup/{data_type}_{wc.rep_id}/cellSNP.tag.AD.mtx" for data_type in ["scRNA", "scATAC"]],
         snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
         region_bed=lambda wc: config["region_bed"],
+        genome_size=lambda wc: config["genome_size"],
     output:
         sample_file="allele/multiome_{rep_id}/samples_ids.tsv",
         all_barcodes="allele/multiome_{rep_id}/barcodes.txt",
         info_file="allele/multiome_{rep_id}/snp_info.tsv.gz",
         unique_snp_ids="allele/multiome_{rep_id}/unique_snp_ids.npy",
-        dp_mtx=["allele/multiome_{rep_id}/" + f"snp_matrix.{data_type}.dp.npz" for data_type in ["scRNA", "scATAC"]],
-        alt_mtx=["allele/multiome_{rep_id}/" + f"snp_matrix.{data_type}.alt.npz" for data_type in ["scRNA", "scATAC"]],
-        ref_mtx=["allele/multiome_{rep_id}/" + f"snp_matrix.{data_type}.ref.npz" for data_type in ["scRNA", "scATAC"]],
-        a_mtx=["allele/multiome_{rep_id}/" + f"cell_snp_Aallele.{data_type}.npz" for data_type in ["scRNA", "scATAC"]],
-        b_mtx=["allele/multiome_{rep_id}/" + f"cell_snp_Ballele.{data_type}.npz" for data_type in ["scRNA", "scATAC"]],
+        dp_mtx=["allele/multiome_{rep_id}/" + f"{data_type}_snp_matrix.dp.npz" for data_type in ["scRNA", "scATAC"]],
+        alt_mtx=["allele/multiome_{rep_id}/" + f"{data_type}_snp_matrix.alt.npz" for data_type in ["scRNA", "scATAC"]],
+        ref_mtx=["allele/multiome_{rep_id}/" + f"{data_type}_snp_matrix.ref.npz" for data_type in ["scRNA", "scATAC"]],
+        a_mtx=["allele/multiome_{rep_id}/" + f"{data_type}_snp_matrix.A.npz" for data_type in ["scRNA", "scATAC"]],
+        b_mtx=["allele/multiome_{rep_id}/" + f"{data_type}_snp_matrix.B.npz" for data_type in ["scRNA", "scATAC"]],
     params:
         sample_name=SAMPLE_ID,
         modality="multiome",
@@ -83,6 +88,6 @@ rule postprocess_matrix_multiome_per_replicate:
         rep_ids=lambda wc: [wc.rep_id],
         mask_out_of_region=config["params_postprocess"]["mask_out_of_region"],
     log:
-        "logs/postprocess.multiome_{rep_id}.log"
+        "logs/postprocess.multiome.{rep_id}.log"
     script:
         """../scripts/postprocess_nonbulk.py"""
