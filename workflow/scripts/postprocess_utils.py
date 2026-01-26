@@ -14,14 +14,14 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.backends.backend_pdf import PdfPages
 
-from utils import read_VCF, get_chr_sizes
+from utils import *
 
 
 ##################################################
 def canon_mat_one_replicate(
     parent_keys: pd.Index,
     vcf_file: str,
-    dp_mat_file: str,
+    tot_mat_file: str,
     ad_mat_file: str,
     ncells: int,
 ):
@@ -41,11 +41,11 @@ def canon_mat_one_replicate(
     present = child_loc >= 0
     logging.info(f"located SNPs in parent={present.sum()}/{M}")
 
-    dp_mtx: csr_matrix = mmread(dp_mat_file).tocsr()
+    tot_mtx: csr_matrix = mmread(tot_mat_file).tocsr()
     ad_mtx: csr_matrix = mmread(ad_mat_file).tocsr()
 
-    assert dp_mtx.shape == ad_mtx.shape
-    assert dp_mtx.shape == (m, ncells)
+    assert tot_mtx.shape == ad_mtx.shape
+    assert tot_mtx.shape == (m, ncells)
 
     # parent-row indices that exist in child slice
     # e.g., [0, 2, 3], located SNP index in parent [0, M).
@@ -54,11 +54,11 @@ def canon_mat_one_replicate(
     common_cidx = child_loc[present]
 
     # expanded DP mtx
-    dp_present = dp_mtx[common_cidx, :].tocoo()
-    dp_canon = csr_matrix(
-        (dp_present.data, (common_pidx[dp_present.row], dp_present.col)),
+    tot_present = tot_mtx[common_cidx, :].tocoo()
+    tot_canon = csr_matrix(
+        (tot_present.data, (common_pidx[tot_present.row], tot_present.col)),
         shape=(M, ncells),
-        dtype=dp_mtx.dtype,
+        dtype=tot_mtx.dtype,
     )
 
     # expanded AD mtx
@@ -69,60 +69,45 @@ def canon_mat_one_replicate(
         dtype=ad_mtx.dtype,
     )
 
-    return dp_canon, ad_canon
+    return tot_canon, ad_canon
 
 
-def merge_mats(dp_list: list, ad_list: list):
-    if len(dp_list) == 1:
-        return dp_list[0], dp_list[0] - ad_list[0], ad_list[0]
-    dp_mtx = hstack(dp_list, format="csr")
+def merge_mats(tot_list: list, ad_list: list):
+    if len(tot_list) == 1:
+        return tot_list[0], tot_list[0] - ad_list[0], ad_list[0]
+    tot_mtx = hstack(tot_list, format="csr")
     alt_mtx = hstack(ad_list, format="csr")
-    ref_mtx = dp_mtx - alt_mtx
-    return dp_mtx, ref_mtx, alt_mtx
+    ref_mtx = tot_mtx - alt_mtx
+    return tot_mtx, ref_mtx, alt_mtx
 
 
-def apply_phase_to_mat(dp_mtx, ref_mtx, alt_mtx, phases):
+def apply_phase_to_mat(tot_mtx, ref_mtx, alt_mtx, phases):
     p = phases[:, None]
     if issparse(ref_mtx):
         b_mtx = ref_mtx.multiply(p) + alt_mtx.multiply(1 - p)
-        a_mtx = dp_mtx - b_mtx
+        a_mtx = tot_mtx - b_mtx
     else:
         b_mtx = ref_mtx * p + alt_mtx * (1 - p)
-        a_mtx = dp_mtx - b_mtx
+        a_mtx = tot_mtx - b_mtx
     return a_mtx, b_mtx
 
 
-def compute_af(dp_mtx, b_mtx, apply_pseudobulk=False):
-    dp = dp_mtx.toarray() if issparse(dp_mtx) else dp_mtx
-    b = b_mtx.toarray() if issparse(b_mtx) else b_mtx
-    nsnps = dp.shape[0]
-    if apply_pseudobulk:
-        af = np.divide(
-            np.sum(b, axis=1),
-            np.sum(dp, axis=1),
-            out=np.full(nsnps, np.nan, dtype=np.float32),
-        )
-    else:
-        af = np.divide(b, dp, out=np.full(dp.shape, np.nan, dtype=np.float32))
-    return af
-
-
-def compute_af_per_sample(dp_mtx, b_mtx, i: int):
-    dp_col = dp_mtx[:, i]
+def compute_af_per_sample(tot_mtx, b_mtx, i: int):
+    tot_col = tot_mtx[:, i]
     b_col = b_mtx[:, i]
 
-    den = dp_col.toarray().ravel() if issparse(dp_col) else np.asarray(dp_col).ravel()
+    den = tot_col.toarray().ravel() if issparse(tot_col) else np.asarray(tot_col).ravel()
     num = b_col.toarray().ravel() if issparse(b_col) else np.asarray(b_col).ravel()
 
     out = np.full_like(den, np.nan, dtype=np.float32)
     return np.divide(num, den, out=out, where=(den > 0))
 
 
-def compute_af_pseudobulk(dp_mtx, b_mtx):
-    if issparse(dp_mtx):
-        den = np.asarray(dp_mtx.sum(axis=1)).ravel()
+def compute_af_pseudobulk(tot_mtx, b_mtx):
+    if issparse(tot_mtx):
+        den = np.asarray(tot_mtx.sum(axis=1)).ravel()
     else:
-        den = dp_mtx.sum(axis=1)
+        den = tot_mtx.sum(axis=1)
 
     if issparse(b_mtx):
         num = np.asarray(b_mtx.sum(axis=1)).ravel()
@@ -134,7 +119,7 @@ def compute_af_pseudobulk(dp_mtx, b_mtx):
 
 
 ##################################################
-def get_mask_by_region(snps: pd.DataFrame, region_bed_file: str) -> np.ndarray:
+def get_mask_by_region(snps: pd.DataFrame, regions: pd.DataFrame) -> np.ndarray:
     """
     Return a boolean mask (len == len(snps)) indicating whether each SNP (CHR, POS)
     overlaps any interval in a BED-like file (Chromosome, Start, End), using 0-based
@@ -142,18 +127,6 @@ def get_mask_by_region(snps: pd.DataFrame, region_bed_file: str) -> np.ndarray:
 
     Assumes SNP POS is 1-based. Converts each SNP to an interval [POS-1, POS).
     """
-    regions = pd.read_table(
-        region_bed_file,
-        sep="\t",
-        header=None,
-        usecols=[0, 1, 2],
-        names=["Chromosome", "Start", "End"],
-        dtype={0: "string"},
-    )
-    if not str(regions["Chromosome"].iloc[0]).startswith("chr"):
-        if str(snps["#CHR"].iloc[0]).startswith("chr"):
-            regions["Chromosome"] = "chr" + regions["Chromosome"].astype(str)
-
     snp_positions = snps[["#CHR", "POS"]].copy()
     snp_positions["Start"] = snp_positions["POS"].astype(np.int64) - 1
     snp_positions["End"] = snp_positions["POS"].astype(np.int64)
@@ -176,8 +149,8 @@ def get_mask_by_region(snps: pd.DataFrame, region_bed_file: str) -> np.ndarray:
     return mask
 
 
-def get_mask_by_depth(snps: pd.DataFrame, dp_mtx: csr_matrix, min_dp=1):
-    mask = np.asarray(dp_mtx.sum(axis=1)).ravel() >= min_dp
+def get_mask_by_depth(snps: pd.DataFrame, tot_mtx: csr_matrix, min_dp=1):
+    mask = np.asarray(tot_mtx.sum(axis=1)).ravel() >= min_dp
     logging.info(
         f"filter by depth, min_dp={min_dp}, #passed SNPs={np.sum(mask)}/{len(snps)}"
     )
@@ -211,10 +184,79 @@ def get_mask_by_het_balanced(
 
 
 ##################################################
+def subset_baf(
+    baf_df: pd.DataFrame, ch: str, start: int, end: int, is_last_block=False
+):
+    if ch != None:
+        baf_ch = baf_df[baf_df["#CHR"] == ch]
+    else:
+        baf_ch = baf_df
+    if baf_ch.index.name == "POS":
+        pos = baf_ch.index
+    else:
+        pos = baf_ch["POS"]
+    if is_last_block:
+        return baf_ch[(pos >= start) & (pos <= end)]
+    else:
+        return baf_ch[(pos >= start) & (pos < end)]
+
+
+def assign_snp_bounderies(snp_positions: pd.DataFrame, regions: pd.DataFrame):
+    """
+    divide regions into [START, END) subregions, each subregion has one SNP.
+    If a SNP is out-of-region, its START and END will be 0 and region_id will be 0.
+    """
+    print("assign SNP bounderies")
+    snp_info: pd.DataFrame = snp_positions.copy(deep=True)
+    snp_info["POS0"] = snp_info["POS"] - 1
+    snp_info["START"] = 0
+    snp_info["END"] = 0
+
+    snp_info["region_id"] = 0
+    region_id = 0
+
+    chroms = snp_info["#CHR"].unique().tolist()
+    region_grps_ch = regions.groupby(by="#CHR", sort=False)
+    for chrom in chroms:
+        regions_ch = region_grps_ch.get_group(chrom)
+        for _, region in regions_ch.iterrows():
+            reg_start, reg_end = region["START"], region["END"]
+            reg_snps = subset_baf(snp_info, chrom, reg_start, reg_end)
+            if len(reg_snps) == 0:
+                continue
+            reg_snp_positions = reg_snps["POS0"].to_numpy()
+            reg_snp_indices = reg_snps.index.to_numpy()
+
+            # annotate region ID
+            snp_info.loc[reg_snp_indices, "region_id"] = region_id
+            region_id += 1
+
+            # build SNP bounderies
+            if len(reg_snps) == 1:
+                snp_info.loc[reg_snp_indices, "START"] = reg_start
+                snp_info.loc[reg_snp_indices, "END"] = reg_end
+            else:
+                reg_bounderies = np.ceil(
+                    np.vstack([reg_snp_positions[:-1], reg_snp_positions[1:]]).mean(
+                        axis=0
+                    )
+                ).astype(np.uint32)
+                reg_bounderies = np.concatenate(
+                    [[reg_start], reg_bounderies, [reg_end]]
+                )
+                snp_info.loc[reg_snp_indices, "START"] = reg_bounderies[:-1]
+                snp_info.loc[reg_snp_indices, "END"] = reg_bounderies[1:]
+
+    snp_info["BLOCKSIZE"] = snp_info["END"] - snp_info["START"]
+    print(snp_info["BLOCKSIZE"].describe().T)
+    return snp_info
+
+
+##################################################
 def plot_snps_allele_freqs(
     snps,
     rep_ids,
-    dp_mtx,
+    tot_mtx,
     b_mtx,
     genome_file,
     plot_dir,
@@ -225,15 +267,15 @@ def plot_snps_allele_freqs(
         f"QC analysis - plot SNPs Allele-frequency, allele={allele}, apply_pseudobulk={apply_pseudobulk}"
     )
     if apply_pseudobulk:
-        af = compute_af_pseudobulk(dp_mtx, b_mtx)
+        af = compute_af_pseudobulk(tot_mtx, b_mtx)
         plot_file = os.path.join(plot_dir, f"af_{allele}_allele.pseudobulk.pdf")
         plot_snps_allele_freqs_sample(snps, af, genome_file, plot_file)
     else:
-        dp_csc = dp_mtx.tocsc()
+        tot_csc = tot_mtx.tocsc()
         b_csc = b_mtx.tocsc()
         for i, rep_id in enumerate(rep_ids):
             plot_file = os.path.join(plot_dir, f"af_{allele}_allele.{rep_id}.pdf")
-            af = compute_af_per_sample(dp_csc, b_csc, i)
+            af = compute_af_per_sample(tot_csc, b_csc, i)
             plot_snps_allele_freqs_sample(snps, af[:, i], genome_file, plot_file)
     return
 

@@ -94,6 +94,20 @@ def read_VCF(vcf_file: str, addchr=True, addkey=False):
     return snps
 
 
+def read_region_file(region_bed_file: str, addchr=True):
+    regions = pd.read_table(
+        region_bed_file,
+        sep="\t",
+        header=None,
+        usecols=[0, 1, 2],
+        names=["Chromosome", "Start", "End"],
+        dtype={0: "string"},
+    )
+    if not str(regions["Chromosome"].iloc[0]).startswith("chr") and addchr:
+        regions["Chromosome"] = "chr" + regions["Chromosome"].astype(str)
+    return regions
+
+
 def symlink_force(src, dst):
     try:
         os.remove(dst)

@@ -7,7 +7,7 @@ rule pileup_snps_cellsnp_lite_cell:
     output:
         cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
         sample_file="pileup/{data_type}_{rep_id}/cellSNP.samples.tsv",
-        dp_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx",
+        tot_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx",
         ad_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.AD.mtx",
     wildcard_constraints:
         data_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
@@ -23,7 +23,6 @@ rule pileup_snps_cellsnp_lite_cell:
         "logs/pileup_snps.{data_type}_{rep_id}.log"
     shell:
         r"""
-        set -euo pipefail
         cellsnp_dir=$(dirname "{output.cellsnp_file}")
         {params.cellsnp_lite} \
             -b "{input.barcode}" \
@@ -35,7 +34,7 @@ rule pileup_snps_cellsnp_lite_cell:
             --minCOUNT {params.minCOUNT} \
             --UMItag {params.UMItag} \
             --cellTAG {params.cellTAG} \
-            --gzip >> "{log}" 2>&1
+            --gzip
         """
 
 rule pileup_snps_cellsnp_lite_bulk:
@@ -45,7 +44,7 @@ rule pileup_snps_cellsnp_lite_bulk:
     output:
         cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
         sample_file="pileup/{data_type}_{rep_id}/cellSNP.samples.tsv",
-        dp_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx",
+        tot_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx",
         ad_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.AD.mtx",
     wildcard_constraints:
         data_type="bulkDNA"
@@ -60,7 +59,6 @@ rule pileup_snps_cellsnp_lite_bulk:
         "logs/pileup_snps.{data_type}_{rep_id}.log"
     shell:
         r"""
-        set -euo pipefail
         cellsnp_dir=$(dirname "{output.cellsnp_file}")
         {params.cellsnp_lite} \
             -s "{input.bam}" \
@@ -71,7 +69,7 @@ rule pileup_snps_cellsnp_lite_bulk:
             --minCOUNT {params.minCOUNT} \
             --UMItag {params.UMItag} \
             --cellTAG {params.cellTAG} \
-            --gzip >> "{log}" 2>&1
+            --gzip
         """
 
 # rule pileup_snps_bcftools_bulk:

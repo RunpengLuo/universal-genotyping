@@ -42,7 +42,7 @@ Some requirements on sample files:
 * All rows should have same `SAMPLE` field, replicates can be distinguished based on replicate ID `REP_ID`
 * Paired scMultiome can be described by two rows with same `REP_ID` and two `DATA_TYPE` values: `scRNA` and `scATAC`.
 * For mode 1, specify `bulkDNA` under `DATA_TYPE`, and use `REP_ID`=`normal` to label the matched-normal sample if available.
-* For mode 2, `DATA_TYPE` can be chosen from `scRNA`, `scATAC`, `VISIUM`, `VISIUM3PRIME`.
+* For mode 2, `DATA_TYPE` can be chosen from `scRNA`, `scATAC`, `VISIUM`, `VISIUM3prime`.
 
 ### Output
 

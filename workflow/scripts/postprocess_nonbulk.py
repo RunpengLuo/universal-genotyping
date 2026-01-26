@@ -29,7 +29,7 @@ logging.basicConfig(
 # inputs
 vcf_files = sm.input["vcfs"]
 barcode_files = sm.input["sample_tsvs"]
-dp_mat_files = sm.input["dp_mats"]
+tot_mat_files = sm.input["tot_mats"]
 ad_mat_files = sm.input["ad_mats"]
 region_bed_file = sm.input["region_bed"]
 genome_file = sm.input["genome_size"]
@@ -49,6 +49,13 @@ M = len(snps)
 parent_keys = pd.Index(snps["KEY"])
 assert not parent_keys.duplicated().any(), "invalid bi-allelic SNP VCF file"
 
+# add per-SNP subregion info
+regions = read_region_file(
+    region_bed_file, addchr=str(snps["#CHR"].iloc[0]).startswith("chr")
+)
+snps = assign_snp_bounderies(snps, regions)
+snp_cols = ["#CHR", "POS", "START", "END", "BLOCKSIZE", "region_id"]
+
 # load phase information
 gt = snps["GT"].astype(str)
 is_phased_arr = gt.str.contains(r"\|", na=False).to_numpy()
@@ -65,7 +72,7 @@ logging.info(f"SNP file is phased={is_phased}")
 
 snp_mask = np.ones(len(snps), dtype=bool)
 if mask_by_region:
-    snp_mask = snp_mask & get_mask_by_region(snps, region_bed_file)
+    snp_mask = snp_mask & get_mask_by_region(snps, regions)
 
 if modality == "multiome":
     barcodes_gex = pd.read_table(
@@ -79,35 +86,42 @@ if modality == "multiome":
     ncells = len(barcodes)
     rep_id = rep_ids[0]
 
-    dp_mtx_list = []
+    tot_mtx_list = []
     ref_mtx_list = []
     alt_mtx_list = []
     for i, data_type in enumerate(data_types):
-        dp_mtx, alt_mtx = canon_mat_one_replicate(
-            parent_keys, vcf_files[i], dp_mat_files[i], ad_mat_files[i], ncells
+        tot_mtx, alt_mtx = canon_mat_one_replicate(
+            parent_keys, vcf_files[i], tot_mat_files[i], ad_mat_files[i], ncells
         )
-        ref_mtx = dp_mtx - alt_mtx
-        dp_mtx_list.append(dp_mtx)
+        ref_mtx = tot_mtx - alt_mtx
+        tot_mtx_list.append(tot_mtx)
         ref_mtx_list.append(ref_mtx)
         alt_mtx_list.append(alt_mtx)
     snps = snps.loc[snp_mask, :].reset_index(drop=True)
 
     # save outputs
+    snps.to_csv(
+        sm.output["bed_file"],
+        columns=["#CHR", "START", "END"],
+        sep="\t",
+        header=False,
+        index=False,
+    )
     snps.to_csv(sm.output["info_file"], sep="\t", header=True, index=False)
     snp_ids = snps["#CHR"].astype(str) + "_" + snps["POS"].astype(str)
     np.save(sm.output["unique_snp_ids"], snp_ids.to_numpy())
     barcodes.to_csv(sm.output["barcode_file"], sep="\t", header=False, index=False)
     for i, data_type in enumerate(["scRNA", "scATAC"]):
-        dp_mtx = dp_mtx_list[i][snp_mask, :]
+        tot_mtx = tot_mtx_list[i][snp_mask, :]
         ref_mtx = ref_mtx_list[i][snp_mask, :]
         alt_mtx = alt_mtx_list[i][snp_mask, :]
         # save as sparse matrix
-        save_npz(sm.output["dp_mtx"][i], dp_mtx)
+        save_npz(sm.output["tot_mtx"][i], tot_mtx)
         save_npz(sm.output["ref_mtx"][i], ref_mtx)
         save_npz(sm.output["alt_mtx"][i], alt_mtx)
         if is_phased:
             a_mtx, b_mtx = apply_phase_to_mat(
-                dp_mtx, ref_mtx, alt_mtx, phases[snp_mask]
+                tot_mtx, ref_mtx, alt_mtx, phases[snp_mask]
             )
             a_mtx = a_mtx.astype(np.int32, copy=False)
             b_mtx = b_mtx.astype(np.int32, copy=False)
@@ -118,12 +132,12 @@ if modality == "multiome":
             symlink_force(sm.output["ref_mtx"][i], sm.output["b_mtx"][i])
 
         # QC analysis
-        qc_dir = os.path.join(os.path.dirname(sm.output["dp_mtx"][i]), "qc")
+        qc_dir = os.path.join(os.path.dirname(sm.output["tot_mtx"][i]), "qc")
         os.makedirs(qc_dir, exist_ok=True)
         plot_snps_allele_freqs(
             snps,
             rep_ids,
-            dp_mtx,
+            tot_mtx,
             ref_mtx,
             genome_file,
             qc_dir,
@@ -134,7 +148,7 @@ if modality == "multiome":
             plot_snps_allele_freqs(
                 snps,
                 rep_ids,
-                dp_mtx,
+                tot_mtx,
                 b_mtx,
                 genome_file,
                 qc_dir,
@@ -144,7 +158,7 @@ if modality == "multiome":
 else:
     num_samples = len(rep_ids)
     barcode_list = []
-    dp_mtx_list = []
+    tot_mtx_list = []
     ad_mtx_list = []
     for i, rep_id in enumerate(rep_ids):
         barcodes = pd.read_table(
@@ -152,36 +166,43 @@ else:
         )
         if len(rep_ids) > 1:
             barcodes["BARCODE"] = barcodes["BARCODE"].astype(str) + f"_{rep_id}"
-        dp_canon, ad_canon = canon_mat_one_replicate(
+        tot_canon, ad_canon = canon_mat_one_replicate(
             parent_keys,
             vcf_files[i],
-            dp_mat_files[i],
+            tot_mat_files[i],
             ad_mat_files[i],
             ncells=len(barcodes),
         )
         barcode_list.append(barcodes)
-        dp_mtx_list.append(dp_canon)
+        tot_mtx_list.append(tot_canon)
         ad_mtx_list.append(ad_canon)
 
     all_barcodes = pd.concat(barcode_list, axis=0, ignore_index=True)
-    dp_mtx, ref_mtx, alt_mtx = merge_mats(dp_mtx_list, ad_mtx_list)
+    tot_mtx, ref_mtx, alt_mtx = merge_mats(tot_mtx_list, ad_mtx_list)
     snps = snps.loc[snp_mask, :].reset_index(drop=True)
 
-    dp_mtx = dp_mtx[snp_mask, :]
+    tot_mtx = tot_mtx[snp_mask, :]
     ref_mtx = ref_mtx[snp_mask, :]
     alt_mtx = alt_mtx[snp_mask, :]
 
     # save outputs
+    snps.to_csv(
+        sm.output["bed_file"],
+        columns=["#CHR", "START", "END"],
+        sep="\t",
+        header=False,
+        index=False,
+    )
     snps.to_csv(sm.output["info_file"], sep="\t", header=True, index=False)
     snp_ids = snps["#CHR"].astype(str) + "_" + snps["POS"].astype(str)
     np.save(sm.output["unique_snp_ids"], snp_ids.to_numpy())
     all_barcodes.to_csv(sm.output["all_barcodes"], sep="\t", header=False, index=False)
 
-    save_npz(sm.output["dp_mtx"], dp_mtx)
+    save_npz(sm.output["tot_mtx"], tot_mtx)
     save_npz(sm.output["ref_mtx"], ref_mtx)
     save_npz(sm.output["alt_mtx"], alt_mtx)
     if is_phased:
-        a_mtx, b_mtx = apply_phase_to_mat(dp_mtx, ref_mtx, alt_mtx, phases[snp_mask])
+        a_mtx, b_mtx = apply_phase_to_mat(tot_mtx, ref_mtx, alt_mtx, phases[snp_mask])
         a_mtx = a_mtx.astype(np.int32, copy=False)
         b_mtx = b_mtx.astype(np.int32, copy=False)
         save_npz(sm.output["a_mtx"], a_mtx)
@@ -191,12 +212,12 @@ else:
         symlink_force(sm.output["ref_mtx"], sm.output["b_mtx"])
 
     # QC analysis
-    qc_dir = os.path.join(os.path.dirname(sm.output["dp_mtx"]), "qc")
+    qc_dir = os.path.join(os.path.dirname(sm.output["tot_mtx"]), "qc")
     os.makedirs(qc_dir, exist_ok=True)
     plot_snps_allele_freqs(
         snps,
         rep_ids,
-        dp_mtx,
+        tot_mtx,
         ref_mtx,
         genome_file,
         qc_dir,
@@ -207,7 +228,7 @@ else:
         plot_snps_allele_freqs(
             snps,
             rep_ids,
-            dp_mtx,
+            tot_mtx,
             b_mtx,
             genome_file,
             qc_dir,

@@ -27,9 +27,9 @@ assert all(dt in allowed_data_types for dt in all_data_types)
 
 if "bulkDNA" in all_data_types:
     assert len(all_data_types) == 1, "mode 1 cannot have non-bulk samples, run the workflow in 2 steps"
-    mode = "bulk"
+    workflow_mode = "bulk"
 else:
-    mode = "single_cell"
+    workflow_mode = "single_cell"
 
 rep_ids = sample_df["REP_ID"].unique().tolist()
 get_data = {}
@@ -151,19 +151,20 @@ for mod, rep_ids in mod2reps.items():
         final_targets.append(f"allele/{mod}/samples_ids.tsv")
         final_targets.append(f"allele/{mod}/snp_info.tsv.gz")
         final_targets.append(f"allele/{mod}/snp_matrix.dp.npz")
+        final_targets.append(f"allele/{mod}/snp_matrix.tot.npz")
         final_targets.append(f"allele/{mod}/snp_matrix.alt.npz")
         final_targets.append(f"allele/{mod}/snp_matrix.ref.npz")
     elif mod == "multiome":
         final_targets.extend([f"allele/{mod}_{rep_id}/barcodes.txt" for rep_id in rep_ids])
         for data_type in data_types:
-            final_targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.dp.npz" for rep_id in rep_ids])
+            final_targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.tot.npz" for rep_id in rep_ids])
             final_targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.alt.npz" for rep_id in rep_ids])
             final_targets.extend([f"allele/{mod}_{rep_id}/snp_matrix.{data_type}.ref.npz" for rep_id in rep_ids])
             final_targets.extend([f"allele/{mod}_{rep_id}/cell_snp_Aallele.{data_type}.npz" for rep_id in rep_ids])
             final_targets.extend([f"allele/{mod}_{rep_id}/cell_snp_Ballele.{data_type}.npz" for rep_id in rep_ids])
     else:
         final_targets.append(f"allele/{mod}/barcodes.txt")
-        final_targets.append(f"allele/{mod}/snp_matrix.dp.npz")
+        final_targets.append(f"allele/{mod}/snp_matrix.tot.npz")
         final_targets.append(f"allele/{mod}/snp_matrix.alt.npz")
         final_targets.append(f"allele/{mod}/snp_matrix.ref.npz")
         final_targets.append(f"allele/{mod}/cell_snp_Aallele.npz")

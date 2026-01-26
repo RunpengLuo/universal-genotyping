@@ -1,3 +1,4 @@
+##################################################
 if genotype_mode == "bulk_normal":
     rule genotype_snps_bulk_normal:
         """
@@ -23,8 +24,6 @@ if genotype_mode == "bulk_normal":
             max_depth=config["params_bcftools"]["max_depth"],
         shell:
             r"""
-            set -euo pipefail
-
             {params.bcftools} query -f '%CHROM\t%POS\n' -r {params.chrom} \
                 {input.snp_panel} | bgzip -c > {output.tmp_pos}
             tabix -s1 -b2 -e2 {output.tmp_pos}
@@ -41,16 +40,19 @@ if genotype_mode == "bulk_normal":
             | {params.bcftools} call -m -Ou \
             | {params.bcftools} view -v snps -m2 -M2 \
                 -i 'GT="alt" && FMT/DP>={params.min_dp}' \
-                -Oz -o {output.snp_file} >> "{log}" 2>&1
+                -Oz -o {output.snp_file}
 
             tabix -p vcf {output.snp_file}
             """
 
-elif genotype_mode == "bulk_tumor":
+##################################################
+if genotype_mode == "bulk_tumor":
     # genotype SNPs from bulk tumor samples
     # TODO
-    pass 
-elif genotype_mode == "pseudobulk_tumor":
+    pass
+
+##################################################
+if genotype_mode == "pseudobulk_tumor":
     rule genotype_snps_pseudobulk:
         input:
             bams=lambda wc: {"scRNA": gex_tbams, "scATAC": atac_tbams}[wc.data_type],
@@ -69,14 +71,13 @@ elif genotype_mode == "pseudobulk_tumor":
             minCOUNT=config["params_cellsnp_lite"]["minCOUNT_genotype"],
         shell:
             r"""
-            set -euo pipefail
             echo "genotype SNPs on pseudobulk {data_type} sample"
             cellsnp_dir=$(dirname "{output.snp_file}")
             mkdir -p ${{cellsnp_dir}}
             printf "%s\n" {input.bams} > ${{cellsnp_dir}}/bams.lst
 
             nsnps_panel=$({params.bcftools} view -H "{input.snp_panel}" | wc -l)
-            echo "[QC] {input.snp_panel} record #SNPs: ${{nsnps_panel}}" >> "{log}"
+            echo "[QC] {input.snp_panel} record #SNPs: ${{nsnps_panel}}"
             {params.cellsnp_lite} \
                 -S ${{cellsnp_dir}}/bams.lst \
                 -O ${{cellsnp_dir}} \
@@ -88,10 +89,10 @@ elif genotype_mode == "pseudobulk_tumor":
                 --minCOUNT {params.minCOUNT} \
                 --UMItag {params.UMItag} \
                 --cellTAG None \
-                --gzip >> "{log}" 2>&1
+                --gzip
             rm ${{cellsnp_dir}}/bams.lst
             nsnps_cellsnp=$({params.bcftools} view -H "{output.snp_file}" | wc -l)
-            echo "[QC] {output} record #SNPs: ${{nsnps_cellsnp}}" >> "{log}"
+            echo "[QC] {output} record #SNPs: ${{nsnps_cellsnp}}"
             """
 
     rule annotate_snps_pseudobulk:

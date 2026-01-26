@@ -15,14 +15,13 @@ if config["phaser"] == "shapeit":
             "logs/phase_snps.chr{chrname}.log"
         shell:
             r"""
-            set -euo pipefail
             {params.shapeit} \
                 --input "{input.chrom_vcf_file}" \
                 --map "{input.gmap_file}" \
                 --reference "{input.phasing_panel_file}" \
                 --region "{params.chrom}" \
                 --thread "{threads}" \
-                --output "phase/phased.{params.chrom}.vcf" >> "{log}" 2>&1
+                --output "phase/phased.{params.chrom}.vcf"
             
             bgzip -f "phase/phased.{params.chrom}.vcf"
             tabix -f -p vcf "{output.phased_file}"
@@ -44,14 +43,13 @@ elif config["phaser"] == "eagle":
             "logs/phase_snps.chr{chrname}.log"
         shell:
             r"""
-            set -euo pipefail
             {params.eagle} \
                 --vcfTarget "{input.chrom_vcf_file}" \
                 --geneticMapFile "{input.gmap_file}" \
                 --vcfRef "{input.phasing_panel_file}" \
                 --vcfOutFormat z \
                 --numThreads "{threads}" \
-                --outPrefix "phase/phased.{params.chrom}" >> "{log}" 2>&1
+                --outPrefix "phase/phased.{params.chrom}"
             tabix -f -p vcf "{output.phased_file}"
             """
 
@@ -66,7 +64,6 @@ rule concat_phased_snps:
         bcftools=config["bcftools"],
     shell:
         r"""
-        set -euo pipefail
         printf "%s\n" {input.vcf_files} > "phase/phased_snps.lst"
         {params.bcftools} concat -f "phase/phased_snps.lst" -Oz -o "{output.phased_vcf}"
         tabix -f -p vcf "{output.phased_vcf}"
@@ -83,7 +80,6 @@ rule extract_phased_het_snps:
         bcftools=config["bcftools"],
     shell:
         r"""
-        set -euo pipefail
         {params.bcftools} view "{input.phased_vcf}" -Oz -m2 -M2 \
             -i 'GT="0|1" || GT="1|0"' -o "{output.phased_het_vcf}"
         tabix -f -p vcf "{output.phased_het_vcf}"
