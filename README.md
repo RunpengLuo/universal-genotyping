@@ -38,14 +38,29 @@ Sample file is tsv-format and has following columns to describe all samples from
 * (Required columns): SAMPLE, REP_ID, DATA_TYPE, PATH_to_bam
 * (Optional columns): PATH_to_barcodes, PATH_to_10x_ranger
 
-Some requirements on sample files:
+Requirements on sample files:
 * All rows should have same `SAMPLE` field, replicates can be distinguished based on replicate ID `REP_ID`
 * Paired scMultiome can be described by two rows with same `REP_ID` and two `DATA_TYPE` values: `scRNA` and `scATAC`.
 * For mode 1, specify `bulkDNA` under `DATA_TYPE`, and use `REP_ID`=`normal` to label the matched-normal sample if available.
 * For mode 2, `DATA_TYPE` can be chosen from `scRNA`, `scATAC`, `VISIUM`, `VISIUM3prime`.
 
 ### Output
+* `snps/<chromosome>.vcf.gz*`: annotated bi-allelic Het/Hom-Alt SNPs.
+* `phase/phased.vcf.gz*`: phased SNPs, aggregated over all chromosomes.
+* `phase/phased_snps.vcf.gz*`: phased Het SNPs, exclude Hom-Alt SNPs from `phase/phased.vcf.gz`.
+* `allele/<data_type>(_<rep_id>)?/sample_ids.tsv`: sample IDs.
+* `allele/<data_type>(_<rep_id>)?/snp_info.tsv.gz`: Per-SNP positional and genotype information.
+* `allele/<data_type>(_<rep_id>)?/snp_matrix.dp.npz`: SNP by samples read-depth matrix, generated if mode 1.
+* `allele/<data_type>(_<rep_id>)?/snp_matrix.tot.npz`: SNP by samples/barcodes total-allele matrix.
+* `allele/<data_type>(_<rep_id>)?/snp_matrix.ref.npz`: SNP by samples/barcodes ref-allele matrix.
+* `allele/<data_type>(_<rep_id>)?/snp_matrix.alt.npz`: SNP by samples/barcodes alt-allele matrix.
+* `allele/<data_type>(_<rep_id>)?/snp_matrix.A.npz`: SNP by samples/barcodes A-allele matrix, generated if phased.
+* `allele/<data_type>(_<rep_id>)?/snp_matrix.B.npz`: SNP by samples/barcodes B-allele matrix, generated if phased.
 
+#### Legacy output
+* `allele/<data_type>(_<rep_id>)?/unique_snp_ids.npy`: per-SNP `<chromosome>_<position>` array.
+* `allele/<data_type>(_<rep_id>)?/cell_snp_Aallele.npz`: SNP by samples/barcodes A-allele matrix, generated if phased.
+* `allele/<data_type>(_<rep_id>)?/cell_snp_Ballele.npz`: SNP by samples/barcodes B-allele matrix, generated if phased.
 
 ### TODO
 1. Detecting clonal LOH, from Numbat
