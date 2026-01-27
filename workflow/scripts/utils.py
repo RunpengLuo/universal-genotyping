@@ -105,6 +105,9 @@ def read_region_file(region_bed_file: str, addchr=True):
     )
     if not str(regions["Chromosome"].iloc[0]).startswith("chr") and addchr:
         regions["Chromosome"] = "chr" + regions["Chromosome"].astype(str)
+    regions["#CHR"] = regions["Chromosome"]
+    regions["START"] = regions["Start"]
+    regions["END"] = regions["End"]
     return regions
 
 
