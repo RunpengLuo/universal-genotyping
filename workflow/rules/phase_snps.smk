@@ -21,8 +21,9 @@ if config["phaser"] == "shapeit":
                 --reference "{input.phasing_panel_file}" \
                 --region "{params.chrom}" \
                 --thread "{threads}" \
-                --output "{output.phased_file}"
+                --output "phase/{params.chrom}.vcf"
 
+            bgzip -f "phase/{params.chrom}.vcf"
             tabix -f -p vcf "{output.phased_file}"
             """
 elif config["phaser"] == "eagle":
