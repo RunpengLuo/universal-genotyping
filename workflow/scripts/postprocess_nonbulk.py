@@ -129,7 +129,9 @@ if modality == "multiome":
             symlink_force(sm.output["ref_mtx"][i], sm.output["b_mtx"][i])
 
         # QC analysis
-        qc_dir = os.path.join(os.path.dirname(sm.output["tot_mtx"][i]), f"qc_{data_type}")
+        qc_dir = os.path.join(
+            os.path.dirname(sm.output["tot_mtx"][i]), f"qc_{data_type}"
+        )
         os.makedirs(qc_dir, exist_ok=True)
         plot_snps_allele_freqs(
             snps,
@@ -205,7 +207,7 @@ else:
     else:
         symlink_force(sm.output["alt_mtx"], sm.output["a_mtx"])
         symlink_force(sm.output["ref_mtx"], sm.output["b_mtx"])
-    
+
     # legacy CalicoST outputs
     snp_ids = snps["#CHR"].astype(str) + "_" + snps["POS"].astype(str)
     np.save(sm.output["unique_snp_ids_legacy"], snp_ids.to_numpy())

@@ -96,7 +96,9 @@ def compute_af_per_sample(tot_mtx, b_mtx, i: int):
     tot_col = tot_mtx[:, i]
     b_col = b_mtx[:, i]
 
-    den = tot_col.toarray().ravel() if issparse(tot_col) else np.asarray(tot_col).ravel()
+    den = (
+        tot_col.toarray().ravel() if issparse(tot_col) else np.asarray(tot_col).ravel()
+    )
     num = b_col.toarray().ravel() if issparse(b_col) else np.asarray(b_col).ravel()
 
     out = np.full_like(den, np.nan, dtype=np.float32)

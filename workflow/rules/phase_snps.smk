@@ -106,3 +106,19 @@ rule concat_and_extract_phased_het_snps:
             -o "{output.phased_vcf}"
         tabix -f -p vcf "{output.phased_vcf}"
         """
+
+rule parse_genetic_map:
+    input:
+        phased_vcf="phase/phased_snps.vcf.gz",
+        gmap_files=lambda wc: [get_gmap_file(c) for c in config["chromosomes"]],
+    output:
+        gmap_tsv="phase/genetic_map.tsv.gz",
+    log:
+        "logs/parse_genetic_map.log",
+    params:
+        chrnames=config["chromosomes"],
+        phaser=config["phaser"],
+    threads: 1
+    script:
+        "../scripts/parse_genetic_map.py"
+        

@@ -81,3 +81,4 @@ In samples with high tumor purity (e.g., tumor cell lines) without matched norma
 ```
 2. mapping resolutions, 2um to Xum?
 3. divides post het SNPs into haplotype blocks, compute RDR, then aggregate to form phased blocks.
+4. we assumed all BAM files have chr-prefix, and we preserve chr-prefix in all processed files.

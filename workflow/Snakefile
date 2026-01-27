@@ -138,6 +138,9 @@ if run_genotype_snps:
 ##################################################
 # final target files
 final_targets = []
+if run_genotype_snps and phaser in ["eagle", "shapeit"]:
+    final_targets.append("phase/genetic_map.tsv.gz")
+
 for mod, rep_ids in mod2reps.items():
     data_types = ["scRNA", "scATAC"] if mod == "multiome" else [mod]
     if mod == "bulkDNA":
