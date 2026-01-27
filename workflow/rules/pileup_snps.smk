@@ -71,14 +71,3 @@ rule pileup_snps_cellsnp_lite_bulk:
             --cellTAG {params.cellTAG} \
             --gzip
         """
-
-# rule pileup_snps_bcftools_bulk:
-#     input:
-#         bam=lambda wc: get_data[(wc.data_type, wc.rep_id)][1],
-#         snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else ref_snp_file),
-#     output:
-#         vcf_file="pileup/{data_type}_{rep_id}/allele_counts.vcf.gz",
-#     shell:
-#         r"""
-#         echo "TODO"
-#         """

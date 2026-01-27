@@ -20,6 +20,7 @@ for c in optional:
         sample_df[c] = "N/A"
 
 SAMPLE_ID = sample_df["SAMPLE"].iloc[0]
+assert (sample_df["SAMPLE"] == SAMPLE_ID).all(), "identical SAMPLE required"
 
 all_data_types = sample_df["DATA_TYPE"].unique().tolist()
 allowed_data_types = ["bulkDNA", "scATAC", "scRNA", "VISIUM", "VISIUM3prime"]
@@ -86,28 +87,17 @@ run_genotype_snps = (
 )
 
 ##################################################
-# genotype_snps rules: bulk normal > bulk tumor > single-cell
 genotype_dtypes = []
-genotype_mode = ""
+has_normal = False
 if run_genotype_snps:
-    if len(bulk_nbams) > 0:
-        "multiple normal BAM file is provided, taking first one: "
-        bulk_nbams = [bulk_nbams[0]]
-        genotype_mode = "bulk_normal"
+    if workflow_mode == "bulk":
         genotype_dtypes = ["bulkDNA"]
-    elif len(bulk_tbams) > 0:
-        genotype_mode = "bulk_tumor"
-        genotype_dtypes = ["bulkDNA"]
+        has_normal = len(bulk_nbams) > 0
     else:
-        genotype_mode = "pseudobulk_tumor"
-        if len(gex_tbams) > 0 and len(atac_tbams) > 0:
-            genotype_dtypes = ["scRNA", "scATAC"]
-        elif len(atac_tbams) > 0:
-            genotype_dtypes = ["scATAC"]
-        elif len(gex_tbams) > 0:
-            genotype_dtypes = ["scRNA"]
-        else:
-            raise ValueError("require genotyping, but no bam file provided!")
+        if len(gex_tbams) > 0:
+            genotype_dtypes.append("scRNA")
+        if len(atac_tbams) > 0:
+            genotype_dtypes.append("scATAC")
 
     ##################################################
     # parse phase_snps inputs

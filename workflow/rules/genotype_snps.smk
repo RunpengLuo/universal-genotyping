@@ -1,12 +1,12 @@
 ##################################################
-if genotype_mode == "bulk_normal":
-    rule genotype_snps_bulk_normal:
+if workflow_mode == "bulk":
+    rule genotype_snps_bulk:
         """
         Genotype Bi-allelic HET/ALT-HOM SNPs 
         from bulk-DNA normal sample via bcftools
         """
         input:
-            bams=lambda wc: bulk_nbams[0] if len(bulk_nbams) > 0 else [],
+            bams=lambda wc: bulk_nbams[0] if has_normal else bulk_tbams[0],
             snp_panel=config["snp_panel"],
             reference=config["reference"]
         output:
@@ -44,15 +44,10 @@ if genotype_mode == "bulk_normal":
 
             tabix -p vcf {output.snp_file}
             """
+    # TODO add post-steps if genotyping from tumor sample.
 
 ##################################################
-if genotype_mode == "bulk_tumor":
-    # genotype SNPs from bulk tumor samples
-    # TODO
-    pass
-
-##################################################
-if genotype_mode == "pseudobulk_tumor":
+if workflow_mode == "single_cell":
     rule genotype_snps_pseudobulk:
         input:
             bams=lambda wc: {"scRNA": gex_tbams, "scATAC": atac_tbams}[wc.data_type],

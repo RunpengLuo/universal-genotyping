@@ -19,7 +19,7 @@ snakemake -p --cores 1 -s /path/to/workflow/Snakefile --configfile config/config
     * used by Numbat, ~92MB
 2. https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e4.chr1toX.hg38.vcf.gz
     * used by CalicoST, ~568MB
-3. dbSNPv157
+3. dbSNPv157 (for WGS data)
     * hg19: https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.25.gz
     * hg38: https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz and https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz.tbi
 
@@ -59,8 +59,7 @@ Requirements on sample files:
 
 ### Output
 * `snps/<chromosome>.vcf.gz*`: annotated bi-allelic Het/Hom-Alt SNPs.
-* `phase/phased.vcf.gz*`: phased SNPs, aggregated over all chromosomes.
-* `phase/phased_snps.vcf.gz*`: phased Het SNPs, exclude Hom-Alt SNPs from `phase/phased.vcf.gz`.
+* `phase/phased_snps.vcf.gz*`: phased Het SNPs.
 * `allele/<data_type>(_<rep_id>)?/sample_ids.tsv`: sample IDs.
 * `allele/<data_type>(_<rep_id>)?/snp_info.tsv.gz`: Per-SNP positional and genotype information.
 * `allele/<data_type>(_<rep_id>)?/snp_matrix.dp.npz`: SNP by samples read-depth matrix, generated if mode 1.
