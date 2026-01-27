@@ -87,7 +87,7 @@ if workflow_mode == "bulk":
                 snp_info = snp_info.merge(
                     mos_df, how="left", on=["#CHR", "START", "END"], sort=False
                 )
-            dp_mat = snp_info.loc[rep_ids].to_numpy(dtype=np.float32)
+            dp_mat = snp_info[rep_ids].to_numpy(dtype=np.float32)
             np.savez_compressed(output.dp_mtx, mat=dp_mat)
 
 
