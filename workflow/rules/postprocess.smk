@@ -42,7 +42,7 @@ if workflow_mode == "bulk":
             sample_name=SAMPLE_ID,
             modality="bulkDNA",
             out_prefix="allele/bulkDNA/out_mosdepth/{rep_id}",
-            reread_qualityadquality=config["params_mosdepth"].get("read_quality", 11),
+            read_quality=config["params_mosdepth"].get("read_quality", 11),
             extra_params=config["params_mosdepth"].get("extra_params", ""),
         log:
             "logs/mosdepth_counting.bulkDNA_{rep_id}.log"
