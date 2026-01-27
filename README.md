@@ -19,8 +19,9 @@ snakemake -p --cores 1 -s /path/to/workflow/Snakefile --configfile config/config
     * used by Numbat, ~92MB
 2. https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e4.chr1toX.hg38.vcf.gz
     * used by CalicoST, ~568MB
-3. dbSNPv155
-    1. https://s3-us-west-2.amazonaws.com/human-pangenomics/index.html?prefix=T2T/CHM13/assemblies/annotation/liftover/*
+3. dbSNPv157
+    * hg19: https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.25.gz
+    * hg38: https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz
 
 #### phasing panel files
 1. 1000GP HG38 phasing panel: http://pklab.med.harvard.edu/teng/data/1000G_hg38.zip
