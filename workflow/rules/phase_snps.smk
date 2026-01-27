@@ -6,6 +6,7 @@ if config["phaser"] == "shapeit":
             gmap_file=lambda wc: get_gmap_file(wc.chrname),
         output:
             phased_file="phase/chr{chrname}.vcf.gz",
+            bcf_file=temp("phase/chr{chrname}.bcf"),
         threads: config["threads"]["phase"]
         params:
             chrom="chr{chrname}",
@@ -21,9 +22,9 @@ if config["phaser"] == "shapeit":
                 --reference "{input.phasing_panel_file}" \
                 --region "{params.chrom}" \
                 --thread "{threads}" \
-                --output "phase/{params.chrom}.vcf"
-
-            bgzip -f "phase/{params.chrom}.vcf"
+                --output "{output.bcf_file}"
+            
+            bcftools view -Ov "{output.bcf_file}" | bgzip > "{output.phased_file}"
             tabix -f -p vcf "{output.phased_file}"
             """
 elif config["phaser"] == "eagle":
