@@ -273,7 +273,7 @@ def plot_snps_allele_freqs(
         for i, rep_id in enumerate(rep_ids):
             plot_file = os.path.join(plot_dir, f"af_{allele}_allele.{rep_id}.pdf")
             af = compute_af_per_sample(_tot_mtx, _b_mtx, i)
-            plot_snps_allele_freqs_sample(snps, af[:, i], genome_file, plot_file)
+            plot_snps_allele_freqs_sample(snps, af, genome_file, plot_file)
     return
 
 
