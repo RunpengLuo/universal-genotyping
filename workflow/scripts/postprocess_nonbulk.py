@@ -61,7 +61,6 @@ gt = snps["GT"].astype(str)
 is_phased_arr = gt.str.contains(r"\|", na=False).to_numpy()
 is_phased = False
 phases = None
-snp_cols = ["#CHR", "POS"]
 if is_phased_arr.any():
     assert is_phased_arr.all(), "some SNPs are unphased"
     snp_cols += ["PS", "GT"]

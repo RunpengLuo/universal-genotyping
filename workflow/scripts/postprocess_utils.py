@@ -201,40 +201,39 @@ def subset_baf(
         return baf_ch[(pos >= start) & (pos < end)]
 
 
-def assign_snp_bounderies(snp_positions: pd.DataFrame, regions: pd.DataFrame):
+def assign_snp_bounderies(snps: pd.DataFrame, regions: pd.DataFrame):
     """
     divide regions into [START, END) subregions, each subregion has one SNP.
     If a SNP is out-of-region, its START and END will be 0 and region_id will be 0.
     """
     print("assign SNP bounderies")
-    snp_info: pd.DataFrame = snp_positions.copy(deep=True)
-    snp_info["POS0"] = snp_info["POS"] - 1
-    snp_info["START"] = 0
-    snp_info["END"] = 0
+    snps["POS0"] = snps["POS"] - 1
+    snps["START"] = 0
+    snps["END"] = 0
 
-    snp_info["region_id"] = 0
+    snps["region_id"] = 0
     region_id = 0
 
-    chroms = snp_info["#CHR"].unique().tolist()
+    chroms = snps["#CHR"].unique().tolist()
     region_grps_ch = regions.groupby(by="#CHR", sort=False)
     for chrom in chroms:
         regions_ch = region_grps_ch.get_group(chrom)
         for _, region in regions_ch.iterrows():
             reg_start, reg_end = region["START"], region["END"]
-            reg_snps = subset_baf(snp_info, chrom, reg_start, reg_end)
+            reg_snps = subset_baf(snps, chrom, reg_start, reg_end)
             if len(reg_snps) == 0:
                 continue
             reg_snp_positions = reg_snps["POS0"].to_numpy()
             reg_snp_indices = reg_snps.index.to_numpy()
 
             # annotate region ID
-            snp_info.loc[reg_snp_indices, "region_id"] = region_id
+            snps.loc[reg_snp_indices, "region_id"] = region_id
             region_id += 1
 
             # build SNP bounderies
             if len(reg_snps) == 1:
-                snp_info.loc[reg_snp_indices, "START"] = reg_start
-                snp_info.loc[reg_snp_indices, "END"] = reg_end
+                snps.loc[reg_snp_indices, "START"] = reg_start
+                snps.loc[reg_snp_indices, "END"] = reg_end
             else:
                 reg_bounderies = np.ceil(
                     np.vstack([reg_snp_positions[:-1], reg_snp_positions[1:]]).mean(
@@ -244,12 +243,11 @@ def assign_snp_bounderies(snp_positions: pd.DataFrame, regions: pd.DataFrame):
                 reg_bounderies = np.concatenate(
                     [[reg_start], reg_bounderies, [reg_end]]
                 )
-                snp_info.loc[reg_snp_indices, "START"] = reg_bounderies[:-1]
-                snp_info.loc[reg_snp_indices, "END"] = reg_bounderies[1:]
+                snps.loc[reg_snp_indices, "START"] = reg_bounderies[:-1]
+                snps.loc[reg_snp_indices, "END"] = reg_bounderies[1:]
 
-    snp_info["BLOCKSIZE"] = snp_info["END"] - snp_info["START"]
-    print(snp_info["BLOCKSIZE"].describe().T)
-    return snp_info
+    snps["BLOCKSIZE"] = snps["END"] - snps["START"]
+    return snps
 
 
 ##################################################
