@@ -60,7 +60,7 @@ if config["phaser"] == "eagle":
 
 ##################################################
 if config["phaser"] == "longphase":
-    rule phase_snps_logphase:
+    rule phase_snps_longphase:
         input:
             chrom_vcf_file=lambda wc: f"snps/chr{wc.chrname}.vcf.gz",
             bam_file=lambda wc: bulk_nbams[0] if has_normal else bulk_tbams[0],
@@ -70,7 +70,7 @@ if config["phaser"] == "longphase":
         params:
             chrom="chr{chrname}",
             longphase=config["longphase"],
-            min_mapq=config["params_bcftools"]["min_mapq"],
+            min_mapq=config["params_longphase"]["min_mapq"],
             extra_params=config["params_longphase"].get("extra_params", ""),
             bcftools=config["bcftools"],
         threads: config["threads"]["phase"]

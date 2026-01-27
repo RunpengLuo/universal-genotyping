@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 ##################################################
+# parse sample file
 chroms = config["chromosomes"]
 refvers = config["reference_version"]
 
@@ -22,12 +23,12 @@ for c in optional:
 SAMPLE_ID = sample_df["SAMPLE"].iloc[0]
 assert (sample_df["SAMPLE"] == SAMPLE_ID).all(), "identical SAMPLE required"
 
-all_data_types = sample_df["DATA_TYPE"].unique().tolist()
+sample_data_types = sample_df["DATA_TYPE"].unique().tolist()
 allowed_data_types = ["bulkDNA", "scATAC", "scRNA", "VISIUM", "VISIUM3prime"]
-assert all(dt in allowed_data_types for dt in all_data_types)
+assert all(dt in allowed_data_types for dt in sample_data_types)
 
-if "bulkDNA" in all_data_types:
-    assert len(all_data_types) == 1, "mode 1 cannot have non-bulk samples, run the workflow in 2 steps"
+if "bulkDNA" in sample_data_types:
+    assert len(sample_data_types) == 1, "mode 1 cannot have non-bulk samples, run the workflow in 2 steps"
     workflow_mode = "bulk"
 else:
     workflow_mode = "single_cell"
@@ -80,6 +81,7 @@ for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
     mod2reps[modality].append(rep_id)
 
 ##################################################
+# parse reference SNP file, if exists
 ref_snp_file = config.get("ref_snp_file")
 run_genotype_snps = (
     ref_snp_file is None
@@ -87,6 +89,7 @@ run_genotype_snps = (
 )
 
 ##################################################
+# parse genotype_snps and phase_snps inputs.
 genotype_dtypes = []
 has_normal = False
 if run_genotype_snps:
@@ -118,18 +121,19 @@ if run_genotype_snps:
         refvers2 = {"hg19": "b37", "hg38": "b38"}[refvers]
         get_gmap_file = lambda chrname: os.path.join(gmap_dir, f"{refvers2}/chr{chrname}.{refvers2}.gmap.gz")
     else:
-        # TODO Top-MED server
-        raise ValueError(f"unsupported phaser: {phaser}")
-    assert all(os.path.exists(get_gmap_file(chrname)) for chrname in chroms), "failed to locate gmap files"
+        # TODO
+        pass
 
-    phasing_panel_version = config["phasing_panel_version"]
-    phasing_panel = config["phasing_panel"]
-    assert os.path.isdir(phasing_panel), "failed to locate phasing panel"
-    if phasing_panel_version == "1000G_hg38":
-        get_phasing_panel = lambda chrname: os.path.join(phasing_panel, f"chr{chrname}.genotypes.bcf")
-    else:
-        raise ValueError(f"unsupported phasing_panel_version: {phasing_panel_version}")
-    assert all(os.path.exists(get_phasing_panel(chrname)) for chrname in chroms), "failed to locate panel files"
+    if phaser in ["eagle", "shapeit"]:
+        assert all(os.path.exists(get_gmap_file(chrname)) for chrname in chroms), "failed to locate gmap files"
+        phasing_panel_version = config["phasing_panel_version"]
+        phasing_panel = config["phasing_panel"]
+        assert os.path.isdir(phasing_panel), "failed to locate phasing panel"
+        if phasing_panel_version == "1000G_hg38":
+            get_phasing_panel = lambda chrname: os.path.join(phasing_panel, f"chr{chrname}.genotypes.bcf")
+        else:
+            raise ValueError(f"unsupported phasing_panel_version: {phasing_panel_version}")
+        assert all(os.path.exists(get_phasing_panel(chrname)) for chrname in chroms), "failed to locate panel files"
 
 ##################################################
 # final target files
