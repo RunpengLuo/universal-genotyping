@@ -107,7 +107,7 @@ if modality == "multiome":
         index=False,
     )
     snps.to_csv(sm.output["info_file"], sep="\t", header=True, index=False)
-    barcodes.to_csv(sm.output["barcode_file"], sep="\t", header=False, index=False)
+    barcodes.to_csv(sm.output["all_barcodes"], sep="\t", header=False, index=False)
     for i, data_type in enumerate(["scRNA", "scATAC"]):
         tot_mtx = tot_mtx_list[i][snp_mask, :]
         ref_mtx = ref_mtx_list[i][snp_mask, :]
