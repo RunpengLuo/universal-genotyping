@@ -92,6 +92,7 @@ run_genotype_snps = (
 # parse genotype_snps and phase_snps inputs.
 genotype_dtypes = []
 has_normal = False
+phaser = config.get("phaser", "N/A")
 if run_genotype_snps:
     if workflow_mode == "bulk":
         genotype_dtypes = ["bulkDNA"]
@@ -105,7 +106,6 @@ if run_genotype_snps:
     ##################################################
     # parse phase_snps inputs
     # define lambda functions that map chrname to genetic map file and phase panel file.
-    phaser = config["phaser"]
     if phaser == "eagle":
         assert config.get("eagle_dir") is not None
         gmap_dir = os.path.join(config["eagle_dir"], "tables")
