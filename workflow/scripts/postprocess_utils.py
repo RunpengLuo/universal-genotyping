@@ -268,11 +268,11 @@ def plot_snps_allele_freqs(
         plot_file = os.path.join(plot_dir, f"af_{allele}_allele.pseudobulk.pdf")
         plot_snps_allele_freqs_sample(snps, af, genome_file, plot_file)
     else:
-        tot_csc = tot_mtx.tocsc()
-        b_csc = b_mtx.tocsc()
+        _tot_mtx = tot_mtx.tocsc() if issparse(tot_mtx) else tot_mtx
+        _b_mtx = b_mtx.tocsc() if issparse(b_mtx) else b_mtx
         for i, rep_id in enumerate(rep_ids):
             plot_file = os.path.join(plot_dir, f"af_{allele}_allele.{rep_id}.pdf")
-            af = compute_af_per_sample(tot_csc, b_csc, i)
+            af = compute_af_per_sample(_tot_mtx, _b_mtx, i)
             plot_snps_allele_freqs_sample(snps, af[:, i], genome_file, plot_file)
     return
 
