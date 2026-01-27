@@ -72,7 +72,7 @@ if workflow_mode == "bulk":
             import pandas as pd
             import numpy as np
 
-            print(f"merge mosdepth results across multi-samples")
+            print("merge mosdepth results across multi-samples")
             samples_df = pd.read_table(input.sample_file, sep="\t")
             rep_ids = samples_df["REP_ID"].astype(str).tolist()
             snp_info = pd.read_table(input.info_file, sep="\t")

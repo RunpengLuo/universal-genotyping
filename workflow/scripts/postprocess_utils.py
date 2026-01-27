@@ -206,7 +206,6 @@ def assign_snp_bounderies(snps: pd.DataFrame, regions: pd.DataFrame):
     divide regions into [START, END) subregions, each subregion has one SNP.
     If a SNP is out-of-region, its START and END will be 0 and region_id will be 0.
     """
-    print("assign SNP bounderies")
     snps["POS0"] = snps["POS"] - 1
     snps["START"] = 0
     snps["END"] = 0
