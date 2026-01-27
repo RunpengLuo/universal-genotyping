@@ -7,6 +7,7 @@ if config["phaser"] == "shapeit":
         output:
             phased_file="phase/chr{chrname}.vcf.gz",
             bcf_file=temp("phase/chr{chrname}.bcf"),
+            bcf_file_csi=temp("phase/chr{chrname}.bcf.csi"),
         threads: config["threads"]["phase"]
         params:
             chrom="chr{chrname}",
