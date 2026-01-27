@@ -129,7 +129,7 @@ if modality == "multiome":
             symlink_force(sm.output["ref_mtx"][i], sm.output["b_mtx"][i])
 
         # QC analysis
-        qc_dir = os.path.join(os.path.dirname(sm.output["tot_mtx"][i]), "qc")
+        qc_dir = os.path.join(os.path.dirname(sm.output["tot_mtx"][i]), f"qc_{data_type}")
         os.makedirs(qc_dir, exist_ok=True)
         plot_snps_allele_freqs(
             snps,
