@@ -21,7 +21,17 @@ snakemake -p --cores 1 -s /path/to/workflow/Snakefile --configfile config/config
     * used by CalicoST, ~568MB
 3. dbSNPv157
     * hg19: https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.25.gz
-    * hg38: https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz
+    * hg38: https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz and https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz.tbi
+
+##### rename dbSNP SNP panel chromosomes
+NCBI dbSNP uses refseq version, rename it to UCSC version.
+```sh
+bcftools view -r NC_000001.11,NC_000002.12,NC_000003.12,NC_000004.12,NC_000005.10,NC_000006.12,NC_000007.14,NC_000008.11,NC_000009.12,NC_000010.11,NC_000011.10,NC_000012.12,NC_000013.11,NC_000014.9,NC_000015.10,NC_000016.10,NC_000017.11,NC_000018.10,NC_000019.10,NC_000020.11,NC_000021.9,NC_000022.11,NC_000023.11,NC_000024.10,NC_012920.1 -Ou GCF_000001405.40.gz \
+    | bcftools annotate --rename-chrs /path/to/rename_chrs.refseq2ucsc.tsv -Ou \
+    | bcftools view -v snps -Oz -o dbsnp157.hg38.biallelic.snps.vcf.gz
+
+bcftools index dbsnp157.hg38.biallelic.snps.vcf.gz
+```
 
 #### phasing panel files
 1. 1000GP HG38 phasing panel: http://pklab.med.harvard.edu/teng/data/1000G_hg38.zip

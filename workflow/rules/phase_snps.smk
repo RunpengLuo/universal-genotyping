@@ -5,7 +5,7 @@ if config["phaser"] == "shapeit":
             phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
             gmap_file=lambda wc: get_gmap_file(wc.chrname),
         output:
-            phased_file="phase/phased.chr{chrname}.vcf.gz",
+            phased_file="phase/chr{chrname}.vcf.gz",
         threads: config["threads"]["phase"]
         params:
             chrom="chr{chrname}",
@@ -21,9 +21,8 @@ if config["phaser"] == "shapeit":
                 --reference "{input.phasing_panel_file}" \
                 --region "{params.chrom}" \
                 --thread "{threads}" \
-                --output "phase/phased.{params.chrom}.vcf"
-            
-            bgzip -f "phase/phased.{params.chrom}.vcf"
+                --output "{output.phased_file}"
+
             tabix -f -p vcf "{output.phased_file}"
             """
 elif config["phaser"] == "eagle":
@@ -33,7 +32,7 @@ elif config["phaser"] == "eagle":
             phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
             gmap_file=lambda wc: get_gmap_file(wc.chrname),
         output:
-            phased_file="phase/phased.chr{chrname}.vcf.gz",
+            phased_file="phase/chr{chrname}.vcf.gz",
         threads: config["threads"]["phase"]
         params:
             chrom="chr{chrname}",
@@ -49,14 +48,14 @@ elif config["phaser"] == "eagle":
                 --vcfRef "{input.phasing_panel_file}" \
                 --vcfOutFormat z \
                 --numThreads "{threads}" \
-                --outPrefix "phase/phased.{params.chrom}"
+                --outPrefix "phase/{params.chrom}"
             tabix -f -p vcf "{output.phased_file}"
             """
 
 
 rule concat_phased_snps:
     input:
-        vcf_files=expand("phase/phased.chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
+        vcf_files=expand("phase/chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
     output:
         phased_vcf="phase/phased.vcf.gz",
     threads: 1
