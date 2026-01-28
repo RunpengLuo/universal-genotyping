@@ -109,7 +109,6 @@ rule concat_and_extract_phased_het_snps:
 
 rule parse_genetic_map:
     input:
-        phased_vcf="phase/phased_snps.vcf.gz",
         gmap_files=lambda wc: [get_gmap_file(c) for c in config["chromosomes"]],
     output:
         gmap_tsv="phase/genetic_map.tsv.gz",

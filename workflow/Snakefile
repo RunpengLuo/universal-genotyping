@@ -18,7 +18,7 @@ assert not missing, f"missing columns: {missing}"
 
 for c in optional:
     if c not in sample_df.columns:
-        sample_df[c] = "N/A"
+        sample_df[c] = pd.NA
 
 SAMPLE_ID = sample_df["SAMPLE"].iloc[0]
 assert (sample_df["SAMPLE"] == SAMPLE_ID).all(), "identical SAMPLE required"
@@ -83,16 +83,13 @@ for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
 ##################################################
 # parse reference SNP file, if exists
 ref_snp_file = config.get("ref_snp_file")
-run_genotype_snps = (
-    ref_snp_file is None
-    or (isinstance(ref_snp_file, str) and ref_snp_file.strip() in {"", "N/A"})
-)
+run_genotype_snps = ref_snp_file is None
 
 ##################################################
 # parse genotype_snps and phase_snps inputs.
 genotype_dtypes = []
 has_normal = False
-phaser = config.get("phaser", "N/A")
+phaser = config.get("phaser", "undefined")
 if run_genotype_snps:
     if workflow_mode == "bulk":
         genotype_dtypes = ["bulkDNA"]
@@ -138,6 +135,9 @@ if run_genotype_snps:
 ##################################################
 # final target files
 final_targets = []
+
+# optional genetic map file required by HATCHet3
+# to estiamte population-based phases-switch errors.
 if run_genotype_snps and phaser in ["eagle", "shapeit"]:
     final_targets.append("phase/genetic_map.tsv.gz")
 

@@ -10,25 +10,25 @@ mosdepth: /path/to/mosdepth
 ##################################################
 # Input
 sample_file: ./config/sample.tsv
-ref_snp_file: N/A
+ref_snp_file: null
 chromosomes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
 
 ##################################################
 # Reference
-reference_version: N/A
-reference: N/A
-genome_size: N/A
-region_bed: N/A
+reference_version: null
+reference: null
+genome_size: null
+region_bed: null
 
 ##################################################
 # SNP panel
 snp_panel_version: 1000GP
-snp_panel: N/A
+snp_panel: null
 
 ##################################################
 # Phase panel, used by population-based phasing methods.
 phasing_panel_version: 1000G_hg38
-phasing_panel: N/A
+phasing_panel: null
 
 ##################################################
 # genotype_snps

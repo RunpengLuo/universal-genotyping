@@ -15,7 +15,8 @@ from utils import read_VCF, sort_df_chr
 
 ##################################################
 """
-Parse genetic map files
+Parse genetic map files from Shapeit or Eagle resources.
+chr-prefix will always be added to comply with other tools.
 """
 
 logging.basicConfig(
@@ -24,7 +25,6 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
 )
 
-snps = read_VCF(sm.input["phased_vcf"])
 gmap_files = list(sm.input["gmap_files"])
 chrnames = list(sm.params["chrnames"])
 phaser = sm.params["phaser"]
@@ -60,8 +60,7 @@ if phaser == "eagle":
     genetic_map["#CHR"] = genetic_map["#CHR"].astype(str)
     genetic_map.loc[genetic_map["#CHR"] == "23", "#CHR"] = "X"
     if not str(genetic_map["#CHR"].loc[0]).startswith("chr"):
-        if str(snps["#CHR"].iloc[0]).startswith("chr"):
-            genetic_map["#CHR"] = "chr" + genetic_map["#CHR"].astype(str)
+        genetic_map["#CHR"] = "chr" + genetic_map["#CHR"].astype(str)
     genetic_map = genetic_map[
         genetic_map["#CHR"].isin({f"chr{c}" for c in chrnames})
     ].reset_index(drop=True)
