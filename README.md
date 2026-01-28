@@ -69,6 +69,9 @@ Requirements on sample files:
 * `allele/<data_type>(_<rep_id>)?/snp_matrix.A.npz`: SNP by samples/barcodes A-allele matrix, generated if phased.
 * `allele/<data_type>(_<rep_id>)?/snp_matrix.B.npz`: SNP by samples/barcodes B-allele matrix, generated if phased.
 
+#### Optional output
+* `phase/genetic_map.tsv.gz`: parsed genetic map file, required by HATCHet3.
+
 #### Legacy output
 * `allele/<data_type>(_<rep_id>)?/unique_snp_ids.npy`: per-SNP `<chromosome>_<position>` array.
 * `allele/<data_type>(_<rep_id>)?/cell_snp_Aallele.npz`: SNP by samples/barcodes A-allele matrix, generated if phased.
