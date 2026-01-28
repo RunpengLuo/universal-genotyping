@@ -45,7 +45,7 @@ if workflow_mode == "bulk":
             read_quality=config["params_mosdepth"].get("read_quality", 11),
             extra_params=config["params_mosdepth"].get("extra_params", ""),
         log:
-            "logs/mosdepth_counting.bulkDNA_{rep_id}.log"
+            "logs/mosdepth.bulkDNA_{rep_id}.log"
         shell:
             r"""
             {params.mosdepth} \
