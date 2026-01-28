@@ -24,7 +24,7 @@ if config["phaser"] == "shapeit":
                 --reference "{input.phasing_panel_file}" \
                 --region "{params.chrom}" \
                 --thread "{threads}" \
-                --output "{output.bcf_file}"
+                --output "{output.bcf_file}" > {log} 2>&1
             
             bcftools view -Ov "{output.bcf_file}" | bgzip > "{output.phased_file}"
             tabix -f -p vcf "{output.phased_file}"
@@ -54,7 +54,7 @@ if config["phaser"] == "eagle":
                 --vcfRef "{input.phasing_panel_file}" \
                 --vcfOutFormat z \
                 --numThreads "{threads}" \
-                --outPrefix "phase/{params.chrom}"
+                --outPrefix "phase/{params.chrom}" > {log} 2>&1
             tabix -f -p vcf "{output.phased_file}"
             """
 
@@ -85,7 +85,7 @@ if config["phaser"] == "longphase":
                 --mappingQuality={params.min_mapq} \
                 --out-prefix="phase/{params.chrom}" \
                 --threads={threads} \
-                {params.extra_params}
+                {params.extra_params} > {log} 2>&1
             tabix -f -p vcf "{output.phased_file}"
             """
 

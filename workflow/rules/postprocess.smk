@@ -54,7 +54,7 @@ if workflow_mode == "bulk":
                 --by "{input.bed_file}" \
                 {params.extra_params} \
                 "{params.out_prefix}" \
-                "{input.bam}"
+                "{input.bam}" > {log} 2>&1
             """
 
     rule count_reads_bulk:

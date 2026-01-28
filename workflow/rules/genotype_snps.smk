@@ -40,7 +40,7 @@ if workflow_mode == "bulk":
             | {params.bcftools} call -m -Ou \
             | {params.bcftools} view -v snps -m2 -M2 \
                 -i 'GT="alt" && FMT/DP>={params.min_dp}' \
-                -Oz -o {output.snp_file}
+                -Oz -o {output.snp_file} > {log} 2>&1
 
             tabix -p vcf {output.snp_file}
             """
@@ -84,7 +84,7 @@ if workflow_mode == "single_cell":
                 --minCOUNT {params.minCOUNT} \
                 --UMItag {params.UMItag} \
                 --cellTAG None \
-                --gzip
+                --gzip > {log} 2>&1
             rm ${{cellsnp_dir}}/bams.lst
             nsnps_cellsnp=$({params.bcftools} view -H "{output.snp_file}" | wc -l)
             echo "[QC] {output} record #SNPs: ${{nsnps_cellsnp}}"

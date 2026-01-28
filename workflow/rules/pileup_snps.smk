@@ -34,7 +34,7 @@ rule pileup_snps_cellsnp_lite_cell:
             --minCOUNT {params.minCOUNT} \
             --UMItag {params.UMItag} \
             --cellTAG {params.cellTAG} \
-            --gzip
+            --gzip > {log} 2>&1
         """
 
 rule pileup_snps_cellsnp_lite_bulk:
@@ -69,5 +69,5 @@ rule pileup_snps_cellsnp_lite_bulk:
             --minCOUNT {params.minCOUNT} \
             --UMItag {params.UMItag} \
             --cellTAG {params.cellTAG} \
-            --gzip
+            --gzip > {log} 2>&1
         """
