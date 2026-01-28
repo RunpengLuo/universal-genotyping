@@ -9,7 +9,7 @@ if workflow_mode == "bulk":
             region_bed=lambda wc: config["region_bed"],
             genome_size=lambda wc: config["genome_size"],
         output:
-            sample_file="allele/bulkDNA/samples_ids.tsv",
+            sample_file="allele/bulkDNA/sample_ids.tsv",
             info_file="allele/bulkDNA/snp_info.tsv.gz",
             bed_file="allele/bulkDNA/snp_positions.bed.gz",
             tot_mtx="allele/bulkDNA/snp_matrix.tot.npz",
@@ -59,7 +59,7 @@ if workflow_mode == "bulk":
 
     rule count_reads_bulk:
         input:
-            sample_file="allele/bulkDNA/samples_ids.tsv",
+            sample_file="allele/bulkDNA/sample_ids.tsv",
             info_file="allele/bulkDNA/snp_info.tsv.gz",
             mos_files=expand("allele/bulkDNA/out_mosdepth/{rep_id}.regions.bed.gz", rep_id=mod2reps.get("bulkDNA", [])),
         output:
@@ -103,7 +103,7 @@ if workflow_mode == "single_cell":
             region_bed=lambda wc: config["region_bed"],
             genome_size=lambda wc: config["genome_size"],
         output:
-            sample_file="allele/{data_type}/samples_ids.tsv",
+            sample_file="allele/{data_type}/sample_ids.tsv",
             info_file="allele/{data_type}/snp_info.tsv.gz",
             bed_file="allele/{data_type}/snp_positions.bed.gz",
             all_barcodes="allele/{data_type}/barcodes.txt",
@@ -140,7 +140,7 @@ if workflow_mode == "single_cell":
             region_bed=lambda wc: config["region_bed"],
             genome_size=lambda wc: config["genome_size"],
         output:
-            sample_file="allele/multiome_{rep_id}/samples_ids.tsv",
+            sample_file="allele/multiome_{rep_id}/sample_ids.tsv",
             info_file="allele/multiome_{rep_id}/snp_info.tsv.gz",
             bed_file="allele/multiome_{rep_id}/snp_positions.bed.gz",
             all_barcodes="allele/multiome_{rep_id}/barcodes.txt",

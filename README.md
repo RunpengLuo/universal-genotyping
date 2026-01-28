@@ -2,7 +2,11 @@
 ```
 mamba env create -f ./environment.yaml -p /path/to/envs/genotyping_env
 conda activate /path/to/envs/genotyping_env
-snakemake -p --cores 1 -s /path/to/workflow/Snakefile --configfile config/config.yaml --directory <output>
+snakemake --cores <num_cores> \
+    -s /path/to/workflow/Snakefile \
+    --report report.html \
+    --configfile config/config.yaml \
+    --directory <output>
 ```
 
 ### Dependencies

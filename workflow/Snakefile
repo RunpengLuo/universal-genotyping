@@ -145,7 +145,7 @@ for mod, rep_ids in mod2reps.items():
     data_types = ["scRNA", "scATAC"] if mod == "multiome" else [mod]
     if mod == "bulkDNA":
         # HATCHet input
-        final_targets.append(f"allele/{mod}/samples_ids.tsv")
+        final_targets.append(f"allele/{mod}/sample_ids.tsv")
         final_targets.append(f"allele/{mod}/snp_info.tsv.gz")
         final_targets.append(f"allele/{mod}/snp_matrix.dp.npz")
         final_targets.append(f"allele/{mod}/snp_matrix.tot.npz")
@@ -154,7 +154,7 @@ for mod, rep_ids in mod2reps.items():
         final_targets.append(f"allele/{mod}/snp_matrix.A.npz")
         final_targets.append(f"allele/{mod}/snp_matrix.B.npz")
     elif mod == "multiome":
-        final_targets.extend([f"allele/{mod}_{rep_id}/samples_ids.tsv" for rep_id in rep_ids])
+        final_targets.extend([f"allele/{mod}_{rep_id}/sample_ids.tsv" for rep_id in rep_ids])
         final_targets.extend([f"allele/{mod}_{rep_id}/snp_info.tsv.gz" for rep_id in rep_ids])
         final_targets.extend([f"allele/{mod}_{rep_id}/barcodes.txt" for rep_id in rep_ids])
         for data_type in data_types:
@@ -164,7 +164,7 @@ for mod, rep_ids in mod2reps.items():
             final_targets.extend([f"allele/{mod}_{rep_id}/{data_type}_snp_matrix.A.npz" for rep_id in rep_ids])
             final_targets.extend([f"allele/{mod}_{rep_id}/{data_type}_snp_matrix.B.npz" for rep_id in rep_ids])
     else:
-        final_targets.append(f"allele/{mod}/samples_ids.tsv")
+        final_targets.append(f"allele/{mod}/sample_ids.tsv")
         final_targets.append(f"allele/{mod}/snp_info.tsv.gz")
         final_targets.append(f"allele/{mod}/barcodes.txt")
         final_targets.append(f"allele/{mod}/snp_matrix.tot.npz")
