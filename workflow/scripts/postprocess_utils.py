@@ -152,12 +152,18 @@ def get_mask_by_region(snps: pd.DataFrame, regions: pd.DataFrame) -> np.ndarray:
 
 
 def get_mask_by_depth(snps: pd.DataFrame, tot_mtx: csr_matrix, min_dp=1):
-    mask = np.asarray(tot_mtx.sum(axis=1)).ravel() >= min_dp
+    mask = np.all(tot_mtx >= min_dp, axis=1)
     logging.info(
         f"filter by depth, min_dp={min_dp}, #passed SNPs={np.sum(mask)}/{len(snps)}"
     )
     return mask
 
+def get_mask_by_depth_pseudobulk(snps: pd.DataFrame, tot_mtx: csr_matrix, min_dp=1):
+    mask = np.asarray(tot_mtx.sum(axis=1)).ravel() >= min_dp
+    logging.info(
+        f"filter by depth, min_dp={min_dp}, #passed SNPs={np.sum(mask)}/{len(snps)}"
+    )
+    return mask
 
 def get_mask_by_het_balanced(
     snps: pd.DataFrame,
