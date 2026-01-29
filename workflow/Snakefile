@@ -28,7 +28,7 @@ allowed_data_types = ["bulkDNA", "scATAC", "scRNA", "VISIUM", "VISIUM3prime"]
 assert all(dt in allowed_data_types for dt in sample_data_types)
 
 if "bulkDNA" in sample_data_types:
-    assert len(sample_data_types) == 1, "mode 1 cannot have non-bulk samples, run the workflow in 2 steps"
+    assert len(sample_data_types) == 1, "mode 1 must have only bulk samples. Run mode 1 with bulk-only samples to genotype then mode 2 on non-bulk samples."
     workflow_mode = "bulk"
 else:
     workflow_mode = "single_cell"

@@ -52,6 +52,7 @@ params_annotate_snps:
   min_hom_dp: 10
   min_vaf_thres: 0.1
   filter_nz_OTH: true
+  ignore_hom_ALT: false
 
 ##################################################
 # phase_snps

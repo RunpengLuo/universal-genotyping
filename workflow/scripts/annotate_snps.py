@@ -30,6 +30,7 @@ logging.info("start annotate_snps")
 
 chroms = sm.config["chromosomes"]
 filter_nz_OTH = sm.params["filter_nz_OTH"]
+ignore_hom_ALT = sm.params["ignore_hom_ALT"]
 min_het_reads = sm.params["min_het_reads"]
 min_hom_dp = sm.params["min_hom_dp"]
 min_vaf_thres = sm.params["min_vaf_thres"]
@@ -48,6 +49,9 @@ def get_gt(row):
     else:
         return "./."
 
+keep_gts = ["0/1"]
+if not ignore_hom_ALT:
+    keep_gts.append("1/1")
 
 ##################################################
 for data_type, raw_snp_file in zip(sm.params["data_types"], sm.input["raw_snp_files"]):
@@ -72,8 +76,7 @@ for data_type, raw_snp_file in zip(sm.params["data_types"], sm.input["raw_snp_fi
     raw_snps["is_hom_ref"] = (raw_snps["AD"] == 0) & (raw_snps["DP"] >= min_hom_dp)
     raw_snps["SAMPLE"] = raw_snps.apply(get_gt, axis=1)
 
-    # only keep het and hom_alt SNPs
-    raw_snps = raw_snps[raw_snps["SAMPLE"].isin(["0/1", "1/1"])].reset_index(drop=True)
+    raw_snps = raw_snps[raw_snps["SAMPLE"].isin(keep_gts)].reset_index(drop=True)
 
     # filter SNPs by chromosomes
     raw_snps = raw_snps[
