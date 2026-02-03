@@ -4,9 +4,10 @@ mamba env create -f ./environment.yaml -p /path/to/envs/genotyping_env
 conda activate /path/to/envs/genotyping_env
 snakemake --cores <num_cores> \
     -s /path/to/workflow/Snakefile \
-    --report report.html \
     --configfile config/config.yaml \
     --directory <output>
+
+    --report report.html \
 ```
 
 ### Dependencies
@@ -17,7 +18,7 @@ snakemake --cores <num_cores> \
 5. Eagle2 `https://storage.googleapis.com/broad-alkesgroup-public/Eagle/downloads/Eagle_v2.4.1.tar.gz`
 6. Shapeit5 `https://github.com/odelaneau/shapeit5.git`, `https://github.com/odelaneau/shapeit5/releases`
 
-### Aux files
+### Resources
 #### SNP panel files
 1. https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf.gz
     * used by Numbat, ~92MB
@@ -26,16 +27,6 @@ snakemake --cores <num_cores> \
 3. dbSNPv157 (for WGS data)
     * hg19: https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.25.gz
     * hg38: https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz and https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz.tbi
-
-##### rename dbSNP SNP panel chromosomes
-NCBI dbSNP uses refseq version, rename it to UCSC version.
-```sh
-bcftools view -r NC_000001.11,NC_000002.12,NC_000003.12,NC_000004.12,NC_000005.10,NC_000006.12,NC_000007.14,NC_000008.11,NC_000009.12,NC_000010.11,NC_000011.10,NC_000012.12,NC_000013.11,NC_000014.9,NC_000015.10,NC_000016.10,NC_000017.11,NC_000018.10,NC_000019.10,NC_000020.11,NC_000021.9,NC_000022.11,NC_000023.11,NC_000024.10,NC_012920.1 -Ou GCF_000001405.40.gz \
-    | bcftools annotate --rename-chrs /path/to/rename_chrs.refseq2ucsc.tsv -Ou \
-    | bcftools view -v snps -Oz -o dbsnp157.hg38.biallelic.snps.vcf.gz
-
-bcftools index dbsnp157.hg38.biallelic.snps.vcf.gz
-```
 
 #### phasing panel files
 1. 1000GP HG38 phasing panel: http://pklab.med.harvard.edu/teng/data/1000G_hg38.zip
@@ -89,3 +80,19 @@ In samples with high tumor purity (e.g., tumor cell lines) without matched norma
 2. mapping resolutions, 2um to Xum?
 3. divides post het SNPs into haplotype blocks, compute RDR, then aggregate to form phased blocks.
 4. we assumed all BAM files have chr-prefix, and we preserve chr-prefix in all processed files.
+5. cellsnp-lite mode1a only consider alleles present in bi-allelic rows of VCF file, OTH>0 might be due to alt allele not present in VCF file?
+6. gencode may overlap, convert to non-overlapping units and keep as a file in resources.
+7. multiome adaptive binning when missing bulk data?
+
+
+
+### Tips
+#### rename dbSNP SNP panel chromosomes
+NCBI dbSNP uses refseq version, rename it to UCSC version.
+```sh
+bcftools view -r NC_000001.11,NC_000002.12,NC_000003.12,NC_000004.12,NC_000005.10,NC_000006.12,NC_000007.14,NC_000008.11,NC_000009.12,NC_000010.11,NC_000011.10,NC_000012.12,NC_000013.11,NC_000014.9,NC_000015.10,NC_000016.10,NC_000017.11,NC_000018.10,NC_000019.10,NC_000020.11,NC_000021.9,NC_000022.11,NC_000023.11,NC_000024.10,NC_012920.1 -Ou GCF_000001405.40.gz \
+    | bcftools annotate --rename-chrs /path/to/rename_chrs.refseq2ucsc.tsv -Ou \
+    | bcftools view -v snps -Oz -o dbsnp157.hg38.biallelic.snps.vcf.gz
+
+bcftools index dbsnp157.hg38.biallelic.snps.vcf.gz
+```

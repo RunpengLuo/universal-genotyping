@@ -10,8 +10,14 @@ mosdepth: /path/to/mosdepth
 ##################################################
 # Input
 sample_file: /path/to/sample.tsv
-ref_snp_file: null
 chromosomes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+
+# skip genotyping & phasing when provided.
+ref_snp_file: null
+# HATCHet CNV profiles and block phased haplotypes.
+seg_ucn: null
+bbc_ucn: null
+bbc_phases: null
 
 ##################################################
 # Reference
@@ -46,13 +52,14 @@ params_bcftools:
   max_depth: 300
 
 ##################################################
+# mode 2.
 params_annotate_snps:
   # set <min_het_reads> to 0 to replicate numbat criteria.
   min_het_reads: 2
   min_hom_dp: 10
   min_vaf_thres: 0.1
   filter_nz_OTH: true
-  ignore_hom_ALT: false
+  filter_hom_ALT: false
 
 ##################################################
 # phase_snps
@@ -66,15 +73,49 @@ params_longphase:
   extra_params: "--pb"
 
 ##################################################
+# aggregation block BED file
+block_bed: null
 params_postprocess:
-  mask_out_of_region: true
-  # bulk-only
+  # SNP filtering paramters
+  ## filter SNP if any sample failed, bulk only.
   min_depth: 1
+  ## per-SNP beta-posterior CI test on matched-normal sample, bulk only.
   gamma: 0.05
 
+  # switchprobs parameters
+  ## estimate switchprobs by genetic map (population-based phasing)
+  min_switchprob: 1e-6
+  nu: 1
+
+  ## split SNPs if switchprobs exceeds max_switchprob when PS is N/A.
+  max_switchprob: 0.1
+
+  ## constant switchprobs inter-PS for long-read based phasing.
+  ## for HATCHet HMM clustering phase transitions only.
+  switchprob_ps: 5e-2
+
+  # binom_test parameters
+  ## when min(|AF_2 - 0.5|, |AF_1 - 0.5|) > binom_margin and
+  ## sign(AF_1 - 0.5) != sign(AF_2 - 0.5)
+  ## perform adjacent SNP 2-AF binomial test and split SNPs.
+  binom_test: true
+  binom_alpha: 5e-3
+  binom_margin: 0.05
+
+  nsnp_meta: 2
+
+  min_snp_reads: 200
+  min_snp_per_block: 10
+
+##################################################
+# compute RDRs - bulk only
+mappability_file: null
 params_mosdepth:
   read_quality: 11
   extra_params: "--no-per-base --fast-mode"
+
+params_compute_rdr:
+  gc_correct: true
 
 ##################################################
 threads:

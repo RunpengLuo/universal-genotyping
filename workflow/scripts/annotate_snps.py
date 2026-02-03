@@ -30,7 +30,7 @@ logging.info("start annotate_snps")
 
 chroms = sm.config["chromosomes"]
 filter_nz_OTH = sm.params["filter_nz_OTH"]
-ignore_hom_ALT = sm.params["ignore_hom_ALT"]
+filter_hom_ALT = sm.params["filter_hom_ALT"]
 min_het_reads = sm.params["min_het_reads"]
 min_hom_dp = sm.params["min_hom_dp"]
 min_vaf_thres = sm.params["min_vaf_thres"]
@@ -49,8 +49,9 @@ def get_gt(row):
     else:
         return "./."
 
+
 keep_gts = ["0/1"]
-if not ignore_hom_ALT:
+if not filter_hom_ALT:
     keep_gts.append("1/1")
 
 ##################################################
@@ -85,7 +86,20 @@ for data_type, raw_snp_file in zip(sm.params["data_types"], sm.input["raw_snp_fi
 
     # filter multi-allelic SNPs, ~0.1%
     if filter_nz_OTH:
-        raw_snps = raw_snps[raw_snps["OTH"] == 0]
+        nz_oth = raw_snps["OTH"] > 0
+        n_nz = int(nz_oth.sum())
+
+        n_filt_hom_alt = int(raw_snps.loc[nz_oth, "is_hom_alt"].sum())
+        n_filt_het = int(raw_snps.loc[nz_oth, "is_het"].sum())
+        n_filt_hom_ref = int(raw_snps.loc[nz_oth, "is_hom_ref"].sum())
+        n_filt_other = n_nz - (n_filt_hom_alt + n_filt_het + n_filt_hom_ref)
+
+        logging.info(
+            f"{data_type}, #nz-OTH SNPs={n_nz}/{num_raw_snps} "
+            f"(hom_alt={n_filt_hom_alt}, het={n_filt_het}, hom_ref={n_filt_hom_ref}, other={n_filt_other})"
+        )
+
+        raw_snps = raw_snps[~nz_oth]
 
     # filter duplicated SNPs
     raw_snps = raw_snps.drop_duplicates(subset=KEY, keep="first").reset_index(drop=True)
@@ -109,7 +123,7 @@ if len(snp_lists) > 1:
         drop=True
     )
 
-    # 3. filter multi-allelic SNPs.
+    # 2. filter multi-allelic SNPs.
     is_dup = final_snps.duplicated(subset=["#CHROM", "POS"], keep=False)
     final_snps = final_snps[~is_dup].reset_index(drop=True)
 

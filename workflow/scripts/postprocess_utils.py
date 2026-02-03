@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.backends.backend_pdf import PdfPages
 
-from utils import *
+from io_utils import *
 
 
 ##################################################
@@ -85,10 +85,11 @@ def apply_phase_to_mat(tot_mtx, ref_mtx, alt_mtx, phases):
     p = phases[:, None]
     if issparse(ref_mtx):
         b_mtx = ref_mtx.multiply(p) + alt_mtx.multiply(1 - p)
-        a_mtx = tot_mtx - b_mtx
+        b_mtx.data = np.rint(b_mtx.data).astype(np.int32)
     else:
         b_mtx = ref_mtx * p + alt_mtx * (1 - p)
-        a_mtx = tot_mtx - b_mtx
+        b_mtx = np.round(b_mtx).astype(np.int32)
+    a_mtx = tot_mtx - b_mtx
     return a_mtx, b_mtx
 
 
@@ -158,12 +159,14 @@ def get_mask_by_depth(snps: pd.DataFrame, tot_mtx: csr_matrix, min_dp=1):
     )
     return mask
 
+
 def get_mask_by_depth_pseudobulk(snps: pd.DataFrame, tot_mtx: csr_matrix, min_dp=1):
     mask = np.asarray(tot_mtx.sum(axis=1)).ravel() >= min_dp
     logging.info(
         f"filter by depth, min_dp={min_dp}, #passed SNPs={np.sum(mask)}/{len(snps)}"
     )
     return mask
+
 
 def get_mask_by_het_balanced(
     snps: pd.DataFrame,
@@ -174,7 +177,6 @@ def get_mask_by_het_balanced(
 ):
     """
     mask SNPs if normal sample failed beta-posterior credible interval test with beta(1, 1) prior.
-    assume first sample is normal.
     """
     p_lower = gamma / 2.0
     p_upper = 1.0 - p_lower
@@ -209,16 +211,15 @@ def subset_baf(
         return baf_ch[(pos >= start) & (pos < end)]
 
 
-def assign_snp_bounderies(snps: pd.DataFrame, regions: pd.DataFrame):
+def assign_snp_bounderies(snps: pd.DataFrame, regions: pd.DataFrame, rid="region_id"):
     """
     divide regions into [START, END) subregions, each subregion has one SNP.
     If a SNP is out-of-region, its START and END will be 0 and region_id will be 0.
     """
-    snps["POS0"] = snps["POS"] - 1
     snps["START"] = 0
     snps["END"] = 0
 
-    snps["region_id"] = 0
+    snps[rid] = 0
     region_id = 0
 
     chroms = snps["#CHR"].unique().tolist()
@@ -234,7 +235,7 @@ def assign_snp_bounderies(snps: pd.DataFrame, regions: pd.DataFrame):
             reg_snp_indices = reg_snps.index.to_numpy()
 
             # annotate region ID
-            snps.loc[reg_snp_indices, "region_id"] = region_id
+            snps.loc[reg_snp_indices, rid] = region_id
             region_id += 1
 
             # build SNP bounderies
@@ -258,7 +259,7 @@ def assign_snp_bounderies(snps: pd.DataFrame, regions: pd.DataFrame):
 
 
 ##################################################
-def plot_snps_allele_freqs(
+def plot_allele_freqs(
     snps,
     rep_ids,
     tot_mtx,
@@ -267,25 +268,29 @@ def plot_snps_allele_freqs(
     plot_dir,
     apply_pseudobulk=False,
     allele="ref",
+    unit="allele",
+    suffix="",
 ):
     logging.info(
-        f"QC analysis - plot SNPs Allele-frequency, allele={allele}, apply_pseudobulk={apply_pseudobulk}"
+        f"QC analysis - plot {allele}-{unit} allele frequency, {unit}={allele}, apply_pseudobulk={apply_pseudobulk}"
     )
     if apply_pseudobulk:
         af = compute_af_pseudobulk(tot_mtx, b_mtx)
-        plot_file = os.path.join(plot_dir, f"af_{allele}_allele.pseudobulk.pdf")
-        plot_snps_allele_freqs_sample(snps, af, genome_file, plot_file)
+        plot_file = os.path.join(plot_dir, f"af_{allele}_{unit}.pseudobulk{suffix}.pdf")
+        plot_allele_freqs_sample(snps, af, genome_file, plot_file)
     else:
         _tot_mtx = tot_mtx.tocsc() if issparse(tot_mtx) else tot_mtx
         _b_mtx = b_mtx.tocsc() if issparse(b_mtx) else b_mtx
         for i, rep_id in enumerate(rep_ids):
-            plot_file = os.path.join(plot_dir, f"af_{allele}_allele.{rep_id}.pdf")
+            plot_file = os.path.join(
+                plot_dir, f"af_{allele}{unit}.{rep_id}{suffix}.pdf"
+            )
             af = compute_af_per_sample(_tot_mtx, _b_mtx, i)
-            plot_snps_allele_freqs_sample(snps, af, genome_file, plot_file)
+            plot_allele_freqs_sample(snps, af, genome_file, plot_file)
     return
 
 
-def plot_snps_allele_freqs_sample(
+def plot_allele_freqs_sample(
     snps: pd.DataFrame,
     af: np.ndarray,
     genome_file: str,

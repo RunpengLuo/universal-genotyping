@@ -102,7 +102,6 @@ if run_genotype_snps:
 
     ##################################################
     # parse phase_snps inputs
-    # define lambda functions that map chrname to genetic map file and phase panel file.
     if phaser == "eagle":
         assert config.get("eagle_dir") is not None
         gmap_dir = os.path.join(config["eagle_dir"], "tables")
@@ -118,8 +117,7 @@ if run_genotype_snps:
         refvers2 = {"hg19": "b37", "hg38": "b38"}[refvers]
         get_gmap_file = lambda chrname: os.path.join(gmap_dir, f"{refvers2}/chr{chrname}.{refvers2}.gmap.gz")
     else:
-        # TODO
-        pass
+        assert phaser in ["longphase"], f"unknown phaser: {phaser}"
 
     if phaser in ["eagle", "shapeit"]:
         assert all(os.path.exists(get_gmap_file(chrname)) for chrname in chroms), "failed to locate gmap files"
@@ -136,46 +134,46 @@ if run_genotype_snps:
 # final target files
 final_targets = []
 
-# optional genetic map file required by HATCHet3
-# to estiamte population-based phases-switch errors.
-if run_genotype_snps and phaser in ["eagle", "shapeit"]:
-    final_targets.append("phase/genetic_map.tsv.gz")
-
+# flags
+require_genetic_map = run_genotype_snps and phaser not in ["longphase"]
+has_cn_profile = config.get("seg_ucn") is not None
 for mod, rep_ids in mod2reps.items():
     data_types = ["scRNA", "scATAC"] if mod == "multiome" else [mod]
     if mod == "bulkDNA":
         # HATCHet input
         final_targets.append(f"allele/{mod}/sample_ids.tsv")
-        final_targets.append(f"allele/{mod}/snp_info.tsv.gz")
-        final_targets.append(f"allele/{mod}/snp_matrix.dp.npz")
-        final_targets.append(f"allele/{mod}/snp_matrix.tot.npz")
-        final_targets.append(f"allele/{mod}/snp_matrix.alt.npz")
-        final_targets.append(f"allele/{mod}/snp_matrix.ref.npz")
-        final_targets.append(f"allele/{mod}/snp_matrix.A.npz")
-        final_targets.append(f"allele/{mod}/snp_matrix.B.npz")
+        final_targets.append(f"allele/{mod}/bb.tsv")
+        final_targets.append(f"allele/{mod}/bb.Tallele.npz")
+        final_targets.append(f"allele/{mod}/bb.Aallele.npz")
+        final_targets.append(f"allele/{mod}/bb.Ballele.npz")
+        final_targets.append(f"allele/{mod}/bb.depth.npz")
+        final_targets.append(f"allele/{mod}/bb.rdr.npz")
     elif mod == "multiome":
-        final_targets.extend([f"allele/{mod}_{rep_id}/sample_ids.tsv" for rep_id in rep_ids])
-        final_targets.extend([f"allele/{mod}_{rep_id}/snp_info.tsv.gz" for rep_id in rep_ids])
-        final_targets.extend([f"allele/{mod}_{rep_id}/barcodes.txt" for rep_id in rep_ids])
-        for data_type in data_types:
-            final_targets.extend([f"allele/{mod}_{rep_id}/{data_type}_snp_matrix.tot.npz" for rep_id in rep_ids])
-            final_targets.extend([f"allele/{mod}_{rep_id}/{data_type}_snp_matrix.alt.npz" for rep_id in rep_ids])
-            final_targets.extend([f"allele/{mod}_{rep_id}/{data_type}_snp_matrix.ref.npz" for rep_id in rep_ids])
-            final_targets.extend([f"allele/{mod}_{rep_id}/{data_type}_snp_matrix.A.npz" for rep_id in rep_ids])
-            final_targets.extend([f"allele/{mod}_{rep_id}/{data_type}_snp_matrix.B.npz" for rep_id in rep_ids])
+        assert has_cn_profile, "adaptive binning for multiome data TODO"
+        if has_cn_profile:
+            for rep_id in rep_ids:
+                final_targets.append(f"allele/{mod}_{rep_id}/sample_ids.tsv")
+                final_targets.append(f"allele/{mod}_{rep_id}/barcodes.txt")
+                final_targets.append(f"allele/{mod}_{rep_id}/haplotype_blocks.tsv")
+                for data_type in data_types:
+                    final_targets.append(f"allele/{mod}_{rep_id}/Y_count.{data_type}.npz")
+                    final_targets.append(f"allele/{mod}_{rep_id}/D_count.{data_type}.npz")
     else:
         final_targets.append(f"allele/{mod}/sample_ids.tsv")
-        final_targets.append(f"allele/{mod}/snp_info.tsv.gz")
         final_targets.append(f"allele/{mod}/barcodes.txt")
-        final_targets.append(f"allele/{mod}/snp_matrix.tot.npz")
-        final_targets.append(f"allele/{mod}/snp_matrix.alt.npz")
-        final_targets.append(f"allele/{mod}/snp_matrix.ref.npz")
-        final_targets.append(f"allele/{mod}/snp_matrix.A.npz")
-        final_targets.append(f"allele/{mod}/snp_matrix.B.npz")
-        # legacy CalicoST outputs
-        final_targets.append(f"allele/{mod}/unique_snp_ids.npy")
-        final_targets.append(f"allele/{mod}/cell_snp_Aallele.npz")
-        final_targets.append(f"allele/{mod}/cell_snp_Ballele.npz")
+        final_targets.append(f"allele/{mod}/meta.tsv.gz")
+        final_targets.append(f"allele/{mod}/meta.Tallele.npz")
+        final_targets.append(f"allele/{mod}/meta.Aallele.npz")
+        final_targets.append(f"allele/{mod}/meta.Ballele.npz")
+        final_targets.append(f"allele/{mod}/bb.tsv")
+        final_targets.append(f"allele/{mod}/bb.Tallele.npz")
+        final_targets.append(f"allele/{mod}/bb.Aallele.npz")
+        final_targets.append(f"allele/{mod}/bb.Ballele.npz")
+        if mod in ["VISIUM", "VISIUM3PRIME"]:
+            # legacy CalicoST inputs
+            final_targets.append(f"allele/{mod}/unique_snp_ids.npy")
+            final_targets.append(f"allele/{mod}/cell_snp_Aallele.npz")
+            final_targets.append(f"allele/{mod}/cell_snp_Ballele.npz")
 
 ##################################################
 # entrypoint

@@ -17,3 +17,5 @@ dependencies:
   - pip
   - pyranges
   - matplotlib-base
+  - statsmodels
+  - pybedtools
