@@ -117,7 +117,7 @@ alt_mtx = alt_mtx[snp_mask, :]
 (nsnps, nsamples) = tot_mtx.shape
 
 # assign each SNP a consecutive interval [START, END) along chromosome based on midpoints
-snps = assign_snp_bounderies(snps, regions, id="region_id")
+snps = assign_snp_bounderies(snps, regions, region_id="region_id")
 
 ##################################################
 # convert to phased A/B mats
@@ -185,6 +185,8 @@ if binom_test:
             margin=float(sm.params["binom_margin"]),
         )
     switches = np.any(switches_2d, axis=1)
+
+    # TODO print top 50 BAFs at switched SNPs
     snps["binom_id"] = np.cumsum(switches)
     grp_cols.append("binom_id")
 

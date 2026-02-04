@@ -77,9 +77,9 @@ params_longphase:
 block_bed: null
 params_postprocess:
   # SNP filtering paramters
-  ## filter SNP if any sample failed, bulk only.
+  ## filter SNP if any sample failed, (mode 1)
   min_depth: 1
-  ## per-SNP beta-posterior CI test on matched-normal sample, bulk only.
+  ## per-SNP beta-posterior CI test on matched-normal sample, (mode 1)
   gamma: 0.05
 
   # switchprobs parameters
