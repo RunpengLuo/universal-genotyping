@@ -169,7 +169,7 @@ for mod, rep_ids in mod2reps.items():
         final_targets.append(f"allele/{mod}/bb.Tallele.npz")
         final_targets.append(f"allele/{mod}/bb.Aallele.npz")
         final_targets.append(f"allele/{mod}/bb.Ballele.npz")
-        if mod in ["VISIUM", "VISIUM3PRIME"]:
+        if mod in ["VISIUM", "VISIUM3prime"]:
             # legacy CalicoST inputs
             final_targets.append(f"allele/{mod}/unique_snp_ids.npy")
             final_targets.append(f"allele/{mod}/cell_snp_Aallele.npz")

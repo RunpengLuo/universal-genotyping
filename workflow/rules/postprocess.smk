@@ -122,7 +122,7 @@ if workflow_mode == "single_cell":
             outputs["b_mtx_bb"] = [base_dir + "/bb.Ballele.npz"]
 
             # legacy CalicoST inputs
-            if data_type in ["VISIUM", "VISIUM3PRIME"]:
+            if data_type in ["VISIUM", "VISIUM3prime"]:
                 outputs["unique_snp_ids_legacy"] = [base_dir + "/unique_snp_ids.npy"]
                 outputs["a_mtx_legacy"] = [base_dir + "/cell_snp_Aallele.npz"]
                 outputs["b_mtx_legacy"] = [base_dir + "/cell_snp_Ballele.npz"]
