@@ -20,7 +20,7 @@ def interp_cM_blocks(
     blocks = blocks.join(hb_pos, on="bbc_id")
 
     genetic_map_chrs = genetic_map.groupby(by="#CHR", sort=False, observed=True)
-    for ch, block_idx in blocks.groupby("#CHR", sort=False).groups.items():
+    for ch, block_idx in blocks.groupby(by="#CHR", sort=False, observed=True):
         ch_map = genetic_map_chrs.get_group(ch)
         start_cMs = np.interp(
             blocks.loc[block_idx, "snp_start"].to_numpy(),
@@ -42,7 +42,7 @@ def interp_cM_blocks(
 def interp_cM_snps(snp_info: pd.DataFrame, genetic_map: pd.DataFrame):
     snp_info["dist_cM"] = 0.0
     genetic_map_chrs = genetic_map.groupby(by="#CHR", sort=False, observed=True)
-    for ch, ch_snps in snp_info.groupby(by="#CHR", sort=False):
+    for ch, ch_snps in snp_info.groupby(by="#CHR", sort=False, observed=True):
         ch_maps = genetic_map_chrs.get_group(ch)
         pos_cms = np.interp(
             ch_snps["POS"].to_numpy(),
