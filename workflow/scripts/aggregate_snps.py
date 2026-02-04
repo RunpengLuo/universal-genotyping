@@ -85,6 +85,7 @@ def adaptive_binning(
     bin_id = 0
     snps[colname] = 0
     snp_grps = snps.groupby(by=grp_cols, sort=False)
+    logging.info(f"adaptive binning, colname={colname}")
     logging.info(f"#SNP groups={len(snp_grps)}, grouper: {grp_cols}")
     for _, grp_snps in snp_grps:
         grp_idxs = grp_snps.index.to_numpy()
@@ -138,28 +139,24 @@ def adaptive_binning(
     snp_bins.loc[:, "BLOCKSIZE"] = snp_bins["END"] - snp_bins["START"]
     snp_bins[colname] = snp_bins.index
 
-    nbins_total = int(snp_bins.shape[0])
-    nsnps_total = int(snps.shape[0])
-
     bin_sizes = snp_bins["#SNPS"].to_numpy()
     block_sizes = snp_bins["BLOCKSIZE"].to_numpy()
-
+    logging.info("adaptive binning summary")
+    logging.info(f"#SNPs={len(snps)}")
+    logging.info(f"#bins={len(snp_bins)}")
     logging.info(
-        "[adaptive-binning]%s summary\n"
-        "  total_snps=%d\n"
-        "  total_bins=%d\n"
-        "  snps_per_bin: min=%.0f  median=%.0f  max=%.0f\n"
-        "  block_bp:     min=%.0f  median=%.0f  max=%.0f",
-        f" {colname}",
-        nsnps_total,
-        nbins_total,
+        "snps per bin: min=%.0f  median=%.0f  max=%.0f\n",
         float(bin_sizes.min()),
         float(np.median(bin_sizes)),
         float(bin_sizes.max()),
+    )
+    logging.info(
+        "blocksize per bin: min=%.0f  median=%.0f  max=%.0f\n",
         float(block_sizes.min()),
         float(np.median(block_sizes)),
         float(block_sizes.max()),
     )
+
     return snp_bins
 
 
