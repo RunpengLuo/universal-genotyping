@@ -56,7 +56,7 @@ mappability_file = maybe_path(sm.input["mappability_file"])
 
 sample_name = sm.params["sample_name"]
 qc_dir = sm.params["qc_dir"]
-mosdepth_dir = sm.params["mos_dir"]
+mosdepth_dir = sm.params["mosdepth_dir"]
 gc_correct = bool(sm.params["gc_correct"])
 
 logging.info("run compute_rdr_bulk")
