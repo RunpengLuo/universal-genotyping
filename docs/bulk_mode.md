@@ -16,9 +16,9 @@ Input: 1 matched-normal sample and multiple tumor sample, short-read WGS/WES, or
     3. convert to A/B phased matrices.
     4. set tag `region_id` and assign per-SNP sub-intervals based on adjacent midpoints along chromosome.
     5. TODO handle `block_bed`.
-    6. assign `BINOM_ID` based on pairwise AF binom test. same id allows to aggregate.
+    6. assign `binom_id` based on pairwise AF binom test. same id allows to aggregate.
     6. `PS` given by phaser or estimated by switch probs inferred from genetic map with threshold `max_swithprob`.
-    7. group SNPs by (`region_id`, `BINOM_ID`, `PS`), per group, assign `meta_id` and `bbc_id` refers to n=2 SNP blocks and SNP blocks with MSR and MSPB criteria.
+    7. group SNPs by (`region_id`, `binom_id`, `PS`), per group, assign `meta_id` and `bbc_id` refers to n=2 SNP blocks and SNP blocks with MSR and MSPB criteria.
     8. build segment df `segments0` and `segments`, record left and right most SNP positions as `POS0L` and `POS0R`, expand to segment BED-like intervals `START`, `END` either based on adjacent midpoint (expanded regions, HATCHet convention) or set `START=POS0L` and `END=POS0R+1`.
     9. aggregate counts into segment by sample phased matrices according to step 4.8.
 5. `run_mosdepth_bulk` takes `segments` BED file and computes per-segment read depth using BAM files.
