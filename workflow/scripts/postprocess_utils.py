@@ -212,7 +212,7 @@ def subset_baf(
 
 
 def assign_snp_bounderies(
-    snps: pd.DataFrame, regions: pd.DataFrame, region_id="region_id"
+    snps: pd.DataFrame, regions: pd.DataFrame, colname="region_id"
 ):
     """
     divide regions into [START, END) subregions, each subregion has one SNP.
@@ -221,7 +221,7 @@ def assign_snp_bounderies(
     snps["START"] = 0
     snps["END"] = 0
 
-    snps[region_id] = 0
+    snps[colname] = 0
     region_id = 0
 
     chroms = snps["#CHR"].unique().tolist()
@@ -237,7 +237,7 @@ def assign_snp_bounderies(
             reg_snp_indices = reg_snps.index.to_numpy()
 
             # annotate region ID
-            snps.loc[reg_snp_indices, region_id] = region_id
+            snps.loc[reg_snp_indices, colname] = region_id
             region_id += 1
 
             # build SNP bounderies

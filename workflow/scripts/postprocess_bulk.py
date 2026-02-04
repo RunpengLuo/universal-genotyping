@@ -117,7 +117,7 @@ alt_mtx = alt_mtx[snp_mask, :]
 (nsnps, nsamples) = tot_mtx.shape
 
 # assign each SNP a consecutive interval [START, END) along chromosome based on midpoints
-snps = assign_snp_bounderies(snps, regions, region_id="region_id")
+snps = assign_snp_bounderies(snps, regions, colname="region_id")
 
 ##################################################
 # convert to phased A/B mats

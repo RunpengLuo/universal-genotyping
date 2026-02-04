@@ -235,7 +235,7 @@ else:
     # TODO, for multiome data, block_bed file to decide common blocks for gene/peak?
     assert modality != "multiome", "adaptive binning for multiome data TODO"
     # TODO assign intervals by block_bed? e.g., evenly divides gencode ranges.
-    snps = assign_snp_bounderies(snps, regions, region_id="region_id")
+    snps = assign_snp_bounderies(snps, regions, colname="region_id")
 
     a_mtx, b_mtx, tot_mtx = a_mtxs[0], b_mtxs[0], tot_mtxs[0]
     # pseudobulk count vectors
