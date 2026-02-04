@@ -291,6 +291,7 @@ def plot_allele_freqs(
             plot_1d_sample(pos_df, af, genome_size, plot_file, unit=unit, val_type="AF")
     return
 
+
 def plot_1d_sample(
     pos_df: pd.DataFrame,
     val: np.ndarray,
@@ -301,7 +302,7 @@ def plot_1d_sample(
     s=4,
     dpi=150,
     alpha=0.6,
-    figsize=(40, 3)
+    figsize=(40, 3),
 ):
     """
     plot any features like AF, RDR, etc., in 1d chromosome scatter plot.
@@ -309,7 +310,7 @@ def plot_1d_sample(
     assert val_type in ["AF", "BAF", "RDR", "log2RDR"], f"unknown value type={val_type}"
     logging.info(f"chromosome wide {unit}-level {val_type} plot, out_file={out_file}")
     chrom_sizes = get_chr_sizes(genome_size)
-    
+
     ch = pos_df["#CHR"].to_numpy()
     if "POS" in pos_df.columns:
         pos = pos_df["POS"].to_numpy()
@@ -345,7 +346,7 @@ def plot_1d_sample(
         if val_type in ["AF", "BAF"]:
             ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
             ax.set_ylim(-0.05, 1.05)
-        
+
         ax.set_xlab(val_type)
         ax.set_xlim(0, chr_end)
         ax.grid(alpha=0.2)

@@ -15,32 +15,6 @@ from utils import *
 from bias_correction import *
 from postprocess_utils import plot_1d_sample
 
-def compute_RDR(
-    bbs: pd.DataFrame,
-    rep_ids: list,
-    dp_mtx: np.ndarray,
-    gc_dir: str,
-    gc_correct=True,
-    ref_file=None,
-    mapp_file=None,
-    genome_size=None,
-    has_normal=True,
-    tumor_sidx=1,
-):
-    assert has_normal, "no normal sample, TODO"
-    bases_mat = dp_mtx * bbs["BLOCKSIZE"].to_numpy()[:, None]
-    total_bases = np.sum(bases_mat, axis=0)
-    library_correction = total_bases[0] / total_bases[1:]
-    logging.info(f"RDR library normalization factor: {library_correction}")
-
-    rdr_mat = dp_mtx[:, 1:] / dp_mtx[:, 0][:, None]
-    rdr_mat *= library_correction[None, :]
-    if gc_correct:
-        gc_df = compute_gc_content(bbs, ref_file, mapp_file, genome_size)
-        rdr_mat = bias_correction_rdr(rdr_mat, gc_df, rep_ids[tumor_sidx:], gc_dir)
-    return rdr_mat
-
-
 ##################################################
 logging.basicConfig(
     filename=sm.log[0],
@@ -88,24 +62,35 @@ logging.info(f"compute RDRs, has_normal={has_normal}, gc_correct={gc_correct}")
 assert has_normal, "no normal sample, TODO"
 tumor_sidx = {False: 0, True: 1}[has_normal]
 
-rdr_mtx_bb = compute_RDR(
-    bbs,
-    rep_ids,
-    dp_mtx_bb,
-    qc_dir,
-    gc_correct=gc_correct,
-    ref_file=reference,
-    mapp_file=mappability_file,
-    genome_size=genome_size,
-    has_normal=has_normal,
-    tumor_sidx=tumor_sidx,
-)
-np.savez_compressed(sm.output["rdr_mtx_bb"], mat=rdr_mtx_bb)
+if has_normal:
+    bases_mtx_bb = dp_mtx_bb * bbs["BLOCKSIZE"].to_numpy()[:, None]
+    total_bases = np.sum(bases_mtx_bb, axis=0)
+    library_correction = total_bases[0] / total_bases[1:]
+    logging.info(f"RDR library normalization factor: {library_correction}")
 
-# plot per-sample RDRs
+    rdr_mtx_bb = dp_mtx_bb[:, 1:] / dp_mtx_bb[:, 0][:, None]
+    rdr_mtx_bb *= library_correction[None, :]
+else:
+    raise ValueError("no normal sample, TODO")
+
+# plot per-sample RDRs (before corrections)
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
-    plot_file = os.path.join(
-        qc_dir, f"rdr_bb.{rep_id}.pdf"
+    plot_file = os.path.join(qc_dir, f"rdr_bb_before_correction.{rep_id}.pdf")
+    plot_1d_sample(
+        bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR"
     )
-    plot_1d_sample(bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR")
+
+##################################################
+if gc_correct:
+    gc_df = compute_gc_content(bbs, reference, mappability_file, genome_size)
+    rdr_mtx_bb = bias_correction_rdr(rdr_mtx_bb, gc_df, rep_ids[tumor_sidx:], qc_dir)
+
+# plot per-sample RDRs (after corrections)
+for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
+    plot_file = os.path.join(qc_dir, f"rdr_bb.{rep_id}.pdf")
+    plot_1d_sample(
+        bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR"
+    )
+
+np.savez_compressed(sm.output["rdr_mtx_bb"], mat=rdr_mtx_bb)
 logging.info(f"finished.")

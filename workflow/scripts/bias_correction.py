@@ -48,7 +48,9 @@ def compute_gc_content(
     return gc_df
 
 
-def bias_correction_rdr(raw_rdr_mat: np.ndarray, gc_df: pd.DataFrame, rep_ids: list, out_dir=None):
+def bias_correction_rdr(
+    raw_rdr_mat: np.ndarray, gc_df: pd.DataFrame, rep_ids: list, out_dir=None
+):
     logging.info("correct for GC biases on RDR")
     gc = gc_df["GC"].to_numpy()
     mapv = gc_df["MAP"].to_numpy()
