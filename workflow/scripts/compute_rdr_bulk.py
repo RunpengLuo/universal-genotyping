@@ -1,9 +1,6 @@
 import os, sys, gzip, logging
 from snakemake.script import snakemake as sm
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-
 t = int(getattr(sm, "threads", 1))
 os.environ["OMP_NUM_THREADS"] = str(t)
 os.environ["OPENBLAS_NUM_THREADS"] = str(t)

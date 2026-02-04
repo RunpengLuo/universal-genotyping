@@ -10,7 +10,6 @@ from scipy.interpolate import interp1d
 
 from pybedtools import BedTool
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 
 def compute_gc_content(

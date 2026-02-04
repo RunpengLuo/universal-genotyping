@@ -113,9 +113,10 @@ def adaptive_binning(
 
         # fill last block if any
         bin_ids[prev_start:] = max(bin_id - 1, bin_id0)
-        snps.loc[grp_idxs, bin_id] = bin_ids
+        snps.loc[grp_idxs, colname] = bin_ids
 
         # if only a partial block is found, block_id is not incremented in the loop
+        # and partial block is assigned to previous block.
         bin_id = max(bin_id, bin_id0 + 1)
 
     pos_dict = {
@@ -131,11 +132,34 @@ def adaptive_binning(
     for grp_col in grp_cols:
         pos_dict[grp_col] = (grp_col, "first")
 
-    snp_grps = snps.groupby(by=bin_id, sort=False, as_index=True)
+    snp_grps = snps.groupby(by=colname, sort=False, as_index=True)
     snp_bins = snp_grps.agg(**pos_dict)
     snp_bins.loc[:, "#SNPS"] = snp_grps.size().reset_index(drop=True)
     snp_bins.loc[:, "BLOCKSIZE"] = snp_bins["END"] - snp_bins["START"]
-    snp_bins[bin_id] = snp_bins.index
+    snp_bins[colname] = snp_bins.index
+
+    nbins_total = int(snp_bins.shape[0])
+    nsnps_total = int(snps.shape[0])
+
+    bin_sizes = snp_bins["#SNPS"].to_numpy()
+    block_sizes = snp_bins["BLOCKSIZE"].to_numpy()
+
+    logging.info(
+        "[adaptive-binning]%s summary\n"
+        "  total_snps=%d\n"
+        "  total_bins=%d\n"
+        "  snps_per_bin: min=%.0f  median=%.0f  max=%.0f\n"
+        "  block_bp:     min=%.0f  median=%.0f  max=%.0f",
+        f" {colname}",
+        nsnps_total,
+        nbins_total,
+        float(bin_sizes.min()),
+        float(np.median(bin_sizes)),
+        float(bin_sizes.max()),
+        float(block_sizes.min()),
+        float(np.median(block_sizes)),
+        float(block_sizes.max()),
+    )
     return snp_bins
 
 
@@ -150,8 +174,7 @@ def matrix_segmentation(X, bin_ids, K):
       - sparse in  -> (K, M) csr_matrix
       - dense in   -> (K, M) ndarray
     """
-    sparse_in = issparse(X)
-    X = X.tocsr() if sparse_in else np.asarray(X)
+    X = X.tocsr() if issparse(X) else np.asarray(X)
 
     bin_ids = np.asarray(bin_ids, dtype=np.int64)
     N, M = X.shape
@@ -167,11 +190,7 @@ def matrix_segmentation(X, bin_ids, K):
     )
 
     X_bin = B @ X  # (K, M)
-
-    if sparse_in:
-        return X_bin.tocsr()
-    else:
-        return X_bin.toarray()  # ensure dense output
+    return X_bin
 
 
 def cnv_guided_allele_aggregation(

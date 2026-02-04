@@ -211,7 +211,9 @@ def subset_baf(
         return baf_ch[(pos >= start) & (pos < end)]
 
 
-def assign_snp_bounderies(snps: pd.DataFrame, regions: pd.DataFrame, region_id="region_id"):
+def assign_snp_bounderies(
+    snps: pd.DataFrame, regions: pd.DataFrame, region_id="region_id"
+):
     """
     divide regions into [START, END) subregions, each subregion has one SNP.
     If a SNP is out-of-region, its START and END will be 0 and region_id will be 0.
@@ -283,7 +285,7 @@ def plot_allele_freqs(
         _b_mtx = b_mtx.tocsc() if issparse(b_mtx) else b_mtx
         for i, rep_id in enumerate(rep_ids):
             plot_file = os.path.join(
-                plot_dir, f"af_{allele}{unit}.{rep_id}{suffix}.pdf"
+                plot_dir, f"af_{allele}_{unit}.{rep_id}{suffix}.pdf"
             )
             af = compute_af_per_sample(_tot_mtx, _b_mtx, i)
             plot_allele_freqs_sample(snps, af, genome_file, plot_file)
@@ -302,7 +304,13 @@ def plot_allele_freqs_sample(
     chrom_sizes = get_chr_sizes(genome_file)
 
     ch = snps["#CHR"].to_numpy()
-    pos = snps["POS"].to_numpy()
+    if "POS" in snps.columns:
+        pos = snps["POS"].to_numpy()
+    else:
+        # use midpoints for [START, END) intervals
+        pos = ((snps["START"].to_numpy() + snps["END"].to_numpy()) // 2).astype(
+            np.int64
+        )
     # find contiguous chromosome blocks
     change = np.flatnonzero(ch[1:] != ch[:-1]) + 1
     starts = np.r_[0, change]
