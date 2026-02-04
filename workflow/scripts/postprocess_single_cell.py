@@ -268,8 +268,21 @@ else:
             alpha=float(sm.params["binom_alpha"]),
             margin=float(sm.params["binom_margin"]),
         )
-        snps["BINOM_ID"] = np.cumsum(switches)
-        grp_cols.append("BINOM_ID")
+        num_switches = np.sum(switches)
+        logging.info(f"#binom_test switches={num_switches}/{len(switches) - 1}")
+        if num_switches > 0:
+            pair_mask = switches[1:]  # N-1
+            prev_bafs = baf_vec[:-1][pair_mask]
+            next_bafs = baf_vec[1:][pair_mask]
+            avg_abs_bafdevs = np.abs(next_bafs - prev_bafs)
+            counts, _ = np.histogram(avg_abs_bafdevs, bins=np.linspace(0.0, 1.0, 21))
+            counts, edges = np.histogram(avg_abs_bafdevs, bins=50)
+            logging.info("pairwise SNP average BAF absolute deviations")
+            logging.info("bin_left\tbin_right\tcount")
+            for l, r, c in zip(edges[:-1], edges[1:], counts):
+                logging.info(f"{l:.6g}\t{r:.6g}\t{int(c)}")
+        snps["binom_id"] = np.cumsum(switches)
+        grp_cols.append("binom_id")
 
     ##################################################
     # meta-snp segmentation

@@ -187,13 +187,13 @@ if binom_test:
     switches = np.any(switches_2d, axis=1)
 
     num_switches = np.sum(switches)
-    logging.info(f"#binom_test switches={num_switches}")
+    logging.info(f"#binom_test switches={num_switches}/{len(switches) - 1}")
     if num_switches > 0:
         pair_mask = switches[1:]  # N-1
         prev_bafs = baf_mtx[:, tumor_sidx:][:-1, :][pair_mask, :]
         next_bafs = baf_mtx[:, tumor_sidx:][1:, :][pair_mask, :]
         avg_abs_bafdevs = np.mean(np.abs(next_bafs - prev_bafs), axis=1)
-        avg_abs_bafdevs = avg_abs_bafdevs[np.isfinite(avg_abs_bafdevs)]
+        counts, _ = np.histogram(avg_abs_bafdevs, bins=np.linspace(0.0, 1.0, 21))
         counts, edges = np.histogram(avg_abs_bafdevs, bins=50)
         logging.info("pairwise SNP average BAF absolute deviations")
         logging.info("bin_left\tbin_right\tcount")

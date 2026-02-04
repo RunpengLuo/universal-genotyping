@@ -328,13 +328,10 @@ def plot_allele_freqs_sample(
         y = af[lo:hi]
         m = np.isfinite(y)
 
-        n_all = hi - lo
         n_plot = int(m.sum())
         if n_plot == 0:
             logging.warning(f"{chrom}: all SNPs have non-finite AF")
             continue
-
-        logging.info(f"plot {chrom} with #SNP={n_plot}/{n_all}")
         fig, ax = plt.subplots(1, 1, figsize=(40, 3))
         ax.scatter(x[m], y[m], s=s, alpha=0.6, rasterized=True)
         ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
