@@ -64,7 +64,6 @@ for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
         modality = data_type
         bam = rep_df["PATH_to_bam"].iloc[0]
         get_data[(data_type, rep_id)] = [barcodes, bam, rangers]
-        # bams = [bam]
         if data_type == "bulkDNA":
             assert rep_id == "normal" or rep_id[0] == "T", "bulk REP_ID must be either normal or starts with T"
             if rep_id == "normal":

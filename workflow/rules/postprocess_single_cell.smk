@@ -1,39 +1,5 @@
 ##################################################
 if workflow_mode == "single_cell":
-    def single_modality_output(wc):
-        has_cn_profile = config.get("seg_ucn") is not None
-        data_type = f"{wc.data_type}"
-        base_dir = f"allele/{data_type}"
-        outputs = {
-            "sample_file": base_dir + "/sample_ids.tsv",
-            "all_barcodes": base_dir + "/barcodes.txt",
-            "qc_dir": directory(base_dir + "/qc"),
-            "snp_file": base_dir + "/snps.tsv.gz",
-            "tot_mtx_snp": [base_dir + "/snp.Tallele.npz"],
-            "a_mtx_snp": [base_dir + "/snp.Aallele.npz"],
-            "b_mtx_snp": [base_dir + "/snp.Ballele.npz"],
-        }
-        if has_cn_profile:
-            outputs["cnp_file"] = [base_dir + "/haplotype_blocks.tsv"]
-            outputs["y_count"] = [base_dir + "/Y_count.npz"]
-            outputs["d_count"] = [base_dir + "/D_count.npz"]
-        else:
-            outputs["meta_file"] = [base_dir + "/meta.tsv.gz"]
-            outputs["tot_mtx_meta"] = [base_dir + "/meta.Tallele.npz"]
-            outputs["a_mtx_meta"] = [base_dir + "/meta.Aallele.npz"]
-            outputs["b_mtx_meta"] = [base_dir + "/meta.Ballele.npz"]
-            outputs["bb_file"] = [base_dir + "/bb.tsv"]
-            outputs["tot_mtx_bb"] = [base_dir + "/bb.Tallele.npz"]
-            outputs["a_mtx_bb"] = [base_dir + "/bb.Aallele.npz"]
-            outputs["b_mtx_bb"] = [base_dir + "/bb.Ballele.npz"]
-
-            # legacy CalicoST inputs
-            if data_type in ["VISIUM", "VISIUM3prime"]:
-                outputs["unique_snp_ids_legacy"] = [base_dir + "/unique_snp_ids.npy"]
-                outputs["a_mtx_legacy"] = [base_dir + "/cell_snp_Aallele.npz"]
-                outputs["b_mtx_legacy"] = [base_dir + "/cell_snp_Ballele.npz"]
-        return outputs
-
     rule postprocess_single_modality:
         input:
             vcfs=lambda wc: expand("pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz", data_type=wc.data_type, rep_id=mod2reps[wc.data_type]),
@@ -48,7 +14,13 @@ if workflow_mode == "single_cell":
             bbc_ucn = lambda wc: [] if config.get("bbc_ucn") is None else config["bbc_ucn"],
             bbc_phases = lambda wc: [] if config.get("bbc_phases") is None else config["bbc_phases"],
         output:
-            single_modality_output
+            sample_file="allele/{data_type}/sample_ids.tsv",
+            all_barcodes="allele/{data_type}/barcodes.txt",
+            qc_dir=directory("allele/{data_type}/qc"),
+            snp_file="allele/{data_type}/snps.tsv.gz",
+            tot_mtx_snp="allele/{data_type}/snp.Tallele.npz",
+            a_mtx_snp="allele/{data_type}/snp.Aallele.npz",
+            b_mtx_snp="allele/{data_type}/snp.Ballele.npz",
         wildcard_constraints:
             data_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
         params:
@@ -56,8 +28,6 @@ if workflow_mode == "single_cell":
             modality=lambda wc: wc.data_type,
             data_types=lambda wc: [wc.data_type],
             rep_ids=lambda wc: mod2reps.get(wc.data_type, []),
-            min_depth=config["params_postprocess"]["min_depth"],
-            gamma=config["params_postprocess"]["gamma"],
             nu=config["params_postprocess"]["nu"],
             min_switchprob=config["params_postprocess"]["min_switchprob"],
             max_switchprob=config["params_postprocess"]["max_switchprob"],
@@ -67,36 +37,29 @@ if workflow_mode == "single_cell":
             nsnp_meta=config["params_postprocess"]["nsnp_meta"],
             min_snp_reads=config["params_postprocess"]["min_snp_reads"],
             min_snp_per_block=config["params_postprocess"]["min_snp_per_block"],
+            # optional outputs, when CNP is provided
+            cnp_file=lambda wc: "allele/{wc.data_type}/haplotype_blocks.tsv",
+            y_count=lambda wc: "allele/{wc.data_type}/Y_count.npz",
+            d_count=lambda wc: "allele/{wc.data_type}/D_count.npz",
+            # otherwise, meta-SNP outputs
+            meta_file=lambda wc: "allele/{wc.data_type}/meta.tsv.gz",
+            tot_mtx_meta=lambda wc: "allele/{wc.data_type}/meta.Tallele.npz",
+            a_mtx_meta=lambda wc: "allele/{wc.data_type}/meta.Aallele.npz",
+            b_mtx_meta=lambda wc: "allele/{wc.data_type}/meta.Ballele.npz",
+            # and BB segment outputs
+            bb_file=lambda wc: "allele/{wc.data_type}/bb.tsv",
+            a_mtx_bb=lambda wc: "allele/{wc.data_type}/bb.Aallele.npz",
+            b_mtx_bb=lambda wc: "allele/{wc.data_type}/bb.Ballele.npz",
+            # legacy CalicoST snp-level data
+            unique_snp_ids_legacy=lambda wc: "allele/{wc.data_type}/unique_snp_ids.npy",
+            a_mtx_legacy=lambda wc: "allele/{wc.data_type}/cell_snp_Aallele.npz",
+            b_mtx_legacy=lambda wc: "allele/{wc.data_type}/cell_snp_Ballele.npz",
         log:
             "logs/postprocess.{data_type}.log"
         script:
             """../scripts/postprocess_single_cell.py"""
 
-    ##################################################
-    def multiome_output(wc):
-        data_types = ["scRNA", "scATAC"]
-        has_cn_profile = config.get("seg_ucn") is not None
-        base_dir = f"allele/multiome_{wc.rep_id}"
-        outputs = {
-            "sample_file": base_dir + "/sample_ids.tsv",
-            "all_barcodes": base_dir + "/barcodes.txt",
-            "qc_dir": directory(base_dir + "/qc"),
-            "snp_file": base_dir + "/snps.tsv.gz",
-            "tot_mtx_snp": [base_dir + f"/snp.Tallele.{data_type}.npz" for data_type in data_types],
-            "a_mtx_snp": [base_dir + f"/snp.Aallele.{data_type}.npz" for data_type in data_types],
-            "b_mtx_snp": [base_dir + f"/snp.Ballele.{data_type}.npz" for data_type in data_types],
-        }
-        if has_cn_profile:
-            outputs["cnp_file"] = [base_dir + "/haplotype_blocks.tsv"]
-            outputs["y_count"] = []
-            outputs["d_count"] = []
-            for data_type in data_types:
-                outputs["y_count"].append(base_dir + f"/Y_count.{data_type}.npz")
-                outputs["d_count"].append(base_dir + f"/D_count.{data_type}.npz")
-        else:
-            raise ValueError("adaptive binning for multiome data TODO")
-        return outputs
-    
+    ##################################################    
     rule postprocess_multiome:
         input:
             vcfs=lambda wc: [f"pileup/{data_type}_{wc.rep_id}/cellSNP.base.vcf.gz" for data_type in ["scRNA", "scATAC"]],
@@ -111,14 +74,24 @@ if workflow_mode == "single_cell":
             bbc_ucn = lambda wc: [] if config.get("bbc_ucn") is None else config["bbc_ucn"],
             bbc_phases = lambda wc: [] if config.get("bbc_phases") is None else config["bbc_phases"],
         output:
-            multiome_output
+            sample_file="allele/multiome_{rep_id}/sample_ids.tsv",
+            all_barcodes="allele/multiome_{rep_id}/barcodes.txt",
+            qc_dir=directory("allele/multiome_{rep_id}/qc"),
+            snp_file="allele/multiome_{rep_id}/snps.tsv.gz",
+            tot_mtx_snp=expand(
+                "allele/multiome_{{rep_id}}/snp.Tallele.{data_type}.npz", data_type=["scRNA", "scATAC"]
+            ),
+            a_mtx_snp=expand(
+                "allele/multiome_{{rep_id}}/snp.Aallele.{data_type}.npz", data_type=["scRNA", "scATAC"]
+            ),
+            b_mtx_snp=expand(
+                "allele/multiome_{{rep_id}}/snp.Ballele.{data_type}.npz", data_type=["scRNA", "scATAC"]
+            )
         params:
             sample_name=SAMPLE_ID,
             modality="multiome",
             data_types=["scRNA", "scATAC"],
             rep_ids=lambda wc: [wc.rep_id],
-            min_depth=config["params_postprocess"]["min_depth"],
-            gamma=config["params_postprocess"]["gamma"],
             nu=config["params_postprocess"]["nu"],
             min_switchprob=config["params_postprocess"]["min_switchprob"],
             max_switchprob=config["params_postprocess"]["max_switchprob"],
@@ -128,6 +101,19 @@ if workflow_mode == "single_cell":
             nsnp_meta=config["params_postprocess"]["nsnp_meta"],
             min_snp_reads=config["params_postprocess"]["min_snp_reads"],
             min_snp_per_block=config["params_postprocess"]["min_snp_per_block"],
+            # optional outputs, when CNP is provided
+            cnp_file=lambda wc: "allele/multiome_{wc.rep_id}/haplotype_blocks.tsv",
+            y_count=lambda wc: [f"allele/multiome_{wc.rep_id}/Y_count.{data_type}.npz" for data_type in ["scRNA", "scATAC"]],
+            d_count=lambda wc: [f"allele/multiome_{wc.rep_id}/D_count.{data_type}.npz" for data_type in ["scRNA", "scATAC"]],
+            # otherwise, meta-SNP outputs TODO
+            # meta_file=lambda wc: "allele/multiome_{wc.rep_id}/meta.tsv.gz",
+            # tot_mtx_meta=lambda wc: "allele/multiome_{wc.rep_id}/meta.Tallele.npz",
+            # a_mtx_meta=lambda wc: "allele/multiome_{wc.rep_id}/meta.Aallele.npz",
+            # b_mtx_meta=lambda wc: "allele/multiome_{wc.rep_id}/meta.Ballele.npz",
+            # # and BB segment outputs
+            # bb_file=lambda wc: "allele/multiome_{wc.rep_id}/bb.tsv",
+            # a_mtx_bb=lambda wc: "allele/multiome_{wc.rep_id}/bb.Aallele.npz",
+            # b_mtx_bb=lambda wc: "allele/multiome_{wc.rep_id}/bb.Ballele.npz",
         log:
             "logs/postprocess.multiome.{rep_id}.log"
         script:

@@ -122,9 +122,9 @@ for i in range(len(data_types)):
 if modality in ["VISIUM", "VISIUM3prime"]:
     logging.info("store legacy CalicoST SNP-level phased mats for VISIUM* data")
     snp_ids = snps["#CHR"].astype(str) + "_" + snps["POS"].astype(str)
-    np.save(sm.output["unique_snp_ids_legacy"], snp_ids.to_numpy())
-    save_npz(sm.output["a_mtx_legacy"], a_mtxs[0])
-    save_npz(sm.output["b_mtx_legacy"], b_mtxs[0])
+    np.save(sm.params["unique_snp_ids_legacy"], snp_ids.to_numpy())
+    save_npz(sm.params["a_mtx_legacy"], a_mtxs[0])
+    save_npz(sm.params["b_mtx_legacy"], b_mtxs[0])
 
 ##################################################
 # filter invalid SNPs
@@ -227,9 +227,9 @@ if has_cn_profile:
             unit="snp",
             suffix=f"_{data_type}",
         )
-        save_npz(sm.output["y_count"][i], y_count)
-        save_npz(sm.output["d_count"][i], d_count)
-    segs_df.to_csv(sm.output["cnp_file"], header=True, sep="\t", index=False)
+        save_npz(sm.params["y_count"][i], y_count)
+        save_npz(sm.params["d_count"][i], d_count)
+    segs_df.to_csv(sm.params["cnp_file"], header=True, sep="\t", index=False)
 else:
     ##################################################
     # TODO, for multiome data, block_bed file to decide common blocks for gene/peak?
@@ -309,10 +309,10 @@ else:
         allele="B",
         unit="meta-snp",
     )
-    meta_snps.to_csv(sm.output["meta_file"][0], sep="\t", header=True, index=False)
-    save_npz(sm.output["tot_mtx_meta"][0], tot_mtx_meta)
-    save_npz(sm.output["a_mtx_meta"][0], a_mtx_meta)
-    save_npz(sm.output["b_mtx_meta"][0], b_mtx_meta)
+    meta_snps.to_csv(sm.params["meta_file"][0], sep="\t", header=True, index=False)
+    save_npz(sm.params["tot_mtx_meta"][0], tot_mtx_meta)
+    save_npz(sm.params["a_mtx_meta"][0], a_mtx_meta)
+    save_npz(sm.params["b_mtx_meta"][0], b_mtx_meta)
 
     # MSR&MSPB segmentation
     bbs = adaptive_binning(
@@ -340,10 +340,10 @@ else:
         unit="haplo-block",
     )
 
-    bbs.to_csv(sm.output["bb_file"][0], sep="\t", header=True, index=False)
-    save_npz(sm.output["tot_mtx_bb"][0], tot_mtx_bb)
-    save_npz(sm.output["a_mtx_bb"][0], a_mtx_bb)
-    save_npz(sm.output["b_mtx_bb"][0], b_mtx_bb)
+    bbs.to_csv(sm.params["bb_file"][0], sep="\t", header=True, index=False)
+    save_npz(sm.params["tot_mtx_bb"][0], tot_mtx_bb)
+    save_npz(sm.params["a_mtx_bb"][0], a_mtx_bb)
+    save_npz(sm.params["b_mtx_bb"][0], b_mtx_bb)
 
 sample_df = pd.DataFrame({"SAMPLE": [f"{sample_name}_{rep_id}" for rep_id in rep_ids]})
 sample_df["SAMPLE_NAME"] = sample_name
