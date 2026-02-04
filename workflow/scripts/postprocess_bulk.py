@@ -193,12 +193,12 @@ if binom_test:
         prev_bafs = baf_mtx[:, tumor_sidx:][:-1, :][pair_mask, :]
         next_bafs = baf_mtx[:, tumor_sidx:][1:, :][pair_mask, :]
         avg_abs_bafdevs = np.mean(np.abs(next_bafs - prev_bafs), axis=1)
-        counts, _ = np.histogram(avg_abs_bafdevs, bins=np.linspace(0.0, 1.0, 21))
-        counts, edges = np.histogram(avg_abs_bafdevs, bins=50)
+        edges = np.linspace(0.0, 1.0, 21)
+        counts, _ = np.histogram(avg_abs_bafdevs, bins=edges)
         logging.info("pairwise SNP average BAF absolute deviations")
         logging.info("bin_left\tbin_right\tcount")
         for l, r, c in zip(edges[:-1], edges[1:], counts):
-            logging.info(f"{l:.6g}\t{r:.6g}\t{int(c)}")
+            logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
     snps["binom_id"] = np.cumsum(switches)
     grp_cols.append("binom_id")
 
