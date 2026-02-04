@@ -3,7 +3,7 @@ rule pileup_snps_cellsnp_lite_cell:
         barcode=lambda wc: get_data[(wc.data_type, wc.rep_id)][0],
         bam=lambda wc: get_data[(wc.data_type, wc.rep_id)][1],
         ranger=lambda wc: get_data[(wc.data_type, wc.rep_id)][2],
-        snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
+        snp_file=lambda wc: branch(run_genotype_snps, then="phase/phased_snps.vcf.gz", otherwise=config["ref_snp_file"]),
     output:
         cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
         sample_file="pileup/{data_type}_{rep_id}/cellSNP.samples.tsv",
@@ -14,7 +14,7 @@ rule pileup_snps_cellsnp_lite_cell:
     threads: config["threads"]["pileup"]
     params:
         cellsnp_lite=config["cellsnp_lite"],
-        UMItag=lambda wc: ("None" if wc.data_type == "scATAC" else config["params_cellsnp_lite"]["UMItag"]),
+        UMItag=lambda wc: branch(wc.data_type == "scATAC", then="None", otherwise=config["params_cellsnp_lite"]["UMItag"]),
         cellTAG=config["params_cellsnp_lite"]["cellTAG"],
         minMAF=0.0,
         minCOUNT=0,
@@ -40,7 +40,7 @@ rule pileup_snps_cellsnp_lite_cell:
 rule pileup_snps_cellsnp_lite_bulk:
     input:
         bam=lambda wc: get_data[(wc.data_type, wc.rep_id)][1],
-        snp_file=lambda wc: ("phase/phased_snps.vcf.gz" if run_genotype_snps else config["ref_snp_file"]),
+        snp_file=lambda wc: branch(run_genotype_snps, then="phase/phased_snps.vcf.gz", otherwise=config["ref_snp_file"]),
     output:
         cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
         sample_file="pileup/{data_type}_{rep_id}/cellSNP.samples.tsv",

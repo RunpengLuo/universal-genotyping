@@ -1,12 +1,13 @@
 ##################################################
 if workflow_mode == "bulk":
+    # TODO genotyping tumor samples
     rule genotype_snps_bulk:
         """
         Genotype Bi-allelic HET/ALT-HOM SNPs 
         from bulk-DNA normal sample via bcftools
         """
         input:
-            bams=lambda wc: bulk_nbams[0] if has_normal else bulk_tbams[0],
+            bams=lambda wc: branch(has_normal, then=bulk_nbams[0], otherwise=bulk_tbams[0]),
             snp_panel=config["snp_panel"],
             reference=config["reference"]
         output:
@@ -44,7 +45,6 @@ if workflow_mode == "bulk":
 
             tabix -p vcf {output.snp_file}
             """
-    # TODO add post-steps if genotyping from tumor sample.
 
 ##################################################
 if workflow_mode == "single_cell":
@@ -61,7 +61,7 @@ if workflow_mode == "single_cell":
             cellsnp_lite=config["cellsnp_lite"],
             chroms=",".join(map(str, config["chromosomes"])),
             refseq=config["reference"],
-            UMItag=lambda wc: ("None" if wc.data_type == "scATAC" else config["params_cellsnp_lite"]["UMItag"]),
+            UMItag=lambda wc: branch(wc.data_type == "scATAC", then="None", otherwise=config["params_cellsnp_lite"]["UMItag"]),
             minMAF=config["params_cellsnp_lite"]["minMAF"],
             minCOUNT=config["params_cellsnp_lite"]["minCOUNT_genotype"],
         shell:

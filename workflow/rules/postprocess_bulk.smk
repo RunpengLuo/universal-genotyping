@@ -48,7 +48,7 @@ if workflow_mode == "bulk":
             bam=lambda wc: get_data[("bulkDNA", wc.rep_id)][1],
             bed_file="allele/bulkDNA/bb.bed.gz",
         output:
-            reg_file="allele/bulkDNA/out_mosdepth/{rep_id}.regions.bed.gz",
+            mosdepth_file="allele/bulkDNA/out_mosdepth/{rep_id}.regions.bed.gz",
         threads: config["threads"]["mosdepth"]
         params:
             mosdepth=config["mosdepth"],
@@ -74,10 +74,10 @@ if workflow_mode == "bulk":
         input:
             sample_file="allele/bulkDNA/sample_ids.tsv",
             bb_file="allele/bulkDNA/bb.tsv",
-            mos_files=expand("allele/bulkDNA/out_mosdepth/{rep_id}.regions.bed.gz", rep_id=mod2reps.get("bulkDNA", [])),
+            mosdepth_files=expand("allele/bulkDNA/out_mosdepth/{rep_id}.regions.bed.gz", rep_id=mod2reps.get("bulkDNA", [])),
             reference=config["reference"],
             genome_size=config["genome_size"],
-            mappability_file=[] if config.get("mappability_file") is None else config["mappability_file"],
+            mappability_file=branch(config.get("mappability_file") is None, then=[], otherwise=config["mappability_file"]),
         output:
             dp_mtx_bb="allele/bulkDNA/bb.depth.npz",
             rdr_mtx_bb="allele/bulkDNA/bb.rdr.npz",

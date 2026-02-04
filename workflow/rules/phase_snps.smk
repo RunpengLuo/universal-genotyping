@@ -63,7 +63,7 @@ if config["phaser"] == "longphase":
     rule phase_snps_longphase:
         input:
             chrom_vcf_file=lambda wc: f"snps/chr{wc.chrname}.vcf.gz",
-            bam_file=lambda wc: bulk_nbams[0] if has_normal else bulk_tbams[0],
+            bam_file=lambda wc: branch(has_normal, then=bulk_nbams[0], otherwise=bulk_tbams[0]),
             ref_fa=lambda wc: config["reference"]
         output:
             phased_file="phase/chr{chrname}.vcf.gz",
