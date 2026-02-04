@@ -28,7 +28,9 @@ allowed_data_types = ["bulkDNA", "scATAC", "scRNA", "VISIUM", "VISIUM3prime"]
 assert all(dt in allowed_data_types for dt in sample_data_types)
 
 if "bulkDNA" in sample_data_types:
-    assert len(sample_data_types) == 1, "mode 1 must have only bulk samples. Run mode 1 with bulk-only samples to genotype then mode 2 on non-bulk samples."
+    assert (
+        len(sample_data_types) == 1
+    ), "mode 1 must have only bulk samples. Run mode 1 with bulk-only samples to genotype then mode 2 on non-bulk samples."
     workflow_mode = "bulk"
 else:
     workflow_mode = "single_cell"
@@ -49,8 +51,12 @@ for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
     if len(rep_data_types) == 2:
         assert ("scRNA" in rep_data_types) and ("scATAC" in rep_data_types)
         assert len(rep_df) == 2, "multiome data should have exactly 2 rows"
-        assert rep_df["PATH_to_barcodes"].nunique() == 1, f"multiome barcode paths differ"
-        assert rep_df["PATH_to_10x_ranger"].nunique() == 1, f"multiome 10x-ranger paths differ"
+        assert (
+            rep_df["PATH_to_barcodes"].nunique() == 1
+        ), f"multiome barcode paths differ"
+        assert (
+            rep_df["PATH_to_10x_ranger"].nunique() == 1
+        ), f"multiome 10x-ranger paths differ"
 
         modality = "multiome"
         gex_bam = rep_df.loc[rep_df["DATA_TYPE"] == "scRNA", "PATH_to_bam"].iloc[0]
@@ -65,7 +71,9 @@ for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
         bam = rep_df["PATH_to_bam"].iloc[0]
         get_data[(data_type, rep_id)] = [barcodes, bam, rangers]
         if data_type == "bulkDNA":
-            assert rep_id == "normal" or rep_id[0] == "T", "bulk REP_ID must be either normal or starts with T"
+            assert (
+                rep_id == "normal" or rep_id[0] == "T"
+            ), "bulk REP_ID must be either normal or starts with T"
             if rep_id == "normal":
                 bulk_nbams.append(bam)
             else:
@@ -105,8 +113,15 @@ if run_genotype_snps:
         assert config.get("eagle_dir") is not None
         gmap_dir = os.path.join(config["eagle_dir"], "tables")
         assert os.path.isdir(gmap_dir), "failed to locate gmap directory"
-        assert refvers in ["hg17", "hg18", "hg19", "hg38"], "unsupported reference version"
-        get_gmap_file = lambda chrname: os.path.join(gmap_dir, f"genetic_map_{refvers}_withX.txt.gz")
+        assert refvers in [
+            "hg17",
+            "hg18",
+            "hg19",
+            "hg38",
+        ], "unsupported reference version"
+        get_gmap_file = lambda chrname: os.path.join(
+            gmap_dir, f"genetic_map_{refvers}_withX.txt.gz"
+        )
 
     elif phaser == "shapeit":
         assert config.get("shapeit_dir") is not None
@@ -114,20 +129,30 @@ if run_genotype_snps:
         assert os.path.isdir(gmap_dir), "failed to locate gmap directory"
         assert refvers in ["hg19", "hg38"], "unsupported reference version"
         refvers2 = {"hg19": "b37", "hg38": "b38"}[refvers]
-        get_gmap_file = lambda chrname: os.path.join(gmap_dir, f"{refvers2}/chr{chrname}.{refvers2}.gmap.gz")
+        get_gmap_file = lambda chrname: os.path.join(
+            gmap_dir, f"{refvers2}/chr{chrname}.{refvers2}.gmap.gz"
+        )
     else:
         assert phaser in ["longphase"], f"unknown phaser: {phaser}"
 
     if phaser in ["eagle", "shapeit"]:
-        assert all(os.path.exists(get_gmap_file(chrname)) for chrname in chroms), "failed to locate gmap files"
+        assert all(
+            os.path.exists(get_gmap_file(chrname)) for chrname in chroms
+        ), "failed to locate gmap files"
         phasing_panel_version = config["phasing_panel_version"]
         phasing_panel = config["phasing_panel"]
         assert os.path.isdir(phasing_panel), "failed to locate phasing panel"
         if phasing_panel_version == "1000G_hg38":
-            get_phasing_panel = lambda chrname: os.path.join(phasing_panel, f"chr{chrname}.genotypes.bcf")
+            get_phasing_panel = lambda chrname: os.path.join(
+                phasing_panel, f"chr{chrname}.genotypes.bcf"
+            )
         else:
-            raise ValueError(f"unsupported phasing_panel_version: {phasing_panel_version}")
-        assert all(os.path.exists(get_phasing_panel(chrname)) for chrname in chroms), "failed to locate panel files"
+            raise ValueError(
+                f"unsupported phasing_panel_version: {phasing_panel_version}"
+            )
+        assert all(
+            os.path.exists(get_phasing_panel(chrname)) for chrname in chroms
+        ), "failed to locate panel files"
 
 ##################################################
 # final target files
@@ -174,6 +199,7 @@ for mod, rep_ids in mod2reps.items():
         #     final_targets.append(f"allele/{mod}/cell_snp_Aallele.npz")
         #     final_targets.append(f"allele/{mod}/cell_snp_Ballele.npz")
 
+
 ##################################################
 # entrypoint
 include: "rules/genotype_snps.smk"
@@ -181,6 +207,9 @@ include: "rules/phase_snps.smk"
 include: "rules/pileup_snps.smk"
 include: "rules/postprocess_bulk.smk"
 include: "rules/postprocess_single_cell.smk"
+
+
 rule all:
-    input: final_targets
+    input:
+        final_targets,
     default_target: True

@@ -1,5 +1,6 @@
 ##################################################
 if config["phaser"] == "shapeit":
+
     rule phase_snps_shapeit:
         input:
             chrom_vcf_file=lambda wc: f"snps/chr{wc.chrname}.vcf.gz",
@@ -15,7 +16,7 @@ if config["phaser"] == "shapeit":
             shapeit=config["shapeit"],
             bcftools=config["bcftools"],
         log:
-            "logs/phase_snps.chr{chrname}.log"
+            "logs/phase_snps.chr{chrname}.log",
         shell:
             r"""
             {params.shapeit} \
@@ -30,8 +31,10 @@ if config["phaser"] == "shapeit":
             tabix -f -p vcf "{output.phased_file}"
             """
 
+
 ##################################################
 if config["phaser"] == "eagle":
+
     rule phase_snps_eagle:
         input:
             chrom_vcf_file=lambda wc: f"snps/chr{wc.chrname}.vcf.gz",
@@ -45,7 +48,7 @@ if config["phaser"] == "eagle":
             eagle=config["eagle"],
             bcftools=config["bcftools"],
         log:
-            "logs/phase_snps.chr{chrname}.log"
+            "logs/phase_snps.chr{chrname}.log",
         shell:
             r"""
             {params.eagle} \
@@ -58,13 +61,17 @@ if config["phaser"] == "eagle":
             tabix -f -p vcf "{output.phased_file}"
             """
 
+
 ##################################################
 if config["phaser"] == "longphase":
+
     rule phase_snps_longphase:
         input:
             chrom_vcf_file=lambda wc: f"snps/chr{wc.chrname}.vcf.gz",
-            bam_file=lambda wc: branch(has_normal, then=bulk_nbams[0], otherwise=bulk_tbams[0]),
-            ref_fa=lambda wc: config["reference"]
+            bam_file=lambda wc: branch(
+                has_normal, then=bulk_nbams[0], otherwise=bulk_tbams[0]
+            ),
+            ref_fa=lambda wc: config["reference"],
         output:
             phased_file="phase/chr{chrname}.vcf.gz",
         params:
@@ -74,8 +81,8 @@ if config["phaser"] == "longphase":
             extra_params=config["params_longphase"].get("extra_params", ""),
             bcftools=config["bcftools"],
         threads: config["threads"]["phase"]
-        log: 
-            "logs/phase_snps.chr{chrname}.log"
+        log:
+            "logs/phase_snps.chr{chrname}.log",
         shell:
             r"""
             {params.longphase} phase \
@@ -89,12 +96,13 @@ if config["phaser"] == "longphase":
             tabix -f -p vcf "{output.phased_file}"
             """
 
+
 rule concat_and_extract_phased_het_snps:
     input:
         vcf_files=expand("phase/chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
     output:
         phased_vcf="phase/phased_snps.vcf.gz",
-        lst_file=temp("phase/phased_snps.lst")
+        lst_file=temp("phase/phased_snps.lst"),
     threads: 1
     params:
         bcftools=config["bcftools"],
@@ -106,6 +114,7 @@ rule concat_and_extract_phased_het_snps:
             -o "{output.phased_vcf}"
         tabix -f -p vcf "{output.phased_vcf}"
         """
+
 
 rule parse_genetic_map:
     input:
@@ -120,4 +129,3 @@ rule parse_genetic_map:
     threads: 1
     script:
         "../scripts/parse_genetic_map.py"
-        

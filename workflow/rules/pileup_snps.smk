@@ -3,7 +3,11 @@ rule pileup_snps_cellsnp_lite_cell:
         barcode=lambda wc: get_data[(wc.data_type, wc.rep_id)][0],
         bam=lambda wc: get_data[(wc.data_type, wc.rep_id)][1],
         ranger=lambda wc: get_data[(wc.data_type, wc.rep_id)][2],
-        snp_file=lambda wc: branch(run_genotype_snps, then="phase/phased_snps.vcf.gz", otherwise=config["ref_snp_file"]),
+        snp_file=lambda wc: branch(
+            run_genotype_snps,
+            then="phase/phased_snps.vcf.gz",
+            otherwise=config["ref_snp_file"],
+        ),
     output:
         cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
         sample_file="pileup/{data_type}_{rep_id}/cellSNP.samples.tsv",
@@ -14,13 +18,17 @@ rule pileup_snps_cellsnp_lite_cell:
     threads: config["threads"]["pileup"]
     params:
         cellsnp_lite=config["cellsnp_lite"],
-        UMItag=lambda wc: branch(wc.data_type == "scATAC", then="None", otherwise=config["params_cellsnp_lite"]["UMItag"]),
+        UMItag=lambda wc: branch(
+            wc.data_type == "scATAC",
+            then="None",
+            otherwise=config["params_cellsnp_lite"]["UMItag"],
+        ),
         cellTAG=config["params_cellsnp_lite"]["cellTAG"],
         minMAF=0.0,
         minCOUNT=0,
         bcftools=config["bcftools"],
     log:
-        "logs/pileup_snps.{data_type}_{rep_id}.log"
+        "logs/pileup_snps.{data_type}_{rep_id}.log",
     shell:
         r"""
         cellsnp_dir=$(dirname "{output.cellsnp_file}")
@@ -37,17 +45,22 @@ rule pileup_snps_cellsnp_lite_cell:
             --gzip > {log} 2>&1
         """
 
+
 rule pileup_snps_cellsnp_lite_bulk:
     input:
         bam=lambda wc: get_data[(wc.data_type, wc.rep_id)][1],
-        snp_file=lambda wc: branch(run_genotype_snps, then="phase/phased_snps.vcf.gz", otherwise=config["ref_snp_file"]),
+        snp_file=lambda wc: branch(
+            run_genotype_snps,
+            then="phase/phased_snps.vcf.gz",
+            otherwise=config["ref_snp_file"],
+        ),
     output:
         cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
         sample_file="pileup/{data_type}_{rep_id}/cellSNP.samples.tsv",
         tot_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx",
         ad_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.AD.mtx",
     wildcard_constraints:
-        data_type="bulkDNA"
+        data_type="bulkDNA",
     threads: config["threads"]["pileup"]
     params:
         cellsnp_lite=config["cellsnp_lite"],
@@ -56,7 +69,7 @@ rule pileup_snps_cellsnp_lite_bulk:
         minMAF=0,
         minCOUNT=0,
     log:
-        "logs/pileup_snps.{data_type}_{rep_id}.log"
+        "logs/pileup_snps.{data_type}_{rep_id}.log",
     shell:
         r"""
         cellsnp_dir=$(dirname "{output.cellsnp_file}")

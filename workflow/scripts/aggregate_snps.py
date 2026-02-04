@@ -145,13 +145,13 @@ def adaptive_binning(
     logging.info(f"#SNPs={len(snps)}")
     logging.info(f"#bins={len(snp_bins)}")
     logging.info(
-        "snps per bin: min=%.0f  median=%.0f  max=%.0f\n",
+        "snps per bin: min=%.0f  median=%.0f  max=%.0f",
         float(bin_sizes.min()),
         float(np.median(bin_sizes)),
         float(bin_sizes.max()),
     )
     logging.info(
-        "blocksize per bin: min=%.0f  median=%.0f  max=%.0f\n",
+        "blocksize per bin: min=%.0f  median=%.0f  max=%.0f",
         float(block_sizes.min()),
         float(np.median(block_sizes)),
         float(block_sizes.max()),

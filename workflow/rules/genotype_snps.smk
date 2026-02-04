@@ -1,20 +1,24 @@
 ##################################################
 if workflow_mode == "bulk":
+
     # TODO genotyping tumor samples
     rule genotype_snps_bulk:
         """
-        Genotype Bi-allelic HET/ALT-HOM SNPs 
+        Genotype Bi-allelic HET/ALT-HOM SNPs
         from bulk-DNA normal sample via bcftools
         """
         input:
-            bams=lambda wc: branch(has_normal, then=bulk_nbams[0], otherwise=bulk_tbams[0]),
+            bams=lambda wc: branch(
+                has_normal, then=bulk_nbams[0], otherwise=bulk_tbams[0]
+            ),
             snp_panel=config["snp_panel"],
-            reference=config["reference"]
+            reference=config["reference"],
         output:
             snp_file="snps/chr{chrname}.vcf.gz",
             tmp_pos=temp("tmp/target.{chrname}.pos.gz"),
-            tmp_pos_tbi=temp("tmp/target.{chrname}.pos.gz.tbi")
-        log: "logs/genotype_snps.chr{chrname}.log",
+            tmp_pos_tbi=temp("tmp/target.{chrname}.pos.gz.tbi"),
+        log:
+            "logs/genotype_snps.chr{chrname}.log",
         threads: config["threads"]["genotype"]
         params:
             chrom="chr{chrname}",
@@ -46,22 +50,29 @@ if workflow_mode == "bulk":
             tabix -p vcf {output.snp_file}
             """
 
+
 ##################################################
 if workflow_mode == "single_cell":
+
     rule genotype_snps_pseudobulk:
         input:
             bams=lambda wc: {"scRNA": gex_tbams, "scATAC": atac_tbams}[wc.data_type],
             snp_panel=config["snp_panel"],
         output:
             snp_file="snps/{data_type}/cellSNP.base.vcf.gz",
-        log: "logs/genotype_snps.{data_type}.log",
-        threads: config["threads"]["genotype"],
+        log:
+            "logs/genotype_snps.{data_type}.log",
+        threads: config["threads"]["genotype"]
         params:
             bcftools=config["bcftools"],
             cellsnp_lite=config["cellsnp_lite"],
             chroms=",".join(map(str, config["chromosomes"])),
             refseq=config["reference"],
-            UMItag=lambda wc: branch(wc.data_type == "scATAC", then="None", otherwise=config["params_cellsnp_lite"]["UMItag"]),
+            UMItag=lambda wc: branch(
+                wc.data_type == "scATAC",
+                then="None",
+                otherwise=config["params_cellsnp_lite"]["UMItag"],
+            ),
             minMAF=config["params_cellsnp_lite"]["minMAF"],
             minCOUNT=config["params_cellsnp_lite"]["minCOUNT_genotype"],
         shell:
@@ -92,10 +103,14 @@ if workflow_mode == "single_cell":
 
     rule annotate_snps_pseudobulk:
         input:
-            raw_snp_files=expand("snps/{data_type}/cellSNP.base.vcf.gz", data_type=genotype_dtypes)
+            raw_snp_files=expand(
+                "snps/{data_type}/cellSNP.base.vcf.gz", data_type=genotype_dtypes
+            ),
         output:
             snp_files=expand("snps/chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
-            snp_files_tbi=expand("snps/chr{chrname}.vcf.gz.tbi", chrname=config["chromosomes"]),
+            snp_files_tbi=expand(
+                "snps/chr{chrname}.vcf.gz.tbi", chrname=config["chromosomes"]
+            ),
         params:
             data_types=genotype_dtypes,
             filter_nz_OTH=config["params_annotate_snps"]["filter_nz_OTH"],
@@ -105,7 +120,6 @@ if workflow_mode == "single_cell":
             min_vaf_thres=config["params_annotate_snps"]["min_vaf_thres"],
         threads: 1
         log:
-            "logs/annotate_snps.log"
+            "logs/annotate_snps.log",
         script:
             "../scripts/annotate_snps.py"
-
