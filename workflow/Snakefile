@@ -180,7 +180,8 @@ for mod, rep_ids in mod2reps.items():
 include: "rules/genotype_snps.smk"
 include: "rules/phase_snps.smk"
 include: "rules/pileup_snps.smk"
-include: "rules/postprocess.smk"
+include: "rules/postprocess_bulk.smk"
+include: "rules/postprocess_single_cell.smk"
 rule all:
     input: final_targets
     default_target: True
