@@ -153,26 +153,26 @@ for mod, rep_ids in mod2reps.items():
             for rep_id in rep_ids:
                 final_targets.append(f"allele/{mod}_{rep_id}/sample_ids.tsv")
                 final_targets.append(f"allele/{mod}_{rep_id}/barcodes.txt")
-                final_targets.append(f"allele/{mod}_{rep_id}/haplotype_blocks.tsv")
-                for data_type in data_types:
-                    final_targets.append(f"allele/{mod}_{rep_id}/Y_count.{data_type}.npz")
-                    final_targets.append(f"allele/{mod}_{rep_id}/D_count.{data_type}.npz")
+                # final_targets.append(f"allele/{mod}_{rep_id}/haplotype_blocks.tsv")
+                # for data_type in data_types:
+                #     final_targets.append(f"allele/{mod}_{rep_id}/Y_count.{data_type}.npz")
+                #     final_targets.append(f"allele/{mod}_{rep_id}/D_count.{data_type}.npz")
     else:
         final_targets.append(f"allele/{mod}/sample_ids.tsv")
         final_targets.append(f"allele/{mod}/barcodes.txt")
-        final_targets.append(f"allele/{mod}/meta.tsv.gz")
-        final_targets.append(f"allele/{mod}/meta.Tallele.npz")
-        final_targets.append(f"allele/{mod}/meta.Aallele.npz")
-        final_targets.append(f"allele/{mod}/meta.Ballele.npz")
-        final_targets.append(f"allele/{mod}/bb.tsv")
-        final_targets.append(f"allele/{mod}/bb.Tallele.npz")
-        final_targets.append(f"allele/{mod}/bb.Aallele.npz")
-        final_targets.append(f"allele/{mod}/bb.Ballele.npz")
-        if mod in ["VISIUM", "VISIUM3prime"]:
-            # legacy CalicoST inputs
-            final_targets.append(f"allele/{mod}/unique_snp_ids.npy")
-            final_targets.append(f"allele/{mod}/cell_snp_Aallele.npz")
-            final_targets.append(f"allele/{mod}/cell_snp_Ballele.npz")
+        # final_targets.append(f"allele/{mod}/meta.tsv.gz")
+        # final_targets.append(f"allele/{mod}/meta.Tallele.npz")
+        # final_targets.append(f"allele/{mod}/meta.Aallele.npz")
+        # final_targets.append(f"allele/{mod}/meta.Ballele.npz")
+        # final_targets.append(f"allele/{mod}/bb.tsv")
+        # final_targets.append(f"allele/{mod}/bb.Tallele.npz")
+        # final_targets.append(f"allele/{mod}/bb.Aallele.npz")
+        # final_targets.append(f"allele/{mod}/bb.Ballele.npz")
+        # if mod in ["VISIUM", "VISIUM3prime"]:
+        #     # legacy CalicoST inputs
+        #     final_targets.append(f"allele/{mod}/unique_snp_ids.npy")
+        #     final_targets.append(f"allele/{mod}/cell_snp_Aallele.npz")
+        #     final_targets.append(f"allele/{mod}/cell_snp_Ballele.npz")
 
 ##################################################
 # entrypoint
