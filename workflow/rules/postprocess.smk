@@ -32,7 +32,7 @@ if workflow_mode == "bulk":
             nu=config["params_postprocess"]["nu"],
             min_switchprob=config["params_postprocess"]["min_switchprob"],
             max_switchprob=config["params_postprocess"]["max_switchprob"],
-            switchprob_ps=config["params_postprocess"]["max_switchprob_ps"],
+            switchprob_ps=config["params_postprocess"]["switchprob_ps"],
             binom_test=config["params_postprocess"]["binom_test"],
             binom_alpha=config["params_postprocess"]["binom_alpha"],
             binom_margin=config["params_postprocess"]["binom_margin"],

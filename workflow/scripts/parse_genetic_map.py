@@ -11,7 +11,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = str(t)
 import numpy as np
 import pandas as pd
 
-from utils import read_VCF, sort_df_chr
+from utils import sort_df_chr
 
 ##################################################
 """

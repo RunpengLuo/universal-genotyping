@@ -13,7 +13,7 @@ if workflow_mode == "bulk":
             snp_file="snps/chr{chrname}.vcf.gz",
             tmp_pos=temp("tmp/target.{chrname}.pos.gz"),
             tmp_pos_tbi=temp("tmp/target.{chrname}.pos.gz.tbi")
-        log: "logs/genotype_snps.{chrname}.log",
+        log: "logs/genotype_snps.chr{chrname}.log",
         threads: config["threads"]["genotype"]
         params:
             chrom="chr{chrname}",
@@ -99,7 +99,7 @@ if workflow_mode == "single_cell":
         params:
             data_types=genotype_dtypes,
             filter_nz_OTH=config["params_annotate_snps"]["filter_nz_OTH"],
-            filter_hom_ALT=config["params_annotate_snps"]["filter_hom_ALT"]
+            filter_hom_ALT=config["params_annotate_snps"]["filter_hom_ALT"],
             min_het_reads=config["params_annotate_snps"]["min_het_reads"],
             min_hom_dp=config["params_annotate_snps"]["min_hom_dp"],
             min_vaf_thres=config["params_annotate_snps"]["min_vaf_thres"],
