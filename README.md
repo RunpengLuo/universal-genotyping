@@ -2,12 +2,21 @@
 ```
 mamba env create -f ./environment.yaml -p /path/to/envs/genotyping_env
 conda activate /path/to/envs/genotyping_env
+
+# run the pipeline
 snakemake --cores <num_cores> \
     -s /path/to/workflow/Snakefile \
     --configfile config/config.yaml \
-    --directory <output>
+    --directory <output> \
+    --config sample_file=/path/to/sample_file.tsv
 
-    --report report.html \
+# generate snakemake performance report
+snakemake --cores <num_cores> \
+    -s /path/to/workflow/Snakefile \
+    --configfile config/config.yaml \
+    --directory <output> \
+    --config sample_file=/path/to/sample_file.tsv \
+    --report report.html
 ```
 
 ### Overview

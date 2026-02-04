@@ -347,7 +347,7 @@ def plot_1d_sample(
             ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
             ax.set_ylim(-0.05, 1.05)
 
-        ax.set_xlab(val_type)
+        ax.set_xlabel(val_type)
         ax.set_xlim(0, chr_end)
         ax.grid(alpha=0.2)
         ax.set_title(f"{val_type} plot - {chrom}")
