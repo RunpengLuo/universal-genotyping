@@ -48,12 +48,12 @@ def compute_gc_content(
     return gc_df
 
 
-def bias_correction_rdr(raw_rdr_mat: np.ndarray, gc_df: pd.DataFrame, out_dir=None):
+def bias_correction_rdr(raw_rdr_mat: np.ndarray, gc_df: pd.DataFrame, rep_ids: list, out_dir=None):
     logging.info("correct for GC biases on RDR")
     gc = gc_df["GC"].to_numpy()
     mapv = gc_df["MAP"].to_numpy()
     gccorr_rdr_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
-    for si in range(raw_rdr_mat.shape[1]):
+    for si, rep_id in enumerate(rep_ids):
         gc_df = pd.DataFrame({"RD": raw_rdr_mat[:, si], "GC": gc, "MAP": mapv})
         if np.any(gc_df["MAP"] != 1):
             # mappability
@@ -77,13 +77,13 @@ def bias_correction_rdr(raw_rdr_mat: np.ndarray, gc_df: pd.DataFrame, out_dir=No
             gc,
             raw_rdr_mat[:, si],
             gccorr_rdr_mat[:, si],
-            sample_id=f"tumor{si}",
+            rep_id=rep_id,
             out_dir=out_dir,
         )
     return gccorr_rdr_mat
 
 
-def plot_gc_bias(gc, raw_rdr, corr_rdr, sample_id=None, out_dir=None):
+def plot_gc_bias(gc, raw_rdr, corr_rdr, rep_id=None, out_dir=None):
     def mad(x):
         return np.median(np.abs(x - np.median(x)))
 
@@ -120,5 +120,5 @@ def plot_gc_bias(gc, raw_rdr, corr_rdr, sample_id=None, out_dir=None):
     axes[1].set_ylabel("RDR")
     axes[1].set_title(f"GC-corrected RDR\nMAD={mad_corr:.3f}")
     plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, f"{sample_id}.gc_corr.png"), dpi=300)
+    plt.savefig(os.path.join(out_dir, f"{rep_id}.gc_corr.png"), dpi=300)
     plt.close(fig)

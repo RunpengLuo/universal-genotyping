@@ -17,6 +17,7 @@ from postprocess_utils import plot_1d_sample
 
 def compute_RDR(
     bbs: pd.DataFrame,
+    rep_ids: list,
     dp_mtx: np.ndarray,
     gc_dir: str,
     gc_correct=True,
@@ -36,7 +37,7 @@ def compute_RDR(
     rdr_mat *= library_correction[None, :]
     if gc_correct:
         gc_df = compute_gc_content(bbs, ref_file, mapp_file, genome_size)
-        rdr_mat = bias_correction_rdr(rdr_mat, gc_df, gc_dir)
+        rdr_mat = bias_correction_rdr(rdr_mat, gc_df, rep_ids[tumor_sidx:], gc_dir)
     return rdr_mat
 
 
@@ -89,6 +90,7 @@ tumor_sidx = {False: 0, True: 1}[has_normal]
 
 rdr_mtx_bb = compute_RDR(
     bbs,
+    rep_ids,
     dp_mtx_bb,
     qc_dir,
     gc_correct=gc_correct,
