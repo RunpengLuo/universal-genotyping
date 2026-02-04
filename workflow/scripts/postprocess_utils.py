@@ -262,15 +262,15 @@ def assign_snp_bounderies(
 
 ##################################################
 def plot_allele_freqs(
-    snps,
+    pos_df,
     rep_ids,
     tot_mtx,
     b_mtx,
-    genome_file,
+    genome_size,
     plot_dir,
     apply_pseudobulk=False,
     allele="ref",
-    unit="allele",
+    unit="SNP",
     suffix="",
 ):
     logging.info(
@@ -279,7 +279,7 @@ def plot_allele_freqs(
     if apply_pseudobulk:
         af = compute_af_pseudobulk(tot_mtx, b_mtx)
         plot_file = os.path.join(plot_dir, f"af_{allele}_{unit}.pseudobulk{suffix}.pdf")
-        plot_allele_freqs_sample(snps, af, genome_file, plot_file)
+        plot_1d_sample(pos_df, af, genome_size, plot_file, unit=unit, val_type="AF")
     else:
         _tot_mtx = tot_mtx.tocsc() if issparse(tot_mtx) else tot_mtx
         _b_mtx = b_mtx.tocsc() if issparse(b_mtx) else b_mtx
@@ -288,57 +288,68 @@ def plot_allele_freqs(
                 plot_dir, f"af_{allele}_{unit}.{rep_id}{suffix}.pdf"
             )
             af = compute_af_per_sample(_tot_mtx, _b_mtx, i)
-            plot_allele_freqs_sample(snps, af, genome_file, plot_file)
+            plot_1d_sample(pos_df, af, genome_size, plot_file, unit=unit, val_type="AF")
     return
 
-
-def plot_allele_freqs_sample(
-    snps: pd.DataFrame,
-    af: np.ndarray,
-    genome_file: str,
+def plot_1d_sample(
+    pos_df: pd.DataFrame,
+    val: np.ndarray,
+    genome_size: str,
     out_file: str,
+    unit="SNP",
+    val_type="BAF",
     s=4,
     dpi=150,
+    alpha=0.6,
+    figsize=(40, 3)
 ):
-    logging.info(f"plot 1D per-SNP B-allele frequency, out_file={out_file}")
-    chrom_sizes = get_chr_sizes(genome_file)
-
-    ch = snps["#CHR"].to_numpy()
-    if "POS" in snps.columns:
-        pos = snps["POS"].to_numpy()
+    """
+    plot any features like AF, RDR, etc., in 1d chromosome scatter plot.
+    """
+    assert val_type in ["AF", "BAF", "RDR", "log2RDR"], f"unknown value type={val_type}"
+    logging.info(f"chromosome wide {unit}-level {val_type} plot, out_file={out_file}")
+    chrom_sizes = get_chr_sizes(genome_size)
+    
+    ch = pos_df["#CHR"].to_numpy()
+    if "POS" in pos_df.columns:
+        pos = pos_df["POS"].to_numpy()
     else:
         # use midpoints for [START, END) intervals
-        pos = ((snps["START"].to_numpy() + snps["END"].to_numpy()) // 2).astype(
+        pos = ((pos_df["START"].to_numpy() + pos_df["END"].to_numpy()) // 2).astype(
             np.int64
         )
+    num_bins = len(pos_df)
     # find contiguous chromosome blocks
     change = np.flatnonzero(ch[1:] != ch[:-1]) + 1
     starts = np.r_[0, change]
-    ends = np.r_[change, len(snps)]
+    ends = np.r_[change, num_bins]
     chroms = ch[starts]
 
     pdf_fd = PdfPages(out_file)
     for chrom, lo, hi in zip(chroms, starts, ends):
         chr_end = chrom_sizes.get(chrom)
         if chr_end is None:
-            logging.warning(f"{chrom}: not found in {genome_file}")
+            logging.warning(f"{chrom}: not found in {genome_size}")
             continue
 
         x = pos[lo:hi]
-        y = af[lo:hi]
+        y = val[lo:hi]
         m = np.isfinite(y)
 
         n_plot = int(m.sum())
         if n_plot == 0:
-            logging.warning(f"{chrom}: all SNPs have non-finite AF")
+            logging.warning(f"{chrom}: all {val_type} values are non-finite")
             continue
-        fig, ax = plt.subplots(1, 1, figsize=(40, 3))
-        ax.scatter(x[m], y[m], s=s, alpha=0.6, rasterized=True)
-        ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
-        ax.set_ylim(-0.05, 1.05)
+        fig, ax = plt.subplots(1, 1, figsize)
+        ax.scatter(x[m], y[m], s=s, alpha=alpha, rasterized=True)
+        if val_type in ["AF", "BAF"]:
+            ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
+            ax.set_ylim(-0.05, 1.05)
+        
+        ax.set_xlab(val_type)
         ax.set_xlim(0, chr_end)
         ax.grid(alpha=0.2)
-        ax.set_title(f"allele-frequency plot - {chrom}")
+        ax.set_title(f"{val_type} plot - {chrom}")
         pdf_fd.savefig(fig, dpi=dpi)
         plt.close(fig)
     pdf_fd.close()

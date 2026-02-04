@@ -31,7 +31,7 @@ ad_mat_files = sm.input["ad_mats"]
 snp_file = sm.input["snp_file"]
 
 region_bed = sm.input["region_bed"]
-genome_file = sm.input["genome_size"]
+genome_size = sm.input["genome_size"]
 block_bed = maybe_path(sm.input["block_bed"])
 gmap_file = sm.input["gmap_file"]
 
@@ -131,7 +131,7 @@ plot_allele_freqs(
     rep_ids,
     tot_mtx,
     b_mtx,
-    genome_file,
+    genome_size,
     qc_dir,
     apply_pseudobulk=False,
     allele="B",
@@ -221,7 +221,7 @@ plot_allele_freqs(
     rep_ids,
     tot_mtx_bb,
     b_mtx_bb,
-    genome_file,
+    genome_size,
     qc_dir,
     apply_pseudobulk=False,
     allele="B",

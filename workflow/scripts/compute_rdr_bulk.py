@@ -13,7 +13,7 @@ import pandas as pd
 
 from utils import *
 from bias_correction import *
-
+from postprocess_utils import plot_1d_sample
 
 def compute_RDR(
     bbs: pd.DataFrame,
@@ -65,6 +65,7 @@ logging.info("run compute_rdr_bulk")
 logging.info("concat mosdepth per-sample depth data")
 samples_df = pd.read_table(sample_file, sep="\t")
 rep_ids = samples_df["REP_ID"].astype(str).tolist()
+nsamples = len(samples_df)
 bbs = pd.read_table(bb_file, sep="\t")
 for rep_id in rep_ids:
     mos_file = os.path.join(mosdepth_dir, f"{rep_id}.regions.bed.gz")
@@ -98,4 +99,11 @@ rdr_mtx_bb = compute_RDR(
     tumor_sidx=tumor_sidx,
 )
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=rdr_mtx_bb)
+
+# plot per-sample RDRs
+for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
+    plot_file = os.path.join(
+        qc_dir, f"rdr_bb.{rep_id}.pdf"
+    )
+    plot_1d_sample(bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR")
 logging.info(f"finished.")
