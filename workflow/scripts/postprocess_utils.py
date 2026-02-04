@@ -341,7 +341,7 @@ def plot_1d_sample(
         if n_plot == 0:
             logging.warning(f"{chrom}: all {val_type} values are non-finite")
             continue
-        fig, ax = plt.subplots(1, 1, figsize)
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
         ax.scatter(x[m], y[m], s=s, alpha=alpha, rasterized=True)
         if val_type in ["AF", "BAF"]:
             ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
