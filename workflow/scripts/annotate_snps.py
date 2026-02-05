@@ -154,10 +154,13 @@ final_snps_chs = final_snps.groupby("#CHROM", sort=False)
 for chrname, out_snp_file in zip(chroms, sm.output["snp_files"]):
     chrom = f"chr{chrname}"
     with open(out_snp_file[:-3], "w") as fd:
-        fd.write("##fileformat=VCFv4.2\n")
-        fd.write(
-            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Pseudobulk genotype">\n'
-        )
+        fd.writelines([
+            '##fileformat=VCFv4.2\n',
+            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Pseudobulk genotype">\n',
+            '##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth, REF+ALT">\n',
+            '##INFO=<ID=AD,Number=1,Type=Integer,Description="Allele Depth for ALT allele">\n',
+            '##INFO=<ID=OTH,Number=1,Type=Integer,Description="Allele Depth other than REF and ALT">\n',
+        ])
         fd.write("\t".join(cols) + "\n")
         if chrom in final_snps_chs.groups:
             final_snps_chs.get_group(chrom)[cols].to_csv(
