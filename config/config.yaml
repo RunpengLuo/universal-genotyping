@@ -26,6 +26,9 @@ reference: null
 genome_size: null
 region_bed: null
 
+# block BED file
+block_bed: null
+
 ##################################################
 # SNP panel
 snp_panel_version: 1000GP
@@ -73,8 +76,6 @@ params_longphase:
   extra_params: "--pb"
 
 ##################################################
-# aggregation block BED file
-block_bed: null
 params_postprocess:
   # SNP filtering paramters
   ## filter SNP if any sample failed, (mode 1)

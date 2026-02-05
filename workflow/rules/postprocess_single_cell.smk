@@ -69,6 +69,7 @@ if workflow_mode == "single_cell":
             min_snp_reads=config["params_postprocess"]["min_snp_reads"],
             min_snp_per_block=config["params_postprocess"]["min_snp_per_block"],
             # optional outputs, when CNP is provided
+            has_cn_profile=lambda wc: config.get("seg_ucn") is not None,
             cnp_file=lambda wc: "allele/{wc.data_type}/haplotype_blocks.tsv",
             y_count=lambda wc: "allele/{wc.data_type}/Y_count.npz",
             d_count=lambda wc: "allele/{wc.data_type}/D_count.npz",
@@ -162,6 +163,7 @@ if workflow_mode == "single_cell":
             min_snp_reads=config["params_postprocess"]["min_snp_reads"],
             min_snp_per_block=config["params_postprocess"]["min_snp_per_block"],
             # optional outputs, when CNP is provided
+            has_cn_profile=lambda wc: config.get("seg_ucn") is not None,
             cnp_file=lambda wc: "allele/multiome_{wc.rep_id}/haplotype_blocks.tsv",
             y_count=lambda wc: [
                 f"allele/multiome_{wc.rep_id}/Y_count.{data_type}.npz"
