@@ -77,6 +77,7 @@ if workflow_mode == "single_cell":
                 then="None",
                 otherwise=config["params_cellsnp_lite"]["UMItag"],
             ),
+            cellTAG=config["params_cellsnp_lite"]["cellTAG"],
             minMAF=config["params_cellsnp_lite"]["minMAF"],
             minCOUNT=config["params_cellsnp_lite"]["minCOUNT_genotype"],
         log:
