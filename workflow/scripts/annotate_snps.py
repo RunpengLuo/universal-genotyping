@@ -12,7 +12,7 @@ import scipy
 import numpy as np
 import pandas as pd
 
-from utils import read_VCF
+from io_utils import read_VCF
 
 ##################################################
 """
