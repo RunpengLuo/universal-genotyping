@@ -70,22 +70,22 @@ if workflow_mode == "single_cell":
             min_snp_per_block=config["params_postprocess"]["min_snp_per_block"],
             # optional outputs, when CNP is provided
             has_cn_profile=lambda wc: config.get("seg_ucn") is not None,
-            cnp_file=lambda wc: "allele/{wc.data_type}/haplotype_blocks.tsv",
-            y_count=lambda wc: "allele/{wc.data_type}/Y_count.npz",
-            d_count=lambda wc: "allele/{wc.data_type}/D_count.npz",
+            cnp_file=lambda wc: f"allele/{wc.data_type}/haplotype_blocks.tsv",
+            y_count=lambda wc: f"allele/{wc.data_type}/Y_count.npz",
+            d_count=lambda wc: f"allele/{wc.data_type}/D_count.npz",
             # otherwise, meta-SNP outputs
-            meta_file=lambda wc: "allele/{wc.data_type}/meta.tsv.gz",
-            tot_mtx_meta=lambda wc: "allele/{wc.data_type}/meta.Tallele.npz",
-            a_mtx_meta=lambda wc: "allele/{wc.data_type}/meta.Aallele.npz",
-            b_mtx_meta=lambda wc: "allele/{wc.data_type}/meta.Ballele.npz",
+            meta_file=lambda wc: f"allele/{wc.data_type}/meta.tsv.gz",
+            tot_mtx_meta=lambda wc: f"allele/{wc.data_type}/meta.Tallele.npz",
+            a_mtx_meta=lambda wc: f"allele/{wc.data_type}/meta.Aallele.npz",
+            b_mtx_meta=lambda wc: f"allele/{wc.data_type}/meta.Ballele.npz",
             # and BB segment outputs
-            bb_file=lambda wc: "allele/{wc.data_type}/bb.tsv.gz",
-            a_mtx_bb=lambda wc: "allele/{wc.data_type}/bb.Aallele.npz",
-            b_mtx_bb=lambda wc: "allele/{wc.data_type}/bb.Ballele.npz",
+            bb_file=lambda wc: f"allele/{wc.data_type}/bb.tsv.gz",
+            a_mtx_bb=lambda wc: f"allele/{wc.data_type}/bb.Aallele.npz",
+            b_mtx_bb=lambda wc: f"allele/{wc.data_type}/bb.Ballele.npz",
             # legacy CalicoST snp-level data
-            unique_snp_ids_legacy=lambda wc: "allele/{wc.data_type}/unique_snp_ids.npy",
-            a_mtx_legacy=lambda wc: "allele/{wc.data_type}/cell_snp_Aallele.npz",
-            b_mtx_legacy=lambda wc: "allele/{wc.data_type}/cell_snp_Ballele.npz",
+            unique_snp_ids_legacy=lambda wc: f"allele/{wc.data_type}/unique_snp_ids.npy",
+            a_mtx_legacy=lambda wc: f"allele/{wc.data_type}/cell_snp_Aallele.npz",
+            b_mtx_legacy=lambda wc: f"allele/{wc.data_type}/cell_snp_Ballele.npz",
         log:
             "logs/postprocess.{data_type}.log",
         script:
