@@ -166,7 +166,7 @@ for mod, rep_ids in mod2reps.items():
     if mod == "bulkDNA":
         # HATCHet input
         final_targets.append(f"allele/{mod}/sample_ids.tsv")
-        final_targets.append(f"allele/{mod}/bb.tsv")
+        final_targets.append(f"allele/{mod}/bb.tsv.gz")
         final_targets.append(f"allele/{mod}/bb.Tallele.npz")
         final_targets.append(f"allele/{mod}/bb.Aallele.npz")
         final_targets.append(f"allele/{mod}/bb.Ballele.npz")
@@ -189,7 +189,7 @@ for mod, rep_ids in mod2reps.items():
         # final_targets.append(f"allele/{mod}/meta.Tallele.npz")
         # final_targets.append(f"allele/{mod}/meta.Aallele.npz")
         # final_targets.append(f"allele/{mod}/meta.Ballele.npz")
-        # final_targets.append(f"allele/{mod}/bb.tsv")
+        # final_targets.append(f"allele/{mod}/bb.tsv.gz")
         # final_targets.append(f"allele/{mod}/bb.Tallele.npz")
         # final_targets.append(f"allele/{mod}/bb.Aallele.npz")
         # final_targets.append(f"allele/{mod}/bb.Ballele.npz")

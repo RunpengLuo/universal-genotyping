@@ -30,7 +30,7 @@ if workflow_mode == "bulk":
             tot_mtx_snp="allele/bulkDNA/snp.Tallele.npz",
             a_mtx_snp="allele/bulkDNA/snp.Aallele.npz",
             b_mtx_snp="allele/bulkDNA/snp.Ballele.npz",
-            bb_file="allele/bulkDNA/bb.tsv",
+            bb_file="allele/bulkDNA/bb.tsv.gz",
             bed_file="allele/bulkDNA/bb.bed.gz",
             tot_mtx_bb="allele/bulkDNA/bb.Tallele.npz",
             a_mtx_bb="allele/bulkDNA/bb.Aallele.npz",
@@ -87,7 +87,7 @@ if workflow_mode == "bulk":
     rule compute_rdr_bulk:
         input:
             sample_file="allele/bulkDNA/sample_ids.tsv",
-            bb_file="allele/bulkDNA/bb.tsv",
+            bb_file="allele/bulkDNA/bb.tsv.gz",
             mosdepth_files=expand(
                 "allele/bulkDNA/out_mosdepth/{rep_id}.regions.bed.gz",
                 rep_id=mod2reps.get("bulkDNA", []),
