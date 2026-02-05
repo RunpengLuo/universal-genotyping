@@ -26,7 +26,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
 )
-logging.info("start annotate_snps")
 
 chroms = sm.config["chromosomes"]
 filter_nz_OTH = sm.params["filter_nz_OTH"]
@@ -38,6 +37,8 @@ snp_lists = []
 KEY = ["#CHROM", "POS", "REF", "ALT"]
 CNT = ["DP", "AD", "OTH"]
 
+logging.info(f"start annotate_snps, filter_nz_OTH={filter_nz_OTH}, filter_hom_ALT={filter_hom_ALT}")
+logging.info(f"min_het_reads={min_het_reads}, min_hom_dp={min_hom_dp}, min_vaf_thres={min_vaf_thres}")
 
 def get_gt(row):
     if row["is_het"]:
@@ -84,21 +85,19 @@ for data_type, raw_snp_file in zip(sm.params["data_types"], sm.input["raw_snp_fi
         raw_snps["#CHROM"].astype(str).isin([f"chr{chrname}" for chrname in chroms])
     ]
 
-    # filter multi-allelic SNPs, ~0.1%
+    nz_oth = raw_snps["OTH"] > 0
+    n_nz = int(nz_oth.sum())
+
+    nz_oth_hom_alt = int(raw_snps.loc[nz_oth, "is_hom_alt"].sum())
+    nz_oth_het = int(raw_snps.loc[nz_oth, "is_het"].sum())
+    nz_oth_hom_ref = int(raw_snps.loc[nz_oth, "is_hom_ref"].sum())
+    nz_oth_other = n_nz - (nz_oth_hom_alt + nz_oth_het + nz_oth_hom_ref)
+
+    logging.info(
+        f"{data_type}, #nz-OTH SNPs={n_nz}/{num_raw_snps} "
+        f"(hom_alt={nz_oth_hom_alt}, het={nz_oth_het}, hom_ref={nz_oth_hom_ref}, other={nz_oth_other})"
+    )
     if filter_nz_OTH:
-        nz_oth = raw_snps["OTH"] > 0
-        n_nz = int(nz_oth.sum())
-
-        n_filt_hom_alt = int(raw_snps.loc[nz_oth, "is_hom_alt"].sum())
-        n_filt_het = int(raw_snps.loc[nz_oth, "is_het"].sum())
-        n_filt_hom_ref = int(raw_snps.loc[nz_oth, "is_hom_ref"].sum())
-        n_filt_other = n_nz - (n_filt_hom_alt + n_filt_het + n_filt_hom_ref)
-
-        logging.info(
-            f"{data_type}, #nz-OTH SNPs={n_nz}/{num_raw_snps} "
-            f"(hom_alt={n_filt_hom_alt}, het={n_filt_het}, hom_ref={n_filt_hom_ref}, other={n_filt_other})"
-        )
-
         raw_snps = raw_snps[~nz_oth]
 
     # filter duplicated SNPs
