@@ -309,7 +309,7 @@ else:
         allele="B",
         unit="meta-snp",
     )
-    meta_snps.to_csv(sm.params["meta_file"][0], sep="\t", header=True, index=False)
+    meta_snps.to_csv(sm.params["meta_file"], sep="\t", header=True, index=False)
     save_npz(sm.params["tot_mtx_meta"][0], tot_mtx_meta)
     save_npz(sm.params["a_mtx_meta"][0], a_mtx_meta)
     save_npz(sm.params["b_mtx_meta"][0], b_mtx_meta)
@@ -340,7 +340,7 @@ else:
         unit="haplo-block",
     )
 
-    bbs.to_csv(sm.params["bb_file"][0], sep="\t", header=True, index=False)
+    bbs.to_csv(sm.params["bb_file"], sep="\t", header=True, index=False)
     save_npz(sm.params["tot_mtx_bb"][0], tot_mtx_bb)
     save_npz(sm.params["a_mtx_bb"][0], a_mtx_bb)
     save_npz(sm.params["b_mtx_bb"][0], b_mtx_bb)
