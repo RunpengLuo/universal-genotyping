@@ -84,7 +84,7 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
 if gc_correct:
     has_mapp = mappability_file is not None
     gc_df = compute_gc_content(bbs, reference, mappability_file, genome_size)
-    rdr_mtx_bb = bias_correction_rdr(rdr_mtx_bb, gc_df, rep_ids[tumor_sidx:], has_mapp, qc_dir)
+    rdr_mtx_bb = bias_correction_rdr(rdr_mtx_bb, gc_df, rep_ids[tumor_sidx:], qc_dir)
 
 # plot per-sample RDRs (after corrections)
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
