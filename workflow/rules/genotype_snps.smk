@@ -54,20 +54,24 @@ if workflow_mode == "bulk":
 ##################################################
 if workflow_mode == "single_cell":
 
-    rule genotype_snps_pseudobulk:
+    rule genotype_snps_single_cell:
         input:
-            bams=lambda wc: {"scRNA": gex_tbams, "scATAC": atac_tbams}[wc.data_type],
-            snp_panel=config["snp_panel"],
+            barcode=lambda wc: get_data[(wc.data_type, wc.rep_id)][0],
+            bam=lambda wc: get_data[(wc.data_type, wc.rep_id)][1],
+            ranger=lambda wc: get_data[(wc.data_type, wc.rep_id)][2],
+            snp_file=config["snp_panel"],
         output:
-            snp_file="snps/{data_type}/cellSNP.base.vcf.gz",
-        log:
-            "logs/genotype_snps.{data_type}.log",
+            cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
+            sample_file="pileup/{data_type}_{rep_id}/cellSNP.samples.tsv",
+            tot_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx",
+            ad_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.AD.mtx",
+        wildcard_constraints:
+            data_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
         threads: config["threads"]["genotype"]
         params:
-            bcftools=config["bcftools"],
             cellsnp_lite=config["cellsnp_lite"],
-            chroms=",".join(map(str, config["chromosomes"])),
             refseq=config["reference"],
+            out_dir=lambda wc: f"pileup/{wc.data_type}_{wc.rep_id}",
             UMItag=lambda wc: branch(
                 wc.data_type == "scATAC",
                 then="None",
@@ -75,44 +79,49 @@ if workflow_mode == "single_cell":
             ),
             minMAF=config["params_cellsnp_lite"]["minMAF"],
             minCOUNT=config["params_cellsnp_lite"]["minCOUNT_genotype"],
+        log:
+            "logs/genotype_snps.{data_type}_{rep_id}.log",
         shell:
             r"""
-            echo "genotype SNPs on pseudobulk {data_type} sample"
-            cellsnp_dir=$(dirname "{output.snp_file}")
-            mkdir -p ${{cellsnp_dir}}
-            printf "%s\n" {input.bams} > ${{cellsnp_dir}}/bams.lst
-
-            nsnps_panel=$({params.bcftools} view -H "{input.snp_panel}" | wc -l)
-            echo "[QC] {input.snp_panel} record #SNPs: ${{nsnps_panel}}"
             {params.cellsnp_lite} \
-                -S ${{cellsnp_dir}}/bams.lst \
-                -O ${{cellsnp_dir}} \
-                -R {input.snp_panel} \
-                --chrom "{params.chroms}" \
-                --refseq {params.refseq} \
+                -b "{input.barcode}" \
+                -s "{input.bam}" \
+                -O "{params.out_dir}" \
+                -R "{input.snp_file}" \
                 -p {threads} \
                 --minMAF {params.minMAF} \
                 --minCOUNT {params.minCOUNT} \
                 --UMItag {params.UMItag} \
-                --cellTAG None \
+                --cellTAG {params.cellTAG} \
                 --gzip > {log} 2>&1
-            rm ${{cellsnp_dir}}/bams.lst
-            nsnps_cellsnp=$({params.bcftools} view -H "{output.snp_file}" | wc -l)
-            echo "[QC] {output} record #SNPs: ${{nsnps_cellsnp}}"
             """
 
-    rule annotate_snps_pseudobulk:
+    rule annotate_snps_single_cell:
         input:
-            raw_snp_files=expand(
-                "snps/{data_type}/cellSNP.base.vcf.gz", data_type=genotype_dtypes
-            ),
+            raw_snp_files=[
+                f"pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz"
+                for (data_type, rep_id) in get_data.keys()
+            ],
+            sample_files=[
+                f"pileup/{data_type}_{rep_id}/cellSNP.samples.tsv"
+                for (data_type, rep_id) in get_data.keys()
+            ],
+            dp_files=[
+                f"pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx"
+                for (data_type, rep_id) in get_data.keys()
+            ],
+            ad_files=[
+                f"pileup/{data_type}_{rep_id}/cellSNP.tag.AD.mtx"
+                for (data_type, rep_id) in get_data.keys()
+            ],
         output:
             snp_files=expand("snps/chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
             snp_files_tbi=expand(
                 "snps/chr{chrname}.vcf.gz.tbi", chrname=config["chromosomes"]
             ),
         params:
-            data_types=genotype_dtypes,
+            data_types=[data_type for (data_type, _) in get_data.keys()],
+            rep_ids=[data_type for (data_type, _) in get_data.keys()],
             filter_nz_OTH=config["params_annotate_snps"]["filter_nz_OTH"],
             filter_hom_ALT=config["params_annotate_snps"]["filter_hom_ALT"],
             min_het_reads=config["params_annotate_snps"]["min_het_reads"],

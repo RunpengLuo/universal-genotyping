@@ -171,7 +171,7 @@ if workflow_mode == "single_cell":
             min_snp_per_block=config["params_postprocess"]["min_snp_per_block"],
             # optional outputs, when CNP is provided
             has_cn_profile=lambda wc: config.get("seg_ucn") is not None,
-            cnp_file=lambda wc: "allele/multiome_{wc.rep_id}/haplotype_blocks.tsv",
+            cnp_file=lambda wc: f"allele/multiome_{wc.rep_id}/haplotype_blocks.tsv",
             y_count=lambda wc: [
                 f"allele/multiome_{wc.rep_id}/Y_count.{data_type}.npz"
                 for data_type in ["scRNA", "scATAC"]
@@ -180,17 +180,19 @@ if workflow_mode == "single_cell":
                 f"allele/multiome_{wc.rep_id}/D_count.{data_type}.npz"
                 for data_type in ["scRNA", "scATAC"]
             ],
-            # otherwise, meta-SNP outputs TODO
-            # meta_file=lambda wc: "allele/multiome_{wc.rep_id}/meta.tsv.gz",
-            # tot_mtx_meta=lambda wc: "allele/multiome_{wc.rep_id}/meta.Tallele.npz",
-            # a_mtx_meta=lambda wc: "allele/multiome_{wc.rep_id}/meta.Aallele.npz",
-            # b_mtx_meta=lambda wc: "allele/multiome_{wc.rep_id}/meta.Ballele.npz",
-            # # and BB segment outputs
-            # bb_file=lambda wc: f"allele/multiome_{wc.rep_id}/bb.tsv.gz",
-            # tot_mtx_bb=lambda wc: f"allele/multiome_{wc.rep_id}/bb.Tallele.npz",
-            # a_mtx_bb=lambda wc: "allele/multiome_{wc.rep_id}/bb.Aallele.npz",
-            # b_mtx_bb=lambda wc: "allele/multiome_{wc.rep_id}/bb.Ballele.npz",
         log:
             "logs/postprocess.multiome.{rep_id}.log",
         script:
             """../scripts/postprocess_single_cell.py"""
+
+
+# otherwise, meta-SNP outputs TODO
+# meta_file=lambda wc: "allele/multiome_{wc.rep_id}/meta.tsv.gz",
+# tot_mtx_meta=lambda wc: "allele/multiome_{wc.rep_id}/meta.Tallele.npz",
+# a_mtx_meta=lambda wc: "allele/multiome_{wc.rep_id}/meta.Aallele.npz",
+# b_mtx_meta=lambda wc: "allele/multiome_{wc.rep_id}/meta.Ballele.npz",
+# # and BB segment outputs
+# bb_file=lambda wc: f"allele/multiome_{wc.rep_id}/bb.tsv.gz",
+# tot_mtx_bb=lambda wc: f"allele/multiome_{wc.rep_id}/bb.Tallele.npz",
+# a_mtx_bb=lambda wc: "allele/multiome_{wc.rep_id}/bb.Aallele.npz",
+# b_mtx_bb=lambda wc: "allele/multiome_{wc.rep_id}/bb.Ballele.npz",

@@ -45,7 +45,7 @@ params_cellsnp_lite:
   UMItag: "Auto"
   cellTAG: "CB"
   minMAF: 0
-  minCOUNT_genotype: 2
+  minCOUNT_genotype: 1
   minCOUNT_pileup: 1
 
 params_bcftools:
