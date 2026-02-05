@@ -83,6 +83,7 @@ if workflow_mode == "single_cell":
             b_mtx_meta=lambda wc: f"allele/{wc.data_type}/meta.Ballele.npz",
             # and BB segment outputs
             bb_file=lambda wc: f"allele/{wc.data_type}/bb.tsv.gz",
+            tot_mtx_bb=lambda wc: f"allele/{wc.data_type}/bb.Tallele.npz",
             a_mtx_bb=lambda wc: f"allele/{wc.data_type}/bb.Aallele.npz",
             b_mtx_bb=lambda wc: f"allele/{wc.data_type}/bb.Ballele.npz",
             # legacy CalicoST snp-level data
@@ -185,7 +186,8 @@ if workflow_mode == "single_cell":
             # a_mtx_meta=lambda wc: "allele/multiome_{wc.rep_id}/meta.Aallele.npz",
             # b_mtx_meta=lambda wc: "allele/multiome_{wc.rep_id}/meta.Ballele.npz",
             # # and BB segment outputs
-            # bb_file=lambda wc: "allele/multiome_{wc.rep_id}/bb.tsv.gz",
+            # bb_file=lambda wc: f"allele/multiome_{wc.rep_id}/bb.tsv.gz",
+            # tot_mtx_bb=lambda wc: f"allele/multiome_{wc.rep_id}/bb.Tallele.npz",
             # a_mtx_bb=lambda wc: "allele/multiome_{wc.rep_id}/bb.Aallele.npz",
             # b_mtx_bb=lambda wc: "allele/multiome_{wc.rep_id}/bb.Ballele.npz",
         log:
