@@ -30,6 +30,9 @@ if workflow_mode == "single_cell":
             ),
             region_bed=lambda wc: config["region_bed"],
             genome_size=lambda wc: config["genome_size"],
+            gmap_file=lambda wc: (
+                "phase/genetic_map.tsv.gz" if require_genetic_map else []
+            ),
             block_bed=lambda wc: branch(
                 config.get("block_bed") is None, then=[], otherwise=config["block_bed"]
             ),
@@ -117,6 +120,9 @@ if workflow_mode == "single_cell":
             ),
             region_bed=lambda wc: config["region_bed"],
             genome_size=lambda wc: config["genome_size"],
+            gmap_file=lambda wc: (
+                "phase/genetic_map.tsv.gz" if require_genetic_map else []
+            ),
             block_bed=lambda wc: branch(
                 config.get("block_bed") is None, then=[], otherwise=config["block_bed"]
             ),
