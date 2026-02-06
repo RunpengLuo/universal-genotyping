@@ -159,6 +159,19 @@ qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 for i, data_type in enumerate(data_types):
     a_mtx, b_mtx, tot_mtx = a_mtxs[i], b_mtxs[i], tot_mtxs[i]
+    ref_mtx = ref_mtxs[i]
+    plot_allele_freqs(
+        snps,
+        rep_ids,
+        tot_mtx,
+        ref_mtx,
+        genome_size,
+        qc_dir,
+        apply_pseudobulk=True,
+        allele="ref",
+        unit="snp",
+        suffix=f"_{data_type}",
+    )
     plot_allele_freqs(
         snps,
         rep_ids,
