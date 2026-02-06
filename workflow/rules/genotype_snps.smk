@@ -64,6 +64,7 @@ if workflow_mode == "single_cell":
         threads:
             config["threads"]["genotype"]
         params:
+            bcftools=config["bcftools"],
             cellsnp_lite=config["cellsnp_lite"],
             out_dir=lambda wc: f"pileup/pseudobulk",
             minMAF=0,
@@ -81,6 +82,8 @@ if workflow_mode == "single_cell":
                 --UMItag None \
                 --cellTAG None \
                 --gzip > {log} 2>&1
+            nsnps_cellsnp=$({params.bcftools} view -H "{output.snp_file}" | wc -l)
+            echo "[QC] {output} record #SNPs: ${{nsnps_cellsnp}}"
             rm {params.out_dir}/bams.lst
             """
 
