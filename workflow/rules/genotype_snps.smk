@@ -14,11 +14,11 @@ if workflow_mode == "bulk":
             snp_panel=config["snp_panel"],
             reference=config["reference"],
         output:
-            snp_file="snps/chr{chrname}.vcf.gz",
-            tmp_pos=temp("tmp/target.{chrname}.pos.gz"),
-            tmp_pos_tbi=temp("tmp/target.{chrname}.pos.gz.tbi"),
+            snp_file=config["snp_dir"] + "/chr{chrname}.vcf.gz",
+            tmp_pos=temp(config["snp_dir"] + "/target.{chrname}.pos.gz"),
+            tmp_pos_tbi=temp(config["snp_dir"] + "/target.{chrname}.pos.gz.tbi"),
         log:
-            "logs/genotype_snps.chr{chrname}.log",
+            config["log_dir"] + "/genotype_snps.chr{chrname}.log",
         threads: config["threads"]["genotype"]
         params:
             chrom="chr{chrname}",
@@ -58,15 +58,15 @@ if workflow_mode == "single_cell":
             bams=gex_tbams+atac_tbams,
             snp_panel=config["snp_panel"],
         output:
-            snp_file="pileup/pseudobulk/cellSNP.base.vcf.gz",
+            snp_file=config["pileup_dir"] + "pseudobulk/cellSNP.base.vcf.gz",
         log:
-            "logs/genotype_snps.pseudobulk.log"
+            config["log_dir"] + "/genotype_snps.pseudobulk.log"
         threads:
             config["threads"]["genotype"]
         params:
             bcftools=config["bcftools"],
             cellsnp_lite=config["cellsnp_lite"],
-            out_dir=lambda wc: f"pileup/pseudobulk",
+            out_dir=lambda wc: config["pileup_dir"] + "pseudobulk",
             minMAF=0,
             minCOUNT=1,
         shell:
@@ -92,19 +92,19 @@ if workflow_mode == "single_cell":
             barcode=lambda wc: get_data[(wc.data_type, wc.rep_id)][0],
             bam=lambda wc: get_data[(wc.data_type, wc.rep_id)][1],
             ranger=lambda wc: get_data[(wc.data_type, wc.rep_id)][2],
-            snp_file="pileup/pseudobulk/cellSNP.base.vcf.gz",
+            snp_file=config["pileup_dir"] + "pseudobulk/cellSNP.base.vcf.gz",
         output:
-            cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
-            sample_file="pileup/{data_type}_{rep_id}/cellSNP.samples.tsv",
-            tot_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx",
-            ad_mat="pileup/{data_type}_{rep_id}/cellSNP.tag.AD.mtx",
+            cellsnp_file=config["pileup_dir"] + "{data_type}_{rep_id}/cellSNP.base.vcf.gz",
+            sample_file=config["pileup_dir"] + "{data_type}_{rep_id}/cellSNP.samples.tsv",
+            tot_mat=config["pileup_dir"] + "{data_type}_{rep_id}/cellSNP.tag.DP.mtx",
+            ad_mat=config["pileup_dir"] + "{data_type}_{rep_id}/cellSNP.tag.AD.mtx",
         wildcard_constraints:
             data_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
         threads: config["threads"]["genotype"]
         params:
             cellsnp_lite=config["cellsnp_lite"],
             refseq=config["reference"],
-            out_dir=lambda wc: f"pileup/{wc.data_type}_{wc.rep_id}",
+            out_dir=lambda wc: config["pileup_dir"] + f"{wc.data_type}_{wc.rep_id}",
             UMItag=lambda wc: branch(
                 wc.data_type == "scATAC",
                 then="None",
@@ -114,7 +114,7 @@ if workflow_mode == "single_cell":
             minMAF=config["params_cellsnp_lite"]["minMAF"],
             minCOUNT=config["params_cellsnp_lite"]["minCOUNT_genotype"],
         log:
-            "logs/genotype_snps.{data_type}_{rep_id}.log",
+            config["log_dir"] + "/genotype_snps.{data_type}_{rep_id}.log",
         shell:
             r"""
             {params.cellsnp_lite} \
@@ -133,25 +133,25 @@ if workflow_mode == "single_cell":
     rule annotate_snps_single_cell:
         input:
             raw_snp_files=[
-                f"pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz"
+                config["pileup_dir"] + f"{data_type}_{rep_id}/cellSNP.base.vcf.gz"
                 for (data_type, rep_id) in get_data.keys()
             ],
             sample_files=[
-                f"pileup/{data_type}_{rep_id}/cellSNP.samples.tsv"
+                config["pileup_dir"] + f"{data_type}_{rep_id}/cellSNP.samples.tsv"
                 for (data_type, rep_id) in get_data.keys()
             ],
             dp_files=[
-                f"pileup/{data_type}_{rep_id}/cellSNP.tag.DP.mtx"
+                config["pileup_dir"] + f"{data_type}_{rep_id}/cellSNP.tag.DP.mtx"
                 for (data_type, rep_id) in get_data.keys()
             ],
             ad_files=[
-                f"pileup/{data_type}_{rep_id}/cellSNP.tag.AD.mtx"
+                config["pileup_dir"] + f"{data_type}_{rep_id}/cellSNP.tag.AD.mtx"
                 for (data_type, rep_id) in get_data.keys()
             ],
         output:
-            snp_files=expand("snps/chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
+            snp_files=expand(config["snp_dir"] + "/chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
             snp_files_tbi=expand(
-                "snps/chr{chrname}.vcf.gz.tbi", chrname=config["chromosomes"]
+               config["snp_dir"] + "/chr{chrname}.vcf.gz.tbi", chrname=config["chromosomes"]
             ),
         params:
             data_types=[data_type for (data_type, _) in get_data.keys()],
@@ -163,6 +163,6 @@ if workflow_mode == "single_cell":
             min_vaf_thres=config["params_annotate_snps"]["min_vaf_thres"],
         threads: 1
         log:
-            "logs/annotate_snps.log",
+            config["log_dir"] + "/annotate_snps.log",
         script:
             "../scripts/annotate_snps.py"

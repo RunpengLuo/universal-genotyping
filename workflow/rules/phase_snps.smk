@@ -3,20 +3,20 @@ if config["phaser"] == "shapeit":
 
     rule phase_snps_shapeit:
         input:
-            chrom_vcf_file=lambda wc: f"snps/chr{wc.chrname}.vcf.gz",
+            chrom_vcf_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
             phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
             gmap_file=lambda wc: get_gmap_file(wc.chrname),
         output:
-            phased_file="phase/chr{chrname}.vcf.gz",
-            bcf_file=temp("phase/chr{chrname}.bcf"),
-            bcf_file_csi=temp("phase/chr{chrname}.bcf.csi"),
+            phased_file=config["phase_dir"] + "chr{chrname}.vcf.gz",
+            bcf_file=temp(config["phase_dir"] + "chr{chrname}.bcf"),
+            bcf_file_csi=temp(config["phase_dir"] + "chr{chrname}.bcf.csi"),
         threads: config["threads"]["phase"]
         params:
             chrom="chr{chrname}",
             shapeit=config["shapeit"],
             bcftools=config["bcftools"],
         log:
-            "logs/phase_snps.chr{chrname}.log",
+            config["log_dir"] + "/phase_snps.chr{chrname}.log",
         shell:
             r"""
             {params.shapeit} \
@@ -37,18 +37,18 @@ if config["phaser"] == "eagle":
 
     rule phase_snps_eagle:
         input:
-            chrom_vcf_file=lambda wc: f"snps/chr{wc.chrname}.vcf.gz",
+            chrom_vcf_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
             phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
             gmap_file=lambda wc: get_gmap_file(wc.chrname),
         output:
-            phased_file="phase/chr{chrname}.vcf.gz",
+            phased_file=config["phase_dir"] + "chr{chrname}.vcf.gz",
         threads: config["threads"]["phase"]
         params:
             chrom="chr{chrname}",
             eagle=config["eagle"],
             bcftools=config["bcftools"],
         log:
-            "logs/phase_snps.chr{chrname}.log",
+            config["log_dir"] + "/phase_snps.chr{chrname}.log",
         shell:
             r"""
             {params.eagle} \
@@ -57,7 +57,7 @@ if config["phaser"] == "eagle":
                 --vcfRef "{input.phasing_panel_file}" \
                 --vcfOutFormat z \
                 --numThreads "{threads}" \
-                --outPrefix "phase/{params.chrom}" > {log} 2>&1
+                --outPrefix config["phase_dir"] + "{params.chrom}" > {log} 2>&1
             tabix -f -p vcf "{output.phased_file}"
             """
 
@@ -67,13 +67,13 @@ if config["phaser"] == "longphase":
 
     rule phase_snps_longphase:
         input:
-            chrom_vcf_file=lambda wc: f"snps/chr{wc.chrname}.vcf.gz",
+            chrom_vcf_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
             bam_file=lambda wc: branch(
                 has_normal, then=bulk_nbams[0], otherwise=bulk_tbams[0]
             ),
             ref_fa=lambda wc: config["reference"],
         output:
-            phased_file="phase/chr{chrname}.vcf.gz",
+            phased_file=config["phase_dir"] + "chr{chrname}.vcf.gz",
         params:
             chrom="chr{chrname}",
             longphase=config["longphase"],
@@ -82,7 +82,7 @@ if config["phaser"] == "longphase":
             bcftools=config["bcftools"],
         threads: config["threads"]["phase"]
         log:
-            "logs/phase_snps.chr{chrname}.log",
+            config["log_dir"] + "/phase_snps.chr{chrname}.log",
         shell:
             r"""
             {params.longphase} phase \
@@ -90,7 +90,7 @@ if config["phaser"] == "longphase":
                 --reference={input.ref_fa} \
                 --snp-file={input.chrom_vcf_file} \
                 --mappingQuality={params.min_mapq} \
-                --out-prefix="phase/{params.chrom}" \
+                --out-prefix=config["phase_dir"] + "{params.chrom}" \
                 --threads={threads} \
                 {params.extra_params} > {log} 2>&1
             tabix -f -p vcf "{output.phased_file}"
@@ -99,10 +99,10 @@ if config["phaser"] == "longphase":
 
 rule concat_and_extract_phased_het_snps:
     input:
-        vcf_files=expand("phase/chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
+        vcf_files=expand(config["phase_dir"] + "chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
     output:
-        phased_vcf="phase/phased_snps.vcf.gz",
-        lst_file=temp("phase/phased_snps.lst"),
+        phased_vcf=config["phase_dir"] + "phased_snps.vcf.gz",
+        lst_file=temp(config["phase_dir"] + "phased_snps.lst"),
     threads: 1
     params:
         bcftools=config["bcftools"],
@@ -120,9 +120,9 @@ rule parse_genetic_map:
     input:
         gmap_files=lambda wc: [get_gmap_file(c) for c in config["chromosomes"]],
     output:
-        gmap_tsv="phase/genetic_map.tsv.gz",
+        gmap_tsv=config["phase_dir"] + "genetic_map.tsv.gz",
     log:
-        "logs/parse_genetic_map.log",
+        config["log_dir"] + "/parse_genetic_map.log",
     params:
         chrnames=config["chromosomes"],
         phaser=config["phaser"],

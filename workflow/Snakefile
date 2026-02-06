@@ -165,39 +165,39 @@ for mod, rep_ids in mod2reps.items():
     data_types = ["scRNA", "scATAC"] if mod == "multiome" else [mod]
     if mod == "bulkDNA":
         # HATCHet input
-        final_targets.append(f"allele/{mod}/sample_ids.tsv")
-        final_targets.append(f"allele/{mod}/bb.tsv.gz")
-        final_targets.append(f"allele/{mod}/bb.Tallele.npz")
-        final_targets.append(f"allele/{mod}/bb.Aallele.npz")
-        final_targets.append(f"allele/{mod}/bb.Ballele.npz")
-        final_targets.append(f"allele/{mod}/bb.depth.npz")
-        final_targets.append(f"allele/{mod}/bb.rdr.npz")
+        final_targets.append(config["allele_dir"] + f"{mod}/sample_ids.tsv")
+        final_targets.append(config["allele_dir"] + f"{mod}/bb.tsv.gz")
+        final_targets.append(config["allele_dir"] + f"{mod}/bb.Tallele.npz")
+        final_targets.append(config["allele_dir"] + f"{mod}/bb.Aallele.npz")
+        final_targets.append(config["allele_dir"] + f"{mod}/bb.Ballele.npz")
+        final_targets.append(config["allele_dir"] + f"{mod}/bb.depth.npz")
+        final_targets.append(config["allele_dir"] + f"{mod}/bb.rdr.npz")
     elif mod == "multiome":
         assert has_cn_profile, "adaptive binning for multiome data TODO"
         if has_cn_profile:
             for rep_id in rep_ids:
-                final_targets.append(f"allele/{mod}_{rep_id}/sample_ids.tsv")
-                final_targets.append(f"allele/{mod}_{rep_id}/barcodes.txt")
-                # final_targets.append(f"allele/{mod}_{rep_id}/haplotype_blocks.tsv")
+                final_targets.append(config["allele_dir"] + f"{mod}_{rep_id}/sample_ids.tsv")
+                final_targets.append(config["allele_dir"] + f"{mod}_{rep_id}/barcodes.txt")
+                # final_targets.append(config["allele_dir"] + f"{mod}_{rep_id}/haplotype_blocks.tsv")
                 # for data_type in data_types:
-                #     final_targets.append(f"allele/{mod}_{rep_id}/Y_count.{data_type}.npz")
-                #     final_targets.append(f"allele/{mod}_{rep_id}/D_count.{data_type}.npz")
+                #     final_targets.append(config["allele_dir"] + f"{mod}_{rep_id}/Y_count.{data_type}.npz")
+                #     final_targets.append(config["allele_dir"] + f"{mod}_{rep_id}/D_count.{data_type}.npz")
     else:
-        final_targets.append(f"allele/{mod}/sample_ids.tsv")
-        final_targets.append(f"allele/{mod}/barcodes.txt")
-        # final_targets.append(f"allele/{mod}/meta.tsv.gz")
-        # final_targets.append(f"allele/{mod}/meta.Tallele.npz")
-        # final_targets.append(f"allele/{mod}/meta.Aallele.npz")
-        # final_targets.append(f"allele/{mod}/meta.Ballele.npz")
-        # final_targets.append(f"allele/{mod}/bb.tsv.gz")
-        # final_targets.append(f"allele/{mod}/bb.Tallele.npz")
-        # final_targets.append(f"allele/{mod}/bb.Aallele.npz")
-        # final_targets.append(f"allele/{mod}/bb.Ballele.npz")
+        final_targets.append(config["allele_dir"] + f"{mod}/sample_ids.tsv")
+        final_targets.append(config["allele_dir"] + f"{mod}/barcodes.txt")
+        # final_targets.append(config["allele_dir"] + f"{mod}/meta.tsv.gz")
+        # final_targets.append(config["allele_dir"] + f"{mod}/meta.Tallele.npz")
+        # final_targets.append(config["allele_dir"] + f"{mod}/meta.Aallele.npz")
+        # final_targets.append(config["allele_dir"] + f"{mod}/meta.Ballele.npz")
+        # final_targets.append(config["allele_dir"] + f"{mod}/bb.tsv.gz")
+        # final_targets.append(config["allele_dir"] + f"{mod}/bb.Tallele.npz")
+        # final_targets.append(config["allele_dir"] + f"{mod}/bb.Aallele.npz")
+        # final_targets.append(config["allele_dir"] + f"{mod}/bb.Ballele.npz")
         # if mod in ["VISIUM", "VISIUM3prime"]:
         #     # legacy CalicoST inputs
-        #     final_targets.append(f"allele/{mod}/unique_snp_ids.npy")
-        #     final_targets.append(f"allele/{mod}/cell_snp_Aallele.npz")
-        #     final_targets.append(f"allele/{mod}/cell_snp_Ballele.npz")
+        #     final_targets.append(config["allele_dir"] + f"{mod}/unique_snp_ids.npy")
+        #     final_targets.append(config["allele_dir"] + f"{mod}/cell_snp_Aallele.npz")
+        #     final_targets.append(config["allele_dir"] + f"{mod}/cell_snp_Ballele.npz")
 
 
 ##################################################

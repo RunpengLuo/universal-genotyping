@@ -1,4 +1,6 @@
 ##################################################
+# Genotyping YAML configuration file
+##################################################
 # Path to executables
 bcftools: /path/to/bcftools
 cellsnp_lite: /path/to/cellsnp-lite
@@ -6,6 +8,13 @@ eagle: /path/to/eagle2
 shapeit: /path/to/phase_common_static
 longphase: /path/to/longphase_linux-x64
 mosdepth: /path/to/mosdepth
+
+# Output paths, relative to snakemake --directory
+snp_dir: "snps"
+phase_dir: "phase"
+pileup_dir: "pileup"
+allele_dir: "allele"
+log_dir: "logs"
 
 ##################################################
 # Input
