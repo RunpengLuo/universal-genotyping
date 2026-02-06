@@ -155,7 +155,7 @@ if workflow_mode == "single_cell":
             ),
         params:
             data_types=[data_type for (data_type, _) in get_data.keys()],
-            rep_ids=[data_type for (data_type, _) in get_data.keys()],
+            rep_ids=[rep_id for (_, rep_id) in get_data.keys()],
             filter_nz_OTH=config["params_annotate_snps"]["filter_nz_OTH"],
             filter_hom_ALT=config["params_annotate_snps"]["filter_hom_ALT"],
             min_het_reads=config["params_annotate_snps"]["min_het_reads"],

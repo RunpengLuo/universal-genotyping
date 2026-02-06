@@ -68,16 +68,7 @@ data_type = data_types[0]
 # step 1. remove duplicated rows and collapse VCF files from multiple replicates
 raw_snps_list = []
 for idx, rep_id in enumerate(rep_ids):
-    raw_snps = read_VCF(raw_snp_files[idx])
-    raw_snps["KEY"] = (
-        raw_snps["#CHROM"].astype(str)
-        + "_"
-        + raw_snps["POS"].astype(str)
-        + "_"
-        + raw_snps["REF"].astype(str)
-        + "_"
-        + raw_snps["ALT"].astype(str)
-    )
+    raw_snps = read_VCF(raw_snp_files[idx], addkey=True)
     assert all(c in raw_snps.columns for c in CNT), "invalid cellsnp-lite format"
     for cnt in CNT:
         raw_snps[f"{cnt}{idx}"] = raw_snps[cnt].astype(np.int64)
@@ -93,7 +84,7 @@ for idx, rep_id in enumerate(rep_ids):
         raw_snps.duplicated(subset="KEY", keep=False), "KEY"
     ].nunique()
     logging.info(
-        f"[{data_type} {rep_id}] duplicated rows, key=#CHROM_POS_REF_ALT: rows={n_dup_rows}, keys={n_dup_keys}"
+        f"[{data_type} {rep_id}] duplicated rows, key=#CHROM_POS: rows={n_dup_rows}, keys={n_dup_keys}"
     )
     raw_snps = raw_snps.drop_duplicates(subset="KEY", keep="first").reset_index(
         drop=True
@@ -104,7 +95,19 @@ for idx, rep_id in enumerate(rep_ids):
 base_snps = pd.concat(
     [raw_snps[["KEY", "#CHROM", "POS", "REF", "ALT"]] for raw_snps in raw_snps_list],
     ignore_index=True,
-).drop_duplicates(subset="KEY", keep="first")
+).drop_duplicates(subset=["#CHROM", "POS", "REF", "ALT"], keep="first")
+
+# filter any SNP rows that present in multiple samples but has different alleles
+# violates bi-allelic REF/ALT assumption, cellsnp-lite issue
+dup_mask = base_snps.duplicated(subset="KEY", keep=False)
+n_dup_rows = int(dup_mask.sum())
+n_dup_keys = int(base_snps.loc[dup_mask, "KEY"].drop_duplicates().shape[0])
+logging.info(
+    f"[{data_type}] duplicated rows, key=#CHROM_POS: rows={n_dup_rows}, keys={n_dup_keys}"
+)
+base_snps = base_snps.loc[~dup_mask, :].reset_index(drop=True)
+nsnps_before_genotyping = len(base_snps)
+
 base_snps = base_snps.sort_values(["#CHROM", "POS"], kind="mergesort")
 for cnt in CNT:
     base_snps[cnt] = 0
@@ -121,16 +124,6 @@ for idx, raw_snps in enumerate(raw_snps_list):
     for cnt in CNT:
         base_snps[cnt] += base_snps[f"{cnt}{idx}"].fillna(0).astype(np.int64)
     base_snps = base_snps.drop(columns=[f"{cnt}{idx}" for cnt in CNT])
-
-# filter multi-allelic SNPs.
-dup_mask = base_snps.duplicated(subset=["#CHROM", "POS"], keep=False)
-n_dup_rows = int(dup_mask.sum())
-n_dup_keys = int(base_snps.loc[dup_mask, ["#CHROM", "POS"]].drop_duplicates().shape[0])
-logging.info(
-    f"[{data_type}] duplicated rows, key=#CHROM_POS: rows={n_dup_rows}, keys={n_dup_keys}"
-)
-base_snps = base_snps.loc[~dup_mask, :].reset_index(drop=True)
-nsnps_before_genotyping = len(base_snps)
 
 # SNP genotyping.
 base_snps["REF_COUNT"] = base_snps["DP"] - base_snps["AD"]
