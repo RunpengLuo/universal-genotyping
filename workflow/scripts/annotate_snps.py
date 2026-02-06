@@ -80,16 +80,17 @@ for idx, rep_id in enumerate(rep_ids):
 
     # filter rows with duplicated snp ids
     n_dup_rows = raw_snps.duplicated(subset="KEY", keep=False).sum()
-    n_dup_keys = raw_snps.loc[
-        raw_snps.duplicated(subset="KEY", keep=False), "KEY"
-    ].nunique()
-    logging.warning(
-        f"[{data_type} {rep_id}] have duplicated rows, key=#CHROM_POS: rows={n_dup_rows}, keys={n_dup_keys}"
-    )
-    logging.warning("drop duplicated SNP rows.")
-    raw_snps = raw_snps.drop_duplicates(subset="KEY", keep="first").reset_index(
-        drop=True
-    )
+    if n_dup_rows > 0:
+        n_dup_keys = raw_snps.loc[
+            raw_snps.duplicated(subset="KEY", keep=False), "KEY"
+        ].nunique()
+        logging.warning(
+            f"[{data_type} {rep_id}] have duplicated rows, key=#CHROM_POS: rows={n_dup_rows}, keys={n_dup_keys}"
+        )
+        logging.warning("drop duplicated SNP rows.")
+        raw_snps = raw_snps.drop_duplicates(subset="KEY", keep="first").reset_index(
+            drop=True
+        )
     raw_snps_list.append(raw_snps)
 
 # union over all replicates
@@ -102,12 +103,14 @@ base_snps = pd.concat(
 # violates bi-allelic REF/ALT assumption, cellsnp-lite issue
 dup_mask = base_snps.duplicated(subset="KEY", keep=False)
 n_dup_rows = int(dup_mask.sum())
-n_dup_keys = int(base_snps.loc[dup_mask, "KEY"].drop_duplicates().shape[0])
-logging.warning(
-    f"[{data_type} across replicates] have duplicated rows, key=#CHROM_POS: rows={n_dup_rows}, keys={n_dup_keys}"
-)
-logging.warning("drop duplicated SNP rows.")
-base_snps = base_snps.loc[~dup_mask, :].reset_index(drop=True)
+if n_dup_rows > 0:
+    n_dup_keys = int(base_snps.loc[dup_mask, "KEY"].drop_duplicates().shape[0])
+    logging.warning(
+        f"[{data_type} across replicates] have duplicated rows, key=#CHROM_POS: rows={n_dup_rows}, keys={n_dup_keys}"
+    )
+    logging.warning("drop duplicated SNP rows.")
+    base_snps = base_snps.loc[~dup_mask, :]
+base_snps = base_snps.reset_index(drop=True)
 nsnps_before_genotyping = len(base_snps)
 
 base_snps = base_snps.sort_values(["#CHROM", "POS"], kind="mergesort")

@@ -37,7 +37,7 @@ def canon_mat_one_replicate(
     assert tot_mtx.shape == ad_mtx.shape
     assert tot_mtx.shape == (m, ncells)
 
-    dup_mask = child_snps["KEY"].duplicated(keep=False).to_numpy()  # True for all duplicates
+    dup_mask = child_snps["KEY"].duplicated(keep=False).to_numpy()
     n_dup_rows = int(dup_mask.sum())
     if n_dup_rows > 0:
         n_dup_keys = int(child_snps.loc[dup_mask, "KEY"].nunique())
