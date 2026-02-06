@@ -53,13 +53,43 @@ if workflow_mode == "bulk":
 
 ##################################################
 if workflow_mode == "single_cell":
+    rule genotype_snps_pseudobulk:
+        input:
+            bams=gex_tbams+atac_tbams,
+            snp_panel=config["snp_panel"],
+        output:
+            snp_file="pileup/pseudobulk/cellSNP.base.vcf.gz",
+        log:
+            "logs/genotype_snps.pseudobulk.log"
+        threads:
+            config["threads"]["genotype"]
+        params:
+            cellsnp_lite=config["cellsnp_lite"],
+            out_dir=lambda wc: f"pileup/pseudobulk",
+            minMAF=0,
+            minCOUNT=1,
+        shell:
+            r"""
+            printf "%s\n" {input.bams} > {params.out_dir}/bams.lst
+            {params.cellsnp_lite} \
+                -S {params.out_dir}/bams.lst \
+                -O "{params.out_dir}" \
+                -R "{input.snp_panel}" \
+                -p {threads} \
+                --minMAF {params.minMAF} \
+                --minCOUNT {params.minCOUNT} \
+                --UMItag None \
+                --cellTAG None \
+                --gzip > {log} 2>&1
+            rm {params.out_dir}/bams.lst
+            """
 
     rule genotype_snps_single_cell:
         input:
             barcode=lambda wc: get_data[(wc.data_type, wc.rep_id)][0],
             bam=lambda wc: get_data[(wc.data_type, wc.rep_id)][1],
             ranger=lambda wc: get_data[(wc.data_type, wc.rep_id)][2],
-            snp_file=config["snp_panel"],
+            snp_file="pileup/pseudobulk/cellSNP.base.vcf.gz",
         output:
             cellsnp_file="pileup/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
             sample_file="pileup/{data_type}_{rep_id}/cellSNP.samples.tsv",
