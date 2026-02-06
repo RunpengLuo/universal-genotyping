@@ -316,7 +316,6 @@ def plot_1d_sample(
     """
     plot any features like AF, RDR, etc., in 1d chromosome scatter plot.
     """
-    assert val_type in ["AF", "BAF", "RDR", "log2RDR"], f"unknown value type={val_type}"
     logging.info(f"chromosome wide {unit}-level {val_type} plot, out_file={out_file}")
     chrom_sizes = get_chr_sizes(genome_size)
 
