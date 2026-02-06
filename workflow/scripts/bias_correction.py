@@ -29,7 +29,6 @@ def compute_gc_content(
             }
         )[["#CHR", "START", "END", "GC"]]
     )
-    gc_df["GC"] /= 100  # convert to %GC
     if mapp_file:
         logging.info("compute mappability")
         map_bt = BedTool(mapp_file)
@@ -49,31 +48,80 @@ def compute_gc_content(
 
 
 def bias_correction_rdr(
-    raw_rdr_mat: np.ndarray, gc_df: pd.DataFrame, rep_ids: list, out_dir=None
+    raw_rdr_mat: np.ndarray, 
+    gc_df: pd.DataFrame, 
+    rep_ids: list,
+    has_mapp=False,
+    out_dir=None,
+    eps_quantile=0.01,
+    gc_quantile=[0.01, 0.99]
 ):
     logging.info("correct for GC biases on RDR")
     gc = gc_df["GC"].to_numpy()
     mapv = gc_df["MAP"].to_numpy()
+
+    gc_lo, gc_hi = np.nanquantile(gc, gc_quantile)
+    logging.info(f"GC-content range for fitting: [{gc_lo}, {gc_hi}]")
+    fit_mask = (gc >= gc_lo) & (gc <= gc_hi)
+
     gccorr_rdr_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
     for si, rep_id in enumerate(rep_ids):
-        gc_df = pd.DataFrame({"RD": raw_rdr_mat[:, si], "GC": gc, "MAP": mapv})
-        if np.any(gc_df["MAP"] != 1):
-            # mappability
-            mod = smf.quantreg("RD ~ GC + I(GC**2) + MAP + I(MAP**2)", data=gc_df).fit(
+        raw_rdrs = raw_rdr_mat[:, si]
+        gc_df = pd.DataFrame({"RD": raw_rdrs[fit_mask], "GC": gc[fit_mask]})
+        if has_mapp:
+            gc_df["MAP"] = mapv[fit_mask]
+            res = smf.quantreg("RD ~ GC + I(GC**2) + MAP + I(MAP**2)", data=gc_df).fit(
                 q=0.5
             )
-            gc_df["CORR_FIT"] = mod.predict(gc_df[["GC", "MAP"]])
-            corr_rdrs = gc_df["RD"] / gc_df["CORR_FIT"].where(
-                (gc_df["CORR_FIT"] > 0) & ~pd.isnull(gc_df["CORR_FIT"]), 1
-            )
+            logging.info(res.summary())
+            exp_rdrs = res.predict(pd.DataFrame({"GC": gc, "MAP": mapv}))
         else:
-            mod = smf.quantreg("RD ~ GC + I(GC**2)", data=gc_df).fit(q=0.5)
-            gc_df["CORR_FIT"] = mod.predict(gc_df[["GC"]])
-            corr_rdrs = gc_df["RD"] / gc_df["CORR_FIT"].where(
-                (gc_df["CORR_FIT"] > 0) & ~pd.isnull(gc_df["CORR_FIT"]), 1
-            )
+            res = smf.quantreg("RD ~ GC + I(GC**2)", data=gc_df).fit(q=0.5)
+            logging.info(res.summary())
+            exp_rdrs = res.predict(pd.DataFrame({"GC": gc})).to_numpy()
+        eps = np.nanquantile(exp_rdrs, eps_quantile)
+        logging.info(f"inferred epsilon for exp RDR={eps}")
+        den = exp_rdrs.copy()
+        den[~np.isfinite(den)] = np.nan
+        den = np.where(np.isfinite(den), den, eps)
+        den = np.clip(den, eps, None)
+        corr_rdrs = raw_rdrs / den
+
+
+        # plot fitted line
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        x = np.linspace(gc.min(), gc.max(), 300)
+        plt.scatter(gc, raw_rdrs, s=2, alpha=0.2)
+        plt.plot(x, res.predict({"GC": x}), linewidth=2, color="red")
+        plt.xlabel("GC") 
+        plt.ylabel("RDR")
+        plt.tight_layout()
+        plt.savefig(os.path.join(out_dir, f"{rep_id}.gc_corr_scatter.png"), dpi=300)
+        plt.close(fig)
+
         corr_factor = np.mean(corr_rdrs)
         logging.info(f"GC correction factor={corr_factor}")
+
+        # raw RDRs
+        logging.info("hist: raw RDR")
+        counts, edges = np.histogram(raw_rdrs)
+        logging.info("bin_left\tbin_right\tcount")
+        for l, r, c in zip(edges[:-1], edges[1:], counts):
+            logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
+
+        # expected RDRs
+        logging.info("hist: expected RDR corr_fit")
+        counts, edges = np.histogram(exp_rdrs)
+        logging.info("bin_left\tbin_right\tcount")
+        for l, r, c in zip(edges[:-1], edges[1:], counts):
+            logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
+        
+        logging.info("hist: corr_rdrs")
+        counts, edges = np.histogram(corr_rdrs)
+        logging.info("bin_left\tbin_right\tcount")
+        for l, r, c in zip(edges[:-1], edges[1:], counts):
+            logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
+
         gccorr_rdr_mat[:, si] = corr_rdrs / corr_factor
         plot_gc_bias(
             gc,
