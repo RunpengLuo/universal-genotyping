@@ -7,9 +7,9 @@ if config["phaser"] == "shapeit":
             phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
             gmap_file=lambda wc: get_gmap_file(wc.chrname),
         output:
-            phased_file=config["phase_dir"] + "chr{chrname}.vcf.gz",
-            bcf_file=temp(config["phase_dir"] + "chr{chrname}.bcf"),
-            bcf_file_csi=temp(config["phase_dir"] + "chr{chrname}.bcf.csi"),
+            phased_file=config["phase_dir"] + "/chr{chrname}.vcf.gz",
+            bcf_file=temp(config["phase_dir"] + "/chr{chrname}.bcf"),
+            bcf_file_csi=temp(config["phase_dir"] + "/chr{chrname}.bcf.csi"),
         threads: config["threads"]["phase"]
         params:
             chrom="chr{chrname}",
@@ -41,7 +41,7 @@ if config["phaser"] == "eagle":
             phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
             gmap_file=lambda wc: get_gmap_file(wc.chrname),
         output:
-            phased_file=config["phase_dir"] + "chr{chrname}.vcf.gz",
+            phased_file=config["phase_dir"] + "/chr{chrname}.vcf.gz",
         threads: config["threads"]["phase"]
         params:
             chrom="chr{chrname}",
@@ -57,7 +57,7 @@ if config["phaser"] == "eagle":
                 --vcfRef "{input.phasing_panel_file}" \
                 --vcfOutFormat z \
                 --numThreads "{threads}" \
-                --outPrefix config["phase_dir"] + "{params.chrom}" > {log} 2>&1
+                --outPrefix config["phase_dir"] + "/{params.chrom}" > {log} 2>&1
             tabix -f -p vcf "{output.phased_file}"
             """
 
@@ -73,7 +73,7 @@ if config["phaser"] == "longphase":
             ),
             ref_fa=lambda wc: config["reference"],
         output:
-            phased_file=config["phase_dir"] + "chr{chrname}.vcf.gz",
+            phased_file=config["phase_dir"] + "/chr{chrname}.vcf.gz",
         params:
             chrom="chr{chrname}",
             longphase=config["longphase"],
@@ -90,7 +90,7 @@ if config["phaser"] == "longphase":
                 --reference={input.ref_fa} \
                 --snp-file={input.chrom_vcf_file} \
                 --mappingQuality={params.min_mapq} \
-                --out-prefix=config["phase_dir"] + "{params.chrom}" \
+                --out-prefix=config["phase_dir"] + "/{params.chrom}" \
                 --threads={threads} \
                 {params.extra_params} > {log} 2>&1
             tabix -f -p vcf "{output.phased_file}"
@@ -99,10 +99,10 @@ if config["phaser"] == "longphase":
 
 rule concat_and_extract_phased_het_snps:
     input:
-        vcf_files=expand(config["phase_dir"] + "chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
+        vcf_files=expand(config["phase_dir"] + "/chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
     output:
-        phased_vcf=config["phase_dir"] + "phased_snps.vcf.gz",
-        lst_file=temp(config["phase_dir"] + "phased_snps.lst"),
+        phased_vcf=config["phase_dir"] + "/phased_snps.vcf.gz",
+        lst_file=temp(config["phase_dir"] + "/phased_snps.lst"),
     threads: 1
     params:
         bcftools=config["bcftools"],
@@ -120,7 +120,7 @@ rule parse_genetic_map:
     input:
         gmap_files=lambda wc: [get_gmap_file(c) for c in config["chromosomes"]],
     output:
-        gmap_tsv=config["phase_dir"] + "genetic_map.tsv.gz",
+        gmap_tsv=config["phase_dir"] + "/genetic_map.tsv.gz",
     log:
         config["log_dir"] + "/parse_genetic_map.log",
     params:

@@ -4,38 +4,38 @@ if workflow_mode == "bulk":
     rule postprocess_bulk:
         input:
             vcfs=lambda wc: expand(
-                config["pileup_dir"] + "bulkDNA_{rep_id}/cellSNP.base.vcf.gz",
+                config["pileup_dir"] + "/bulkDNA_{rep_id}/cellSNP.base.vcf.gz",
                 rep_id=mod2reps["bulkDNA"],
             ),
             tot_mats=lambda wc: expand(
-                config["pileup_dir"] + "bulkDNA_{rep_id}/cellSNP.tag.DP.mtx",
+                config["pileup_dir"] + "/bulkDNA_{rep_id}/cellSNP.tag.DP.mtx",
                 rep_id=mod2reps["bulkDNA"],
             ),
             ad_mats=lambda wc: expand(
-                config["pileup_dir"] + "bulkDNA_{rep_id}/cellSNP.tag.AD.mtx",
+                config["pileup_dir"] + "/bulkDNA_{rep_id}/cellSNP.tag.AD.mtx",
                 rep_id=mod2reps["bulkDNA"],
             ),
-            snp_file=lambda wc: config["phase_dir"] + "phased_snps.vcf.gz",
+            snp_file=lambda wc: config["phase_dir"] + "/phased_snps.vcf.gz",
             genome_size=lambda wc: config["genome_size"],
             region_bed=lambda wc: config["region_bed"],
             gmap_file=lambda wc: (
-                config["phase_dir"] + "genetic_map.tsv.gz" if require_genetic_map else []
+                config["phase_dir"] + "/genetic_map.tsv.gz" if require_genetic_map else []
             ),
             block_bed=lambda wc: (
                 [] if config.get("block_bed") is None else config["block_bed"]
             ),
         output:
-            sample_file=config["allele_dir"] + "bulkDNA/sample_ids.tsv",
-            snp_file=config["allele_dir"] + "bulkDNA/snps.tsv.gz",
-            tot_mtx_snp=config["allele_dir"] + "bulkDNA/snp.Tallele.npz",
-            a_mtx_snp=config["allele_dir"] + "bulkDNA/snp.Aallele.npz",
-            b_mtx_snp=config["allele_dir"] + "bulkDNA/snp.Ballele.npz",
-            bb_file=config["allele_dir"] + "bulkDNA/bb.tsv.gz",
-            bed_file=config["allele_dir"] + "bulkDNA/bb.bed.gz",
-            tot_mtx_bb=config["allele_dir"] + "bulkDNA/bb.Tallele.npz",
-            a_mtx_bb=config["allele_dir"] + "bulkDNA/bb.Aallele.npz",
-            b_mtx_bb=config["allele_dir"] + "bulkDNA/bb.Ballele.npz",
-            qc_dir=directory(config["allele_dir"] + "bulkDNA/qc"),
+            sample_file=config["allele_dir"] + "/bulkDNA/sample_ids.tsv",
+            snp_file=config["allele_dir"] + "/bulkDNA/snps.tsv.gz",
+            tot_mtx_snp=config["allele_dir"] + "/bulkDNA/snp.Tallele.npz",
+            a_mtx_snp=config["allele_dir"] + "/bulkDNA/snp.Aallele.npz",
+            b_mtx_snp=config["allele_dir"] + "/bulkDNA/snp.Ballele.npz",
+            bb_file=config["allele_dir"] + "/bulkDNA/bb.tsv.gz",
+            bed_file=config["allele_dir"] + "/bulkDNA/bb.bed.gz",
+            tot_mtx_bb=config["allele_dir"] + "/bulkDNA/bb.Tallele.npz",
+            a_mtx_bb=config["allele_dir"] + "/bulkDNA/bb.Aallele.npz",
+            b_mtx_bb=config["allele_dir"] + "/bulkDNA/bb.Ballele.npz",
+            qc_dir=directory(config["allele_dir"] + "/bulkDNA/qc"),
         params:
             sample_name=SAMPLE_ID,
             modality="bulkDNA",
@@ -60,15 +60,15 @@ if workflow_mode == "bulk":
     rule run_mosdepth_bulk:
         input:
             bam=lambda wc: get_data[("bulkDNA", wc.rep_id)][1],
-            bed_file=config["allele_dir"] + "bulkDNA/bb.bed.gz",
+            bed_file=config["allele_dir"] + "/bulkDNA/bb.bed.gz",
         output:
-            mosdepth_file=config["allele_dir"] + "bulkDNA/out_mosdepth/{rep_id}.regions.bed.gz",
+            mosdepth_file=config["allele_dir"] + "/bulkDNA/out_mosdepth/{rep_id}.regions.bed.gz",
         threads: config["threads"]["mosdepth"]
         params:
             mosdepth=config["mosdepth"],
             sample_name=SAMPLE_ID,
             modality="bulkDNA",
-            out_prefix=config["allele_dir"] + "bulkDNA/out_mosdepth/{rep_id}",
+            out_prefix=config["allele_dir"] + "/bulkDNA/out_mosdepth/{rep_id}",
             read_quality=config["params_mosdepth"]["read_quality"],
             extra_params=config["params_mosdepth"].get("extra_params", ""),
         log:
@@ -86,10 +86,10 @@ if workflow_mode == "bulk":
 
     rule compute_rdr_bulk:
         input:
-            sample_file=config["allele_dir"] + "bulkDNA/sample_ids.tsv",
-            bb_file=config["allele_dir"] + "bulkDNA/bb.tsv.gz",
+            sample_file=config["allele_dir"] + "/bulkDNA/sample_ids.tsv",
+            bb_file=config["allele_dir"] + "/bulkDNA/bb.tsv.gz",
             mosdepth_files=expand(
-                config["allele_dir"] + "bulkDNA/out_mosdepth/{rep_id}.regions.bed.gz",
+                config["allele_dir"] + "/bulkDNA/out_mosdepth/{rep_id}.regions.bed.gz",
                 rep_id=mod2reps.get("bulkDNA", []),
             ),
             reference=config["reference"],
@@ -100,12 +100,12 @@ if workflow_mode == "bulk":
                 otherwise=config["mappability_file"],
             ),
         output:
-            dp_mtx_bb=config["allele_dir"] + "bulkDNA/bb.depth.npz",
-            rdr_mtx_bb=config["allele_dir"] + "bulkDNA/bb.rdr.npz",
+            dp_mtx_bb=config["allele_dir"] + "/bulkDNA/bb.depth.npz",
+            rdr_mtx_bb=config["allele_dir"] + "/bulkDNA/bb.rdr.npz",
         params:
             sample_name=SAMPLE_ID,
-            qc_dir=config["allele_dir"] + "bulkDNA/qc",
-            mosdepth_dir=config["allele_dir"] + "bulkDNA/out_mosdepth",
+            qc_dir=config["allele_dir"] + "/bulkDNA/qc",
+            mosdepth_dir=config["allele_dir"] + "/bulkDNA/out_mosdepth",
             gc_correct=config["params_compute_rdr"]["gc_correct"],
         log:
             config["log_dir"] + "/compute_rdrs.bulkDNA.log",
