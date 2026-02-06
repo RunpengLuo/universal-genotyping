@@ -83,9 +83,10 @@ for idx, rep_id in enumerate(rep_ids):
     n_dup_keys = raw_snps.loc[
         raw_snps.duplicated(subset="KEY", keep=False), "KEY"
     ].nunique()
-    logging.info(
-        f"[{data_type} {rep_id}] duplicated rows, key=#CHROM_POS: rows={n_dup_rows}, keys={n_dup_keys}"
+    logging.warning(
+        f"[{data_type} {rep_id}] have duplicated rows, key=#CHROM_POS: rows={n_dup_rows}, keys={n_dup_keys}"
     )
+    logging.warning("drop duplicated SNP rows.")
     raw_snps = raw_snps.drop_duplicates(subset="KEY", keep="first").reset_index(
         drop=True
     )
@@ -102,9 +103,10 @@ base_snps = pd.concat(
 dup_mask = base_snps.duplicated(subset="KEY", keep=False)
 n_dup_rows = int(dup_mask.sum())
 n_dup_keys = int(base_snps.loc[dup_mask, "KEY"].drop_duplicates().shape[0])
-logging.info(
-    f"[{data_type}] duplicated rows, key=#CHROM_POS: rows={n_dup_rows}, keys={n_dup_keys}"
+logging.warning(
+    f"[{data_type} across replicates] have duplicated rows, key=#CHROM_POS: rows={n_dup_rows}, keys={n_dup_keys}"
 )
+logging.warning("drop duplicated SNP rows.")
 base_snps = base_snps.loc[~dup_mask, :].reset_index(drop=True)
 nsnps_before_genotyping = len(base_snps)
 

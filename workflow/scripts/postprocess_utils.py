@@ -31,8 +31,23 @@ def canon_mat_one_replicate(
     M = len(parent_keys)
     child_snps = read_VCF(vcf_file, addkey=True)
     m = len(child_snps)
+
+    tot_mtx: csr_matrix = mmread(tot_mat_file).tocsr()
+    ad_mtx: csr_matrix = mmread(ad_mat_file).tocsr()
+    assert tot_mtx.shape == ad_mtx.shape
+    assert tot_mtx.shape == (m, ncells)
+
+    dup_mask = child_snps["KEY"].duplicated(keep=False).to_numpy()  # True for all duplicates
+    n_dup_rows = int(dup_mask.sum())
+    if n_dup_rows > 0:
+        n_dup_keys = int(child_snps.loc[dup_mask, "KEY"].nunique())
+        logging.warning(f"#found duplicated SNP #CHR/POS, #rows={n_dup_rows}/{m} #SNPs={n_dup_keys}, drop all")
+        child_snps = child_snps.loc[~dup_mask].reset_index(drop=True)
+        tot_mtx = tot_mtx[~dup_mask, :]
+        ad_mtx = ad_mtx[~dup_mask, :]
+
+    m = len(child_snps)
     child_keys = pd.Index(child_snps["KEY"])
-    assert not child_keys.duplicated().any()
 
     # for each parent SNP, find its index in child SNP, -1 if not presented.
     # e.g., [0, -1, 1, 2, -1], M=5, m=3
@@ -40,12 +55,6 @@ def canon_mat_one_replicate(
     # e.g., [1, 0, 1, 1, 0]
     present = child_loc >= 0
     logging.info(f"located SNPs in parent={present.sum()}/{M}")
-
-    tot_mtx: csr_matrix = mmread(tot_mat_file).tocsr()
-    ad_mtx: csr_matrix = mmread(ad_mat_file).tocsr()
-
-    assert tot_mtx.shape == ad_mtx.shape
-    assert tot_mtx.shape == (m, ncells)
 
     # parent-row indices that exist in child slice
     # e.g., [0, 2, 3], located SNP index in parent [0, M).
