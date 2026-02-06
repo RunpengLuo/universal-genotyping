@@ -61,7 +61,7 @@ if not filter_hom_ALT:
 ##################################################
 data_types = list(sm.params["data_types"])
 rep_ids = list(sm.params["rep_ids"])
-raw_snp_files = list(sm.params["raw_snp_files"])
+raw_snp_files = list(sm.input["raw_snp_files"])
 assert len(data_types) == 1, "multimodal genotyping unsupported yet"
 data_type = data_types[0]
 
