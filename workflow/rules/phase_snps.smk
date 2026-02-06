@@ -69,7 +69,7 @@ if config["phaser"] == "longphase":
         input:
             chrom_vcf_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
             bam_file=lambda wc: branch(
-                has_normal, then=bulk_nbams[0], otherwise=bulk_tbams[0]
+                has_normal, then=normal_bams[0], otherwise=tumor_bams[0]
             ),
             ref_fa=lambda wc: config["reference"],
         output:

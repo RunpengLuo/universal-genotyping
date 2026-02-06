@@ -37,7 +37,7 @@ snp_file = sm.input["snp_file"]
 
 region_bed = sm.input["region_bed"]
 genome_size = sm.input["genome_size"]
-block_bed = maybe_path(sm.input["block_bed"])
+gtf_file = maybe_path(sm.input["gtf_file"])
 
 sample_name = sm.params["sample_name"]
 modality = sm.params["modality"]
@@ -137,9 +137,9 @@ snp_mask = snp_mask & get_mask_by_region(snps, regions)
 
 # TODO how to handle gene blocks? check numbat-multiome, calicoST has 0 doc about this.
 # blocks = None
-# if block_bed is not None:
+# if gtf_file is not None:
 #     blocks = read_region_file(
-#         block_bed, addchr=str(snps["#CHR"].iloc[0]).startswith("chr")
+#         gtf_file, addchr=str(snps["#CHR"].iloc[0]).startswith("chr")
 #     )
 #     snps = annotate_snps_to_regions(blocks, snps, seg_id="BLOCK_ID")
 #     snp_mask = snp_mask & snps["BLOCK_ID"].notna().to_numpy()
@@ -245,9 +245,9 @@ if has_cn_profile:
     segs_df.to_csv(sm.params["cnp_file"], header=True, sep="\t", index=False)
 else:
     ##################################################
-    # TODO, for multiome data, block_bed file to decide common blocks for gene/peak?
+    # TODO, for multiome data, gtf_file file to decide common blocks for gene/peak?
     assert modality != "multiome", "adaptive binning for multiome data TODO"
-    # TODO assign intervals by block_bed? e.g., evenly divides gencode ranges.
+    # TODO assign intervals by gtf_file? e.g., evenly divides gencode ranges.
     snps = assign_snp_bounderies(snps, regions, colname="region_id")
 
     a_mtx, b_mtx, tot_mtx = a_mtxs[0], b_mtxs[0], tot_mtxs[0]

@@ -33,8 +33,8 @@ if workflow_mode == "single_cell":
             gmap_file=lambda wc: (
                 config["phase_dir"] + "/genetic_map.tsv.gz" if require_genetic_map else []
             ),
-            block_bed=lambda wc: branch(
-                config.get("block_bed") is None, then=[], otherwise=config["block_bed"]
+            gtf_file=lambda wc: branch(
+                config.get("gtf_file") is None, then=[], otherwise=config["gtf_file"]
             ),
             seg_ucn=lambda wc: branch(
                 config.get("seg_ucn") is None, then=[], otherwise=config["seg_ucn"]
@@ -124,8 +124,8 @@ if workflow_mode == "single_cell":
             gmap_file=lambda wc: (
                 config["phase_dir"] + "/genetic_map.tsv.gz" if require_genetic_map else []
             ),
-            block_bed=lambda wc: branch(
-                config.get("block_bed") is None, then=[], otherwise=config["block_bed"]
+            gtf_file=lambda wc: branch(
+                config.get("gtf_file") is None, then=[], otherwise=config["gtf_file"]
             ),
             seg_ucn=lambda wc: branch(
                 config.get("seg_ucn") is None, then=[], otherwise=config["seg_ucn"]

@@ -21,8 +21,8 @@ if workflow_mode == "bulk":
             gmap_file=lambda wc: (
                 config["phase_dir"] + "/genetic_map.tsv.gz" if require_genetic_map else []
             ),
-            block_bed=lambda wc: (
-                [] if config.get("block_bed") is None else config["block_bed"]
+            gtf_file=lambda wc: (
+                [] if config.get("gtf_file") is None else config["gtf_file"]
             ),
         output:
             sample_file=config["allele_dir"] + "/bulkDNA/sample_ids.tsv",

@@ -35,8 +35,8 @@ reference: null
 genome_size: null
 region_bed: null
 
-# block BED file
-block_bed: null
+# gene annotation GTF file
+gtf_file: null
 
 ##################################################
 # SNP panel

@@ -32,7 +32,7 @@ snp_file = sm.input["snp_file"]
 
 region_bed = sm.input["region_bed"]
 genome_size = sm.input["genome_size"]
-block_bed = maybe_path(sm.input["block_bed"])
+gtf_file = maybe_path(sm.input["gtf_file"])
 gmap_file = sm.input["gmap_file"]
 
 sample_name = sm.params["sample_name"]
@@ -45,10 +45,7 @@ snps["POS0"] = snps["POS"] - 1
 parent_keys = pd.Index(snps["KEY"])
 assert not parent_keys.duplicated().any(), "invalid bi-allelic SNP VCF file"
 
-gt = snps["GT"].astype(str)
-is_phased_arr = snps["GT"].astype(str).str.contains(r"\|", na=False).to_numpy()
-assert is_phased_arr.all(), "some SNPs are unphased"
-snps["PHASE"] = gt.str[2].astype(np.int8).to_numpy()
+snps["PHASE"] = snps["GT"].str[2].astype(np.int8).to_numpy()
 
 # If normal sample exists, make first column be normal sample data.
 has_normal = "normal" in rep_ids
@@ -102,9 +99,9 @@ if has_normal:
 
 # TODO
 # blocks = None
-# if block_bed is not None:
+# if gtf_file is not None:
 #     blocks = read_region_file(
-#         block_bed, addchr=str(snps["#CHR"].iloc[0]).startswith("chr")
+#         gtf_file, addchr=str(snps["#CHR"].iloc[0]).startswith("chr")
 #     )
 #     snps = annotate_snps_to_regions(blocks, snps, seg_id="BLOCK_ID")
 #     snp_mask = snp_mask & snps["BLOCK_ID"].notna().to_numpy()

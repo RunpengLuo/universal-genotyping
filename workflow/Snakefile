@@ -39,10 +39,9 @@ rep_ids = sample_df["REP_ID"].unique().tolist()
 get_data = {}
 mod2reps = {}
 
-bulk_nbams = []
-bulk_tbams = []
-gex_tbams = []
-atac_tbams = []
+normal_bams = []
+tumor_bams = []
+bam_types = []
 for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
     rep_data_types = rep_df["DATA_TYPE"].unique().tolist()
     barcodes = rep_df["PATH_to_barcodes"].iloc[0]
@@ -61,8 +60,8 @@ for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
         modality = "multiome"
         gex_bam = rep_df.loc[rep_df["DATA_TYPE"] == "scRNA", "PATH_to_bam"].iloc[0]
         atac_bam = rep_df.loc[rep_df["DATA_TYPE"] == "scATAC", "PATH_to_bam"].iloc[0]
-        gex_tbams.append(gex_bam)
-        atac_tbams.append(atac_bam)
+        tumor_bams.extend([gex_bam, atac_bam])
+        bam_types.extend(["scRNA", "scATAC"])
         get_data[("scRNA", rep_id)] = [barcodes, gex_bam, rangers]
         get_data[("scATAC", rep_id)] = [barcodes, atac_bam, rangers]
     else:
@@ -75,14 +74,15 @@ for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
                 rep_id == "normal" or rep_id[0] == "T"
             ), "bulk REP_ID must be either normal or starts with T"
             if rep_id == "normal":
-                bulk_nbams.append(bam)
+                normal_bams.append(bam)
             else:
-                bulk_tbams.append(bam)
+                tumor_bams.append(bam)
         else:
+            tumor_bams.append(bam)
             if data_type in ["scRNA", "VISIUM", "VISIUM3prime"]:
-                gex_tbams.append(bam)
+                bam_types.append("scRNA")
             else:
-                atac_tbams.append(bam)
+                bam_types.append("scATAC")
     if modality not in mod2reps:
         mod2reps[modality] = []
     mod2reps[modality].append(rep_id)
@@ -94,19 +94,9 @@ run_genotype_snps = ref_snp_file is None
 
 ##################################################
 # parse genotype_snps and phase_snps inputs.
-genotype_dtypes = []
-has_normal = False
+has_normal = len(normal_bams) > 0
 phaser = config.get("phaser", "undefined")
 if run_genotype_snps:
-    if workflow_mode == "bulk":
-        genotype_dtypes = ["bulkDNA"]
-        has_normal = len(bulk_nbams) > 0
-    else:
-        if len(gex_tbams) > 0:
-            genotype_dtypes.append("scRNA")
-        if len(atac_tbams) > 0:
-            genotype_dtypes.append("scATAC")
-
     ##################################################
     # parse phase_snps inputs
     if phaser == "eagle":

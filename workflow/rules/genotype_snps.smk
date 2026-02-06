@@ -9,7 +9,7 @@ if workflow_mode == "bulk":
         """
         input:
             bams=lambda wc: branch(
-                has_normal, then=bulk_nbams[0], otherwise=bulk_tbams[0]
+                has_normal, then=normal_bams[0], otherwise=tumor_bams[0]
             ),
             snp_panel=config["snp_panel"],
             reference=config["reference"],
@@ -55,7 +55,7 @@ if workflow_mode == "bulk":
 if workflow_mode == "single_cell":
     rule genotype_snps_pseudobulk:
         input:
-            bams=gex_tbams+atac_tbams,
+            bams=tumor_bams,
             snp_panel=config["snp_panel"],
         output:
             snp_file=config["pileup_dir"] + "/pseudobulk/cellSNP.base.vcf.gz",
