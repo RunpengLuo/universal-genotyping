@@ -37,6 +37,11 @@ def canon_mat_one_replicate(
     assert tot_mtx.shape == ad_mtx.shape
     assert tot_mtx.shape == (m, ncells)
 
+    # reorder mats to preserve same order as child_snps (sorted when read_VCF)
+    raw_snp_ids = child_snps["RAW_SNP_IDX"].to_numpy()
+    tot_mtx = tot_mtx[raw_snp_ids, :]
+    ad_mtx = ad_mtx[raw_snp_ids, :]
+
     dup_mask = child_snps["KEY"].duplicated(keep=False).to_numpy()
     n_dup_rows = int(dup_mask.sum())
     if n_dup_rows > 0:

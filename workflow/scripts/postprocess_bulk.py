@@ -170,6 +170,8 @@ else:
     logging.info(f"fix intra-PS switchprobs={switchprob_ps}")
     switchprobs = estimate_switchprobs_PS(snps, switchprob_ps)
     snps["switchprobs"] = switchprobs
+num_phaseset = snps["PS"].nunique()
+logging.info(f"#phaseset={num_phaseset}")
 grp_cols.append("PS")
 
 binom_test = bool(sm.params["binom_test"])

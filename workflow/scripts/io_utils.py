@@ -75,7 +75,7 @@ def read_VCF(vcf_file: str, addchr=True, addkey=False):
         snps = snps.iloc[:, :10].copy()
     snps.columns = colnames
     snps["POS"] = snps["POS"].astype(np.int64)
-
+    snps["RAW_SNP_IDX"] = np.arange(len(snps))
     if addchr and not str(snps["#CHROM"].iloc[0]).startswith("chr"):
         snps["#CHROM"] = "chr" + snps["#CHROM"].astype(str)
 
