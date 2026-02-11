@@ -3,8 +3,8 @@ rule pileup_snps_bulk_mode1b:
         bam=lambda wc: get_data[(wc.assay_type, wc.rep_id)][1],
         snp_file=lambda wc: branch(
             run_genotype_snps,
-            then=config["phase_dir"] + "/phased_snps.vcf.gz",
-            otherwise=config["het_snp_file"],
+            then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
+            otherwise=config["het_snp_vcf"],
         ),
     output:
         out_dir=directory(config["pileup_dir"] + "/{assay_type}_{rep_id}"),
@@ -38,8 +38,8 @@ rule pileup_snps_single_cell_mode1a:
         bam=lambda wc: get_data[(wc.assay_type, wc.rep_id)][1],
         snp_file=lambda wc: branch(
             run_genotype_snps,
-            then=config["phase_dir"] + "/phased_snps.vcf.gz",
-            otherwise=config["het_snp_file"],
+            then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
+            otherwise=config["het_snp_vcf"],
         ),
     output:
         out_dir=directory(config["pileup_dir"] + "/{assay_type}_{rep_id}"),

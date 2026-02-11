@@ -25,8 +25,8 @@ if workflow_mode == "bulk_genotyping":
             ),
             snp_file=lambda wc: branch(
                 run_genotype_snps,
-                then=config["phase_dir"] + "/phased_snps.vcf.gz",
-                otherwise=config["het_snp_file"],
+                then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
+                otherwise=config["het_snp_vcf"],
             ),
             region_bed=lambda wc: config["region_bed"],
             genome_size=lambda wc: config["genome_size"],
@@ -206,8 +206,8 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             ),
             snp_file=lambda wc: branch(
                 run_genotype_snps,
-                then=config["phase_dir"] + "/phased_snps.vcf.gz",
-                otherwise=config["het_snp_file"],
+                then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
+                otherwise=config["het_snp_vcf"],
             ),
             h5ad_file=lambda wc: config["allele_dir"]
             + "/{assay_type}/{assay_type}.h5ad",
@@ -282,37 +282,35 @@ rule adaptive_binning:
         """../scripts/adaptive_binning.py"""
 
 
-if workflow_mode == "copytyping_preprocess":
-
-    rule cnv_segmentation:
-        input:
-            snp_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snps.tsv.gz",
-            tot_mtx_snp=lambda wc: config["allele_dir"]
-            + f"/{wc.assay_type}/snp.Tallele.npz",
-            a_mtx_snp=lambda wc: config["allele_dir"]
-            + f"/{wc.assay_type}/snp.Aallele.npz",
-            b_mtx_snp=lambda wc: config["allele_dir"]
-            + f"/{wc.assay_type}/snp.Ballele.npz",
-            sample_file=lambda wc: config["allele_dir"]
-            + f"/{wc.assay_type}/sample_ids.tsv",
-            all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
-            h5ad_file=config["allele_dir"] + "/{assay_type}/{assay_type}.h5ad",
-            seg_ucn=lambda wc: config["seg_ucn"],
-            bbc_ucn=lambda wc: config["bbc_ucn"],
-            bbc_phases=lambda wc: config["bbc_phases"],
-        output:
-            cnv_segments=config["allele_dir"] + "/{assay_type}/cnv_segments.tsv",
-            x_count=config["allele_dir"] + "/{assay_type}/X_count.npz",
-            y_count=config["allele_dir"] + "/{assay_type}/Y_count.npz",
-            d_count=config["allele_dir"] + "/{assay_type}/D_count.npz",
-        wildcard_constraints:
-            assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
-        params:
-            sample_name=SAMPLE_ID,
-            assay_type=lambda wc: wc.assay_type,
-            feature_type=lambda wc: assay_type2feature_type[wc.assay_type],
-        threads: 1
-        log:
-            config["log_dir"] + "/cnv_segmentation.{assay_type}.log",
-        script:
-            """../scripts/cnv_segmentation.py"""
+rule cnv_segmentation:
+    input:
+        snp_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snps.tsv.gz",
+        tot_mtx_snp=lambda wc: config["allele_dir"]
+        + f"/{wc.assay_type}/snp.Tallele.npz",
+        a_mtx_snp=lambda wc: config["allele_dir"]
+        + f"/{wc.assay_type}/snp.Aallele.npz",
+        b_mtx_snp=lambda wc: config["allele_dir"]
+        + f"/{wc.assay_type}/snp.Ballele.npz",
+        sample_file=lambda wc: config["allele_dir"]
+        + f"/{wc.assay_type}/sample_ids.tsv",
+        all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
+        h5ad_file=config["allele_dir"] + "/{assay_type}/{assay_type}.h5ad",
+        seg_ucn=lambda wc: config["seg_ucn"],
+        bbc_ucn=lambda wc: config["bbc_ucn"],
+        bbc_phases=lambda wc: config["bbc_phases"],
+    output:
+        cnv_segments=config["allele_dir"] + "/{assay_type}/cnv_segments.tsv",
+        x_count=config["allele_dir"] + "/{assay_type}/X_count.npz",
+        y_count=config["allele_dir"] + "/{assay_type}/Y_count.npz",
+        d_count=config["allele_dir"] + "/{assay_type}/D_count.npz",
+    wildcard_constraints:
+        assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
+    params:
+        sample_name=SAMPLE_ID,
+        assay_type=lambda wc: wc.assay_type,
+        feature_type=lambda wc: assay_type2feature_type[wc.assay_type],
+    threads: 1
+    log:
+        config["log_dir"] + "/cnv_segmentation.{assay_type}.log",
+    script:
+        """../scripts/cnv_segmentation.py"""

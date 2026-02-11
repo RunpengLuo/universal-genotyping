@@ -100,8 +100,8 @@ rule concat_and_extract_phased_het_snps:
             config["phase_dir"] + "/chr{chrname}.vcf.gz", chrname=config["chromosomes"]
         ),
     output:
-        phased_vcf=config["phase_dir"] + "/phased_snps.vcf.gz",
-        phased_vcf_tbi=config["phase_dir"] + "/phased_snps.vcf.gz.tbi",
+        phased_vcf=config["phase_dir"] + "/phased_het_snps.vcf.gz",
+        phased_vcf_tbi=config["phase_dir"] + "/phased_het_snps.vcf.gz.tbi",
         lst_file=temp(config["phase_dir"] + "/phased_snps.lst"),
     threads: 1
     params:

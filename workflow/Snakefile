@@ -49,10 +49,10 @@ assay_type2feature_type = {
 }
 sample_df["modality"] = sample_df["assay_type"].map(assay_type2modality)
 
-has_het_snps = config.get("het_snp_file") is not None
+has_het_snps = config.get("het_snp_vcf") is not None
 has_cn_profile = config.get("seg_ucn") is not None
 if has_cn_profile:
-    assert has_het_snps, "CN profile is provided, but missing <het_snp_file>"
+    assert has_het_snps, "CN profile is provided, but missing <het_snp_vcf>"
     run_genotype_snps = False
     workflow_mode = "copytyping_preprocess"
 else:

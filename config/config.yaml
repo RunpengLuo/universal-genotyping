@@ -23,7 +23,10 @@ sample_file: /path/to/sample.tsv
 chromosomes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
 
 # skip genotyping & phasing when provided.
-het_snp_file: null
+# /path/to/phase/phased_het_snps.vcf.gz
+het_snps_vcf: null
+# /path/to/allele/*/snps.tsv.gz
+het_snp_info: null
 # HATCHet CNV profiles and block phased haplotypes.
 seg_ucn: null
 bbc_ucn: null
