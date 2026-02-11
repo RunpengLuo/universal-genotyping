@@ -130,6 +130,7 @@ phaser = config.get("phaser", "undefined")
 # population-based phasing required to estimate switchprobs
 require_genetic_map = run_genotype_snps and phaser not in ["longphase"]
 if run_genotype_snps:
+    # locate genetic map files, different phaser option
     if phaser == "eagle":
         assert config.get("eagle_dir") is not None
         gmap_dir = os.path.join(config["eagle_dir"], "tables")
@@ -152,7 +153,6 @@ if run_genotype_snps:
             os.path.exists(get_genetic_map(chrname))
             for chrname in config["chromosomes"]
         ), "failed to locate gmap files"
-        phasing_panel_version = config["phasing_panel_version"]
         phasing_panel = config["phasing_panel"]
         assert os.path.isdir(phasing_panel), "failed to locate phasing panel"
         get_phasing_panel = lambda chrname: os.path.join(

@@ -17,12 +17,10 @@ if workflow_mode == "bulk_genotyping":
             bams=lambda wc: branch(
                 len(normal_bams) > 0, then=normal_bams[0], otherwise=tumor_bams[0]
             ),
-            snp_panel=config["snp_panel"],
+            target_pos=lambda wc: config["snp_targets"] + "/target.chr{chrname}.pos.gz",
             reference=config["reference"],
         output:
             snp_file=config["snp_dir"] + "/chr{chrname}.vcf.gz",
-            tmp_pos=temp("tmp/target.{chrname}.pos.gz"),
-            tmp_pos_tbi=temp("tmp/target.{chrname}.pos.gz.tbi"),
         log:
             config["log_dir"] + "/genotype_snps_bulk/chr{chrname}.log",
         threads: config["threads"]["genotype"]
@@ -35,10 +33,6 @@ if workflow_mode == "bulk_genotyping":
             max_depth=config["params_bcftools"]["max_depth"],
         shell:
             r"""
-            {params.bcftools} query -f '%CHROM\t%POS\n' -r {params.chrom} \
-                {input.snp_panel} | bgzip -c > {output.tmp_pos}
-            tabix -s1 -b2 -e2 {output.tmp_pos}
-
             {params.bcftools} mpileup {input.bams} \
                 -f "{input.reference}" \
                 -Ou \
@@ -47,7 +41,7 @@ if workflow_mode == "bulk_genotyping":
                 -q {params.min_mapq} \
                 -Q {params.min_baseq} \
                 -d {params.max_depth} \
-                -T {output.tmp_pos} \
+                -T {input.target_pos} \
             | {params.bcftools} call -m -Ou \
             | {params.bcftools} view -v snps -m2 -M2 \
                 -i 'GT="alt" && FMT/DP>={params.min_dp}' \

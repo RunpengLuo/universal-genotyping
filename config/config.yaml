@@ -40,17 +40,20 @@ region_bed: null
 gtf_file: null
 
 ##################################################
-# SNP panel
-snp_panel_version: 1000GP
+# Population Panel
+# e.g., 1000GP_hg38
+snp_panel_version: null
+# /path/to/snps.vcf.gz
 snp_panel: null
+# <snp_targets>/target.chr<*>.pos.gz
+snp_targets: null
 
-##################################################
-# Phase panel, used by population-based phasing methods.
-phasing_panel_version: 1000G_hg38
+phasing_panel_version: null
+# <phasing_panel>/chr<*>.genotypes.bcf
 phasing_panel: null
 
 ##################################################
-# genotype_snps
+# genotype and pileup
 params_cellsnp_lite:
   UMItag: "Auto"
   cellTAG: "CB"
@@ -66,7 +69,7 @@ params_bcftools:
   max_depth: 300
 
 ##################################################
-# mode 2.
+# annotate SNP genotypes, single_cell_genotyping
 params_annotate_snps:
   # set <min_het_reads> to 0 to replicate numbat criteria.
   min_het_reads: 2
@@ -119,7 +122,7 @@ params_postprocess:
   ## when min(|AF_2 - 0.5|, |AF_1 - 0.5|) > binom_margin and
   ## sign(AF_1 - 0.5) != sign(AF_2 - 0.5)
   ## perform adjacent SNP 2-AF binomial test and split SNPs.
-  binom_test: true
+  binom_test: false
   binom_alpha: 5e-3
   binom_margin: 0.05
 
