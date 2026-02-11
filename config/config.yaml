@@ -90,9 +90,12 @@ params_longphase:
 gene_blacklist_file: null
 
 params_postprocess:
-  # Gene filtering parameters
+  # process_rna_adata parameters
   gene_id_colname: gene_ids
   min_frac_barcodes: 5e-3
+
+  # process_atac_fragments parameters
+  tile_width: 200000
 
   # SNP filtering paramters
   ## filter SNP if any sample failed, (mode 1)
