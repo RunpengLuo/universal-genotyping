@@ -22,24 +22,30 @@ for chr in $(seq 1 22) X; do
     curl -fL -C - -o "${OUT}/raw/${vcfgz_tbi}" "${BASE}/${vcfgz_tbi}"
   fi
 
-  date
-  echo "extract SNP sites"
-  bcftools view -v snps -G -Oz -o "${OUT}/snps/chr${chr}.vcf.gz" "${OUT}/raw/${vcfgz}"
-  tabix -p vcf "${OUT}/snps/chr${chr}.vcf.gz"
+  if [ ! -f "${OUT}/snps/chr${chr}.vcf.gz" ]; then
+    date
+    echo "extract SNP sites"
+    bcftools view -v snps -G -Oz -o "${OUT}/snps/chr${chr}.vcf.gz" "${OUT}/raw/${vcfgz}"
+    tabix -p vcf "${OUT}/snps/chr${chr}.vcf.gz"
+  fi
   echo "${OUT}/snps/chr${chr}.vcf.gz" >> "${OUT}/snp_files.lst"
 
-  date
-  echo "extract SNP target positions"
-  # add -m2 -M2 to filter multi-allelic positions.
-  bcftools query -f '%CHROM\t%POS\n' \
-    "${OUT}/snps/chr${chr}.vcf.gz" | bgzip -c > "${OUT}/target_positions/target.chr${chr}.pos.gz"
-  tabix -s1 -b2 -e2 "${OUT}/target_positions/target.chr${chr}.pos.gz"
+  if [ ! -f "${OUT}/target_positions/target.chr${chr}.pos.gz" ]; then
+    date
+    echo "extract SNP target positions"
+    # add -m2 -M2 to filter multi-allelic positions.
+    bcftools query -f '%CHROM\t%POS\n' \
+      "${OUT}/snps/chr${chr}.vcf.gz" | bgzip -c > "${OUT}/target_positions/target.chr${chr}.pos.gz"
+    tabix -s1 -b2 -e2 "${OUT}/target_positions/target.chr${chr}.pos.gz"
+  fi
   
-  date
-  echo "convert to phasing panel BCF file"
-  bcftools view -Ob -o "${OUT}/phasing_panel/chr${chr}.genotypes.bcf" \
-    "${OUT}/raw/${vcfgz}"
-  bcftools index --csi "${OUT}/phasing_panel/chr${chr}.genotypes.bcf"
+  if [ ! -f "${OUT}/phasing_panel/chr${chr}.genotypes.bcf" ]; then
+    date
+    echo "convert to phasing panel BCF file"
+    bcftools view -Ob -o "${OUT}/phasing_panel/chr${chr}.genotypes.bcf" \
+      "${OUT}/raw/${vcfgz}"
+    bcftools index --csi "${OUT}/phasing_panel/chr${chr}.genotypes.bcf"
+  fi
 done
 
 bcftools concat -f "${OUT}/snp_files.lst" -Oz -o "${OUT}/snps.vcf.gz"
