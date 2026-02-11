@@ -26,10 +26,11 @@ rep_ids = sample_df["REP_ID"].unique().tolist()
 assay_types = sample_df["assay_type"].unique().tolist()
 
 nonbulk_assays = ["scATAC", "scRNA", "VISIUM", "VISIUM3prime"]
-bulk_assays = ["bulkWGS", "bulkWES"]
+bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
 allowed_assay_types = bulk_assays + nonbulk_assays
 assert all(dt in allowed_assay_types for dt in assay_types)
 assay_type2modality = {
+    "bulkDNA": "DNA",
     "bulkWGS": "DNA",
     "bulkWES": "DNA",
     "scATAC": "DNA",
@@ -38,6 +39,7 @@ assay_type2modality = {
     "VISIUM3prime": "RNA",
 }
 assay_type2feature_type = {
+    "bulkDNA": "unknown",
     "bulkWGS": "unknown",
     "bulkWES": "exon",
     "scATAC": "tile",

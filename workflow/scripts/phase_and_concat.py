@@ -41,7 +41,7 @@ sample_name = sm.params["sample_name"]
 assay_type = sm.params["assay_type"]
 rep_ids = list(sm.params["rep_ids"])
 
-bulk_assays = {"bulkWGS", "bulkWES"}
+bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
 is_bulk_assay = assay_type in bulk_assays
 
 ##################################################

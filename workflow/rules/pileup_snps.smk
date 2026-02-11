@@ -9,7 +9,7 @@ rule pileup_snps_bulk_mode1b:
     output:
         out_dir=directory(config["pileup_dir"] + "/{assay_type}_{rep_id}"),
     wildcard_constraints:
-        assay_type="(bulkWGS|bulkWES)",
+        assay_type="(bulkDNA|bulkWGS|bulkWES)",
     threads: config["threads"]["pileup"]
     params:
         cellsnp_lite=config["cellsnp_lite"],

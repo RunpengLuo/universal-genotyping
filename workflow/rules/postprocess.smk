@@ -40,7 +40,7 @@ if workflow_mode == "bulk_genotyping":
             sample_file=config["allele_dir"] + "/{assay_type}/sample_ids.tsv",
             qc_dir=directory(config["qc_dir"] + "/{assay_type}"),
         wildcard_constraints:
-            assay_type="(bulkWGS|bulkWES)",
+            assay_type="(bulkDNA|bulkWGS|bulkWES)",
         params:
             sample_name=SAMPLE_ID,
             assay_type=lambda wc: wc.assay_type,
@@ -61,7 +61,7 @@ if workflow_mode == "bulk_genotyping":
             + "/{assay_type}/out_mosdepth/{rep_id}.regions.bed.gz",
         threads: config["threads"]["mosdepth"]
         wildcard_constraints:
-            assay_type="(bulkWGS|bulkWES)",
+            assay_type="(bulkDNA|bulkWGS|bulkWES)",
         params:
             sample_name=SAMPLE_ID,
             assay_type=lambda wc: wc.assay_type,
@@ -103,7 +103,7 @@ if workflow_mode == "bulk_genotyping":
             rdr_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.rdr.npz",
             qc_dir=directory(config["qc_dir"] + "/{assay_type}"),
         wildcard_constraints:
-            assay_type="(bulkWGS|bulkWES)",
+            assay_type="(bulkDNA|bulkWGS|bulkWES)",
         params:
             sample_name=SAMPLE_ID,
             mosdepth_dir=lambda wc: config["allele_dir"]

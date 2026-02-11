@@ -53,14 +53,14 @@ phasing_panel_version: null
 phasing_panel: null
 
 ##################################################
-# genotype and pileup
+# genotype and pileup, single_cell_genotyping
 params_cellsnp_lite:
   UMItag: "Auto"
   cellTAG: "CB"
   minMAF_genotype: 0
   minCOUNT_genotype: 2
   minMAF_pileup: 0
-  minCOUNT_pileup: 0
+  minCOUNT_pileup: 1
 
 params_bcftools:
   min_mapq: 0
@@ -103,7 +103,7 @@ params_postprocess:
   # SNP filtering paramters
   ## filter SNP if any sample failed, (mode 1)
   min_depth: 1
-  ## per-SNP beta-posterior CI test on matched-normal sample, (mode 1)
+  ## per-SNP beta-posterior CI test on matched-normal sample
   gamma: 0.05
 
   # switchprobs parameters

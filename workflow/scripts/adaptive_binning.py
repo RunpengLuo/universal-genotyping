@@ -48,7 +48,7 @@ sample_name = sample_df["SAMPLE"].iloc[0]
 rep_ids = sample_df["REP_ID"].tolist()
 assay_type = sm.params["assay_type"]
 
-bulk_assays = {"bulkWGS", "bulkWES"}
+bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
 is_bulk_assay = assay_type in bulk_assays
 has_normal = "normal" in rep_ids
 tumor_sidx = {False: 0, True: 1}[has_normal]
