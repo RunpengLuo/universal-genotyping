@@ -75,7 +75,7 @@ params_annotate_snps:
   min_het_reads: 2
   min_hom_dp: 10
   min_vaf_thres: 0.1
-  filter_nz_OTH: true
+  filter_nz_OTH: false
   filter_hom_ALT: false
 
 ##################################################
