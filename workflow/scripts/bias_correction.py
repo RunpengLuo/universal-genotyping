@@ -48,13 +48,13 @@ def compute_gc_content(
 
 
 def bias_correction_rdr(
-    raw_rdr_mat: np.ndarray, 
-    gc_df: pd.DataFrame, 
+    raw_rdr_mat: np.ndarray,
+    gc_df: pd.DataFrame,
     rep_ids: list,
     has_mapp=False,
     out_dir=None,
     eps_quantile=0.01,
-    gc_quantile=[0.01, 0.99]
+    gc_quantile=[0.01, 0.99],
 ):
     logging.info("correct for GC biases on RDR")
     gc = gc_df["GC"].to_numpy()
@@ -87,13 +87,12 @@ def bias_correction_rdr(
         den = np.clip(den, eps, None)
         corr_rdrs = raw_rdrs / den
 
-
         # plot fitted line
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
         x = np.linspace(gc.min(), gc.max(), 300)
         plt.scatter(gc, raw_rdrs, s=2, alpha=0.2)
         plt.plot(x, res.predict({"GC": x}), linewidth=2, color="red")
-        plt.xlabel("GC") 
+        plt.xlabel("GC")
         plt.ylabel("RDR")
         plt.tight_layout()
         plt.savefig(os.path.join(out_dir, f"{rep_id}.gc_corr_scatter.png"), dpi=300)
@@ -115,7 +114,7 @@ def bias_correction_rdr(
         logging.info("bin_left\tbin_right\tcount")
         for l, r, c in zip(edges[:-1], edges[1:], counts):
             logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
-        
+
         logging.info("hist: corr_rdrs")
         counts, edges = np.histogram(corr_rdrs)
         logging.info("bin_left\tbin_right\tcount")

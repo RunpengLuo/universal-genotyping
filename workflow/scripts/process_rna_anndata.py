@@ -1,0 +1,170 @@
+import os, sys, gzip, logging, subprocess
+from snakemake.script import snakemake as sm
+
+t = int(getattr(sm, "threads", 1))
+os.environ["OMP_NUM_THREADS"] = str(t)
+os.environ["OPENBLAS_NUM_THREADS"] = str(t)
+os.environ["MKL_NUM_THREADS"] = str(t)
+os.environ["VECLIB_MAXIMUM_THREADS"] = str(t)
+os.environ["NUMEXPR_NUM_THREADS"] = str(t)
+
+import numpy as np
+import pandas as pd
+import pyranges as pr
+import anndata
+import scanpy as sc
+import squidpy as sq
+
+from io_utils import *
+from aggregation_utils import *
+
+##################################################
+"""
+Input:
+1. 10x cell/space-ranger RNA Anndata, multiple replicates
+2. reference GTF file with gene_id and intervals
+3. gene blacklist
+4. genome size file
+5. genome regions whitelist
+
+Output:
+single h5ad matrix covers all replicates with position and (optional) celltype columns
+"""
+setup_logging(sm.log[0])
+
+barcode_files = sm.input["barcodes"]
+ranger_dirs = sm.input["ranger_dirs"]
+assay_type = sm.params["assay_type"]
+rep_ids = sm.params["rep_ids"]
+rep2celltypes = dict(sm.params["rep2celltypes"])
+logging.info(f"prepare rna anndata, assay_type={assay_type}, rep_ids={rep_ids}")
+
+##################################################
+# concat adata over multiple replicates from same assay type
+adatas = {}
+for idx, rep_id in enumerate(rep_ids):
+    logging.info(f"process {assay_type}-{rep_id}")
+    barcodes = read_barcodes(barcode_files[idx])
+    barcodes = pd.Index(barcodes).astype(str)
+
+    ranger_dir = ranger_dirs[idx]
+    h5ad_file = os.path.join(ranger_dir, "filtered_feature_bc_matrix.h5")
+    assert os.path.exists(h5ad_file), f"missing {h5ad_file}"
+    if assay_type in ["scRNA"]:
+        adata: sc.AnnData = sc.read_10x_h5(h5ad_file, gex_only=True, make_unique=True)
+    elif assay_type in ["VISIUM", "VISIUM3prime"]:
+        assert os.path.isdir(os.path.join(ranger_dir, "spatial/")), f"missing spatial/"
+        adata: sc.AnnData = sq.read.visium(ranger_dir, load_images=True)
+        adata.var_names_make_unique()
+    else:
+        raise ValueError(f"Unknown assay_type={assay_type}")
+
+    adata.obs_names = adata.obs_names.astype(str)
+    if rep_id in rep2celltypes:
+        celltypes = read_celltypes(rep2celltypes[rep_id])
+        num_annotated_barcodes = len(set(adata.obs_names) & set(celltypes["BARCODE"]))
+        logging.info(f"#barcodes with celltype annotation: {num_annotated_barcodes}")
+        adata.obs["cell_type"] = (
+            celltypes.set_index("BARCODE")
+            .reindex(adata.obs_names)["cell_type"]
+            .fillna("Unknown")
+            .values.astype(str)
+        )
+    else:
+        adata.obs["cell_type"] = "Unknown"
+
+    # filter by barcodes (must match current adata.obs_names)
+    adata = adata[adata.obs_names.isin(barcodes), :].copy()
+    # add replicate suffix to barcode
+    adata.obs_names = adata.obs_names.astype(str) + f"_{rep_id}"
+    adatas[rep_id] = adata
+    logging.info(f"#barcodes={adata.n_obs}, #features={adata.n_vars}")
+
+if len(adatas) > 1:
+    adata = anndata.concat(
+        adatas,
+        join="outer",  # union of var (genes)
+        label="REP_ID",
+        merge="same",
+        fill_value=0,
+    )
+else:
+    adata = adatas[rep_ids[0]]
+adata.X = adata.X.tocsr()
+logging.info(f"#concat barcodes={adata.n_obs}, #union features={adata.n_vars}")
+
+##################################################
+# annotate gene interval in BED format by reference GTF file
+# filter genes not found in reference GTF file
+# invalid case: user should use same GTF file for space-ranger and genotyping.
+gene_id_colname = str(sm.params["gene_id_colname"])
+genes = read_genes_gtf_file(sm.input["gtf_file"], id_col=gene_id_colname)
+logging.info(f"loaded #{len(genes)} unique genes from GTF.")
+
+var_coords = adata.var.merge(
+    genes, how="left", on=gene_id_colname, validate="m:1", sort=False
+)
+var_coords.index = adata.var.index
+
+na_genes = var_coords["START"].isna().to_numpy()
+logging.warning(
+    f"#genes not found in reference GTF file={na_genes.sum()}/{len(var_coords)}"
+)
+
+adata = adata[:, ~na_genes].copy()
+adata.var = var_coords.loc[~na_genes, :].copy()
+
+adata.var["#CHR"] = adata.var["#CHR"].astype(str)
+adata.var["START"] = adata.var["START"].astype(int)
+adata.var["END"] = adata.var["END"].astype(int)
+
+##################################################
+# filter genes
+## 0. filter complete zero counts
+adata.var["pseudobulk_counts"] = np.asarray(adata.X.sum(axis=0)).flatten()
+adata = adata[:, adata.var["pseudobulk_counts"] > 0].copy()
+
+## 1. filter genes by blacklist file
+gene_blacklist_file = maybe_path(sm.input["gene_blacklist_file"])
+if gene_blacklist_file is not None:
+    gene_blacklist = (
+        pd.read_table(gene_blacklist_file, header=None).iloc[:, 0].to_numpy()
+    )
+    ind_gene_blacklist = np.isin(adata.var.index, gene_blacklist)
+    logging.info(
+        f"remove #{np.sum(ind_gene_blacklist)}/{adata.n_vars} genes based on {gene_blacklist_file}"
+    )
+    adata = adata[:, ~ind_gene_blacklist]
+
+## 2. filter lowly expressed genes by counting #epressed barcodes
+sum_count_before_filtering = float(adata.X.sum())
+min_frac_barcodes = float(sm.params["min_frac_barcodes"])
+
+nnz_per_gene = adata.X.getnnz(axis=0)
+ind_sufficient_expressed_genes = np.asarray(
+    nnz_per_gene >= (min_frac_barcodes * adata.n_obs)
+).ravel()
+adata = adata[:, ind_sufficient_expressed_genes]
+count_ratio = float(adata.X.sum()) / sum_count_before_filtering
+logging.info(
+    f"Retaining {100.0 * np.mean(ind_sufficient_expressed_genes)}% of genes with sufficient expression across spots ({100.0 * count_ratio:.2f}% of total UMIs) @ {min_frac_barcodes} fraction of barcodes."
+)
+
+## 3. filter genes by region file, e.g., centromeric and HLA regions.
+## each gene gets a feature_idx
+regions = read_region_file(sm.input["region_bed"])
+adata = feature_to_blocks(adata, regions, assay_type)
+
+## 4. filter outlier genes by outlier detection algorithm TODO
+
+##################################################
+chs = sort_chroms(adata.var["#CHR"].unique().tolist())
+adata.var["#CHR"] = pd.Categorical(adata.var["#CHR"], categories=chs, ordered=True)
+
+assert adata.var_names.is_unique, "var_names is not unique!"
+sort_index = adata.var.sort_values(by=["#CHR", "START"]).index
+adata = adata[:, sort_index].copy()
+adata.write_h5ad(sm.output["h5ad_file"], compression="gzip")
+
+logging.info(f"final processed {assay_type} AnnData")
+logging.info(f"final #obs={adata.n_obs}, #vars={adata.n_vars}")

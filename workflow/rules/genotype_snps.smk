@@ -1,24 +1,30 @@
-##################################################
-if workflow_mode == "bulk":
+"""
+Inputs
+1. BAM files
+2. SNP panels
+3. reference genome
+
+Outputs: bi-allelic hom-alt and het ref/alt SNPs, per chromosome.
+snps/<chrom>.vcf.gz
+"""
+
+if workflow_mode == "bulk_genotyping":
 
     # TODO genotyping tumor samples
+    # handle mulitple BAM files
     rule genotype_snps_bulk:
-        """
-        Genotype Bi-allelic HET/ALT-HOM SNPs
-        from bulk-DNA normal sample via bcftools
-        """
         input:
             bams=lambda wc: branch(
-                has_normal, then=normal_bams[0], otherwise=tumor_bams[0]
+                len(normal_bams) > 0, then=normal_bams[0], otherwise=tumor_bams[0]
             ),
             snp_panel=config["snp_panel"],
             reference=config["reference"],
         output:
             snp_file=config["snp_dir"] + "/chr{chrname}.vcf.gz",
-            tmp_pos=temp(config["snp_dir"] + "/target.{chrname}.pos.gz"),
-            tmp_pos_tbi=temp(config["snp_dir"] + "/target.{chrname}.pos.gz.tbi"),
+            tmp_pos=temp("tmp/target.{chrname}.pos.gz"),
+            tmp_pos_tbi=temp("tmp/target.{chrname}.pos.gz.tbi"),
         log:
-            config["log_dir"] + "/genotype_snps.chr{chrname}.log",
+            config["log_dir"] + "/genotype_snps_bulk/chr{chrname}.log",
         threads: config["threads"]["genotype"]
         params:
             chrom="chr{chrname}",
@@ -51,118 +57,68 @@ if workflow_mode == "bulk":
             """
 
 
-##################################################
-if workflow_mode == "single_cell":
-    rule genotype_snps_pseudobulk:
+if workflow_mode == "single_cell_genotyping":
+
+    rule genotype_snps_pseudobulk_mode1b:
         input:
-            bams=tumor_bams,
+            bams=lambda wc: modality2bams[wc.modality],
             snp_panel=config["snp_panel"],
         output:
-            snp_file=config["pileup_dir"] + "/pseudobulk/cellSNP.base.vcf.gz",
+            out_dir=directory(config["snp_dir"] + "/pseudobulk_{modality}"),
+            bam_lst=temp("tmp/bams.{modality}.lst"),
         log:
-            config["log_dir"] + "/genotype_snps.pseudobulk.log"
-        threads:
-            config["threads"]["genotype"]
+            config["log_dir"] + "/genotype_snps_pseudobulk.{modality}.log",
+        threads: config["threads"]["genotype"]
         params:
             bcftools=config["bcftools"],
             cellsnp_lite=config["cellsnp_lite"],
-            out_dir=lambda wc: config["pileup_dir"] + "/pseudobulk",
-            minMAF=0,
-            minCOUNT=1,
-        shell:
-            r"""
-            printf "%s\n" {input.bams} > {params.out_dir}/bams.lst
-            {params.cellsnp_lite} \
-                -S {params.out_dir}/bams.lst \
-                -O "{params.out_dir}" \
-                -R "{input.snp_panel}" \
-                -p {threads} \
-                --minMAF {params.minMAF} \
-                --minCOUNT {params.minCOUNT} \
-                --UMItag None \
-                --cellTAG None \
-                --gzip > {log} 2>&1
-            nsnps_cellsnp=$({params.bcftools} view -H "{output.snp_file}" | wc -l)
-            echo "[QC] {output} record #SNPs: ${{nsnps_cellsnp}}"
-            rm {params.out_dir}/bams.lst
-            """
-
-    rule genotype_snps_single_cell:
-        input:
-            barcode=lambda wc: get_data[(wc.data_type, wc.rep_id)][0],
-            bam=lambda wc: get_data[(wc.data_type, wc.rep_id)][1],
-            ranger=lambda wc: get_data[(wc.data_type, wc.rep_id)][2],
-            snp_file=config["pileup_dir"] + "/pseudobulk/cellSNP.base.vcf.gz",
-        output:
-            cellsnp_file=config["pileup_dir"] + "/{data_type}_{rep_id}/cellSNP.base.vcf.gz",
-            sample_file=config["pileup_dir"] + "/{data_type}_{rep_id}/cellSNP.samples.tsv",
-            tot_mat=config["pileup_dir"] + "/{data_type}_{rep_id}/cellSNP.tag.DP.mtx",
-            ad_mat=config["pileup_dir"] + "/{data_type}_{rep_id}/cellSNP.tag.AD.mtx",
-        wildcard_constraints:
-            data_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
-        threads: config["threads"]["genotype"]
-        params:
-            cellsnp_lite=config["cellsnp_lite"],
-            refseq=config["reference"],
-            out_dir=lambda wc: config["pileup_dir"] + f"/{wc.data_type}_{wc.rep_id}",
             UMItag=lambda wc: branch(
-                wc.data_type == "scATAC",
-                then="None",
-                otherwise=config["params_cellsnp_lite"]["UMItag"],
+                wc.modality == "RNA",
+                then=config["params_cellsnp_lite"]["UMItag"],
+                otherwise="None",
             ),
-            cellTAG=config["params_cellsnp_lite"]["cellTAG"],
-            minMAF=config["params_cellsnp_lite"]["minMAF"],
+            minMAF=config["params_cellsnp_lite"]["minMAF_genotype"],
             minCOUNT=config["params_cellsnp_lite"]["minCOUNT_genotype"],
-        log:
-            config["log_dir"] + "/genotype_snps.{data_type}_{rep_id}.log",
         shell:
             r"""
+            printf "%s\n" {input.bams} > "{output.bam_lst}"
             {params.cellsnp_lite} \
-                -b "{input.barcode}" \
-                -s "{input.bam}" \
-                -O "{params.out_dir}" \
-                -R "{input.snp_file}" \
+                -S "{output.bam_lst}" \
+                -R "{input.snp_panel}" \
+                -O "{output.out_dir}" \
                 -p {threads} \
                 --minMAF {params.minMAF} \
                 --minCOUNT {params.minCOUNT} \
                 --UMItag {params.UMItag} \
-                --cellTAG {params.cellTAG} \
+                --cellTAG None \
                 --gzip > {log} 2>&1
             """
 
-    rule annotate_snps_single_cell:
+    rule annotate_snps_pseudobulk:
         input:
             raw_snp_files=[
-                config["pileup_dir"] + f"/{data_type}_{rep_id}/cellSNP.base.vcf.gz"
-                for (data_type, rep_id) in get_data.keys()
+                config["snp_dir"] + f"/pseudobulk_{modality}/cellSNP.base.vcf.gz"
+                for modality in modalities
             ],
-            sample_files=[
-                config["pileup_dir"] + f"/{data_type}_{rep_id}/cellSNP.samples.tsv"
-                for (data_type, rep_id) in get_data.keys()
-            ],
-            dp_files=[
-                config["pileup_dir"] + f"/{data_type}_{rep_id}/cellSNP.tag.DP.mtx"
-                for (data_type, rep_id) in get_data.keys()
-            ],
-            ad_files=[
-                config["pileup_dir"] + f"/{data_type}_{rep_id}/cellSNP.tag.AD.mtx"
-                for (data_type, rep_id) in get_data.keys()
-            ],
+            genome_size=config["genome_size"],
         output:
-            snp_files=expand(config["snp_dir"] + "/chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
+            snp_files=expand(
+                config["snp_dir"] + "/chr{chrname}.vcf.gz",
+                chrname=config["chromosomes"],
+            ),
             snp_files_tbi=expand(
-               config["snp_dir"] + "/chr{chrname}.vcf.gz.tbi", chrname=config["chromosomes"]
+                config["snp_dir"] + "/chr{chrname}.vcf.gz.tbi",
+                chrname=config["chromosomes"],
             ),
         params:
-            data_types=[data_type for (data_type, _) in get_data.keys()],
-            rep_ids=[rep_id for (_, rep_id) in get_data.keys()],
-            filter_nz_OTH=config["params_annotate_snps"]["filter_nz_OTH"],
-            filter_hom_ALT=config["params_annotate_snps"]["filter_hom_ALT"],
+            modalities=modalities,
             min_het_reads=config["params_annotate_snps"]["min_het_reads"],
             min_hom_dp=config["params_annotate_snps"]["min_hom_dp"],
             min_vaf_thres=config["params_annotate_snps"]["min_vaf_thres"],
+            filter_nz_OTH=config["params_annotate_snps"]["filter_nz_OTH"],
+            filter_hom_ALT=config["params_annotate_snps"]["filter_hom_ALT"],
         threads: 1
         log:
-            config["log_dir"] + "/annotate_snps.log",
+            config["log_dir"] + "/annotate_snps_pseudobulk.log",
         script:
-            "../scripts/annotate_snps.py"
+            "../scripts/annotate_snps_pseudobulk.py"

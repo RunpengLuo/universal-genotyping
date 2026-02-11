@@ -30,7 +30,7 @@ genome_size = sm.input["genome_size"]
 mappability_file = maybe_path(sm.input["mappability_file"])
 
 sample_name = sm.params["sample_name"]
-qc_dir = sm.params["qc_dir"]
+qc_dir = sm.output["qc_dir"]
 mosdepth_dir = sm.params["mosdepth_dir"]
 gc_correct = bool(sm.params["gc_correct"])
 
@@ -84,7 +84,9 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
 if gc_correct:
     has_mapp = mappability_file is not None
     gc_df = compute_gc_content(bbs, reference, mappability_file, genome_size)
-    rdr_mtx_bb = bias_correction_rdr(rdr_mtx_bb, gc_df, rep_ids[tumor_sidx:], has_mapp, qc_dir)
+    rdr_mtx_bb = bias_correction_rdr(
+        rdr_mtx_bb, gc_df, rep_ids[tumor_sidx:], has_mapp, qc_dir
+    )
 
 # plot per-sample RDRs (after corrections)
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):

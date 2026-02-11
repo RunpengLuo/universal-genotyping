@@ -1,5 +1,5 @@
-SAMPLE	REP_ID	DATA_TYPE	PATH_to_bam	PATH_to_barcodes	PATH_to_10x_ranger
-HT001	U1	sc_RNA	s1.bam	/path/to/barcodes.tsv.gz	/path/to/outs
-HT001	U1	scATAC	s2.bam	/path/to/barcodes.tsv.gz	/path/to/outs
-HT001	U2	VISIUM	s3.bam	/path/to/barcodes.tsv.gz	/path/to/outs
-HT001	U3	VISIUM	s4.bam	/path/to/barcodes.tsv.gz	/path/to/outs
+SAMPLE	REP_ID	assay_type	sample_type	PATH_to_bam	PATH_to_barcodes	PATH_to_10x_ranger
+HT001	U1	scRNA	tumor	s1.bam	/path/to/barcodes.tsv.gz	/path/to/outs
+HT001	U1	scATAC	tumor	s2.bam	/path/to/barcodes.tsv.gz	/path/to/outs
+HT001	U2	VISIUM	tumor	s3.bam	/path/to/barcodes.tsv.gz	/path/to/outs
+HT001	U3	VISIUM	tumor	s4.bam	/path/to/barcodes.tsv.gz	/path/to/outs

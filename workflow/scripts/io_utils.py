@@ -6,45 +6,9 @@ from collections import OrderedDict
 
 import pandas as pd
 import numpy as np
+import pyranges as pr
 
-
-def symlink_force(src, dst):
-    try:
-        os.remove(dst)
-    except FileNotFoundError:
-        pass
-    os.symlink(os.path.abspath(src), os.path.abspath(dst))
-
-
-def maybe_path(x):
-    if x == [] or x is None:
-        return None
-    return x
-
-
-def get_chr2ord(ch):
-    chr2ord = {}
-    for i in range(1, 23):
-        chr2ord[f"{ch}{i}"] = i
-    chr2ord[f"{ch}X"] = 23
-    chr2ord[f"{ch}Y"] = 24
-    chr2ord[f"{ch}M"] = 25
-    return chr2ord
-
-
-def sort_chroms(chromosomes: list):
-    assert len(chromosomes) != 0
-    chromosomes = [str(c) for c in chromosomes]
-    ch = "chr" if str(chromosomes[0]).startswith("chr") else ""
-    chr2ord = get_chr2ord(ch)
-    return sorted(chromosomes, key=lambda x: chr2ord[x])
-
-
-def sort_df_chr(df: pd.DataFrame, ch="#CHR", pos="POS"):
-    chs = sort_chroms(df[ch].unique().tolist())
-    df[ch] = pd.Categorical(df[ch], categories=chs, ordered=True)
-    df.sort_values(by=[ch, pos], inplace=True, ignore_index=True)
-    return df
+from utils import *
 
 
 def get_chr_sizes(sz_file: str):
@@ -57,7 +21,14 @@ def get_chr_sizes(sz_file: str):
     return chr_sizes
 
 
-def read_VCF(vcf_file: str, addchr=True, addkey=False):
+def read_VCF(
+    vcf_file: str,
+    addchr=True,
+    addkey=False,
+    snps_presorted=False,
+    add_pos0=False,
+    add_phase1=False,
+):
     """
     load VCF file as dataframe.
     If phased, parse GT[0] as USEREF, check PS
@@ -85,7 +56,8 @@ def read_VCF(vcf_file: str, addchr=True, addkey=False):
     snps["#CHROM"] = pd.Categorical(
         snps["#CHROM"], categories=chrom_order, ordered=True
     )
-    snps = snps.sort_values(["#CHROM", "POS"], kind="mergesort")
+    if not snps_presorted:
+        snps = snps.sort_values(["#CHROM", "POS"], kind="mergesort")
 
     # copy #CHR field
     snps["#CHR"] = snps["#CHROM"]
@@ -127,6 +99,10 @@ def read_VCF(vcf_file: str, addchr=True, addkey=False):
 
     if addkey:
         snps["KEY"] = snps["#CHROM"].astype(str) + "_" + snps["POS"].astype(str)
+    if add_pos0:
+        snps["POS0"] = snps["POS"] - 1
+    if add_phase1:
+        snps["PHASE"] = snps["GT"].str[2].astype(np.int8).to_numpy()
     snps = snps.reset_index(drop=True)
     return snps
 
@@ -154,9 +130,77 @@ def read_ucn_file(seg_ucn_file: str):
 
     n_clones = len([cname for cname in segs_df.columns if cname.startswith("cn_")])
     clones = ["normal"] + [f"clone{c}" for c in range(1, n_clones)]
-    clone_props = segs_df[[f"u_{clone}" for clone in clones]].iloc[0].tolist()
-    segs_df.loc[:, "CNP"] = segs_df.apply(
+    segs_df["CNP"] = segs_df.apply(
         func=lambda r: ";".join(r[f"cn_{c}"] for c in clones), axis=1
     )
-    segs_df["PROPS"] = ";".join([str(p) for p in clone_props])
-    return segs_df, clones, clone_props
+    segs_df["PROPS"] = segs_df.apply(
+        func=lambda r: ";".join(str(r[f"u_{c}"]) for c in clones), axis=1
+    )
+    return segs_df, clones
+
+
+def read_barcodes(bc_file: str):
+    barcodes = []
+    with open(bc_file, "r") as fd:
+        for line in fd:
+            barcodes.append(line.strip().split("\t")[0])
+        fd.close()
+    return barcodes
+
+
+def read_celltypes(celltype_file: str):
+    # cell_id cell_types final_type
+    celltypes = pd.read_table(celltype_file)
+    celltypes = celltypes.rename(
+        columns={"cell_id": "BARCODE", "cell_types": "cell_type"}
+    )
+    celltypes["BARCODE"] = celltypes["BARCODE"].astype(str)
+
+    if "met_subcluster" in celltypes.columns.tolist():
+        print("use column met_subcluster as final_type")
+        celltypes["final_type"] = celltypes["met_subcluster"]
+
+    if "final_type" not in celltypes.columns.tolist():
+        assert "cell_type" in celltypes.columns.tolist(), (
+            "cell_type column does not exist"
+        )
+        print("use column cell_type as final_type")
+        celltypes["final_type"] = celltypes["cell_type"]
+    return celltypes
+
+
+def read_genes_gtf_file(gtf_file: str, id_col="gene_ids"):
+    gr = pr.read_gtf(gtf_file, rename_attr=True)
+    genes = (
+        gr.df.query("Feature == 'gene'")[["Chromosome", "Start", "End", "gene_id"]]
+        .drop_duplicates("gene_id", keep="first")
+        .rename(
+            columns={
+                "gene_id": id_col,
+                "Chromosome": "#CHR",
+                "Start": "START1",
+                "End": "END",
+            }
+        )
+    )
+    # convert to 0-based BED format
+    genes["START"] = genes["START"] - 1
+
+    return genes
+
+
+def read_genes_bed_file(bed_file: str, id_col="gene_id"):
+    gr = pr.read_bed(bed_file, as_df=True)
+    genes = (
+        gr[["Chromosome", "Start", "End", "Name"]]
+        .drop_duplicates("Name", keep="first")
+        .rename(
+            columns={
+                "Name": id_col,
+                "Chromosome": "#CHR",
+                "Start": "START",
+                "End": "END",
+            }
+        )
+    )
+    return genes

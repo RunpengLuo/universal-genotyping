@@ -9,6 +9,8 @@ from scipy.sparse import csr_matrix, hstack, issparse
 from scipy.stats import beta
 
 import pyranges as pr
+import anndata
+import scanpy as sc
 
 from io_utils import *
 from postprocess_utils import *
@@ -17,7 +19,7 @@ from postprocess_utils import *
 def assign_pos_to_range(
     qry: pd.DataFrame,
     ref: pd.DataFrame,
-    ref_id="SUPER_VAR_IDX",
+    ref_id="region_id",
     pos_col="POS0",
     nodup=True,
 ):
@@ -48,23 +50,23 @@ def assign_pos_to_range(
 
 
 def snp_to_region(
-    snp_df: pd.DataFrame, region_df: pd.DataFrame, modality: str, region_id="BIN_ID"
+    snp_df: pd.DataFrame, region_df: pd.DataFrame, assay_type: str, region_id="BIN_ID"
 ):
     """
     region_df must be 0-indexed non-overlapping intervals [s, t) in standard BED format.
     """
-    logging.info(f"#{modality}-SNP (raw)={len(snp_df)}")
+    logging.info(f"#{assay_type}-SNP (raw)={len(snp_df)}")
     snp_df = assign_pos_to_range(snp_df, region_df, ref_id=region_id, pos_col="POS0")
     isna_snp_df = snp_df[region_id].isna()
     logging.info(
-        f"#{modality}-SNPs outside any region={np.sum(isna_snp_df) / len(snp_df):.3%}"
+        f"#{assay_type}: #SNPS outside any region={np.sum(isna_snp_df) / len(snp_df):.3%}"
     )
     snp_df.dropna(subset=region_id, inplace=True)
     snp_df[region_id] = snp_df[region_id].astype(region_df[region_id].dtype)
-    logging.info(f"#{modality}-SNP (remain)={len(snp_df)}")
+    logging.info(f"#{assay_type}-SNP (remain)={len(snp_df)}")
 
     counts = snp_df[region_id].value_counts()
-    region_df["#SNPS"] = region_df[region_id].map(counts).fillna(0).astype(int)
+    region_df[f"#SNPS"] = region_df[region_id].map(counts).fillna(0).astype(int)
     return snp_df
 
 
@@ -116,7 +118,7 @@ def adaptive_binning(
         bin_ids[prev_start:] = max(bin_id - 1, bin_id0)
         snps.loc[grp_idxs, colname] = bin_ids
 
-        # if only a partial block is found, block_id is not incremented in the loop
+        # if only a partial block is found, block_idx is not incremented in the loop
         # and partial block is assigned to previous block.
         bin_id = max(bin_id, bin_id0 + 1)
 
@@ -162,8 +164,7 @@ def adaptive_binning(
 
 def matrix_segmentation(X, bin_ids, K):
     """
-
-    N: #snps
+    N: #features
     M: #samples
     X: (N, M) sparse or dense   [snp-by-sample]
     bin_ids: (N,) ints in [0..K-1]  (assign each SNP to a bin, bin ids are non-decreasing)
@@ -190,55 +191,79 @@ def matrix_segmentation(X, bin_ids, K):
     return X_bin
 
 
-def cnv_guided_allele_aggregation(
-    snps: pd.DataFrame,
-    segs_df: pd.DataFrame,
-    bbcs_df: pd.DataFrame,
-    data_type: str,
-    tot_mtx=None,
-    ref_mtx=None,
-    alt_mtx=None,
-    region_id="bbc_id",
+def assign_largest_overlap(
+    qry: pd.DataFrame, ref: pd.DataFrame, qry_id: str, ref_id: str
+) -> pd.DataFrame:
+    """
+    for each row in qry, assign the ID of the overlapping interval in ref
+    that has largest overlap length
+    """
+
+    qry_gr = pr.PyRanges(
+        qry.rename(columns={"#CHR": "Chromosome", "START": "Start", "END": "End"})
+    )
+    ref_gr = pr.PyRanges(
+        ref.rename(columns={"#CHR": "Chromosome", "START": "Start", "END": "End"})
+    )
+
+    joined = qry_gr.join(ref_gr, suffix="_REF").as_df()
+    joined["overlap_len"] = (
+        np.minimum(joined["End"], joined["End_REF"])
+        - np.maximum(joined["Start"], joined["Start_REF"])
+    ).clip(lower=0)
+
+    best = joined.loc[joined.groupby(joined.index)["overlap_len"].idxmax()].copy()
+
+    best = best[[qry_id, ref_id, "overlap_len"]]
+    qry = qry.merge(best, on=[qry_id], how="left", sort=False)
+    max_ovlp_idx = qry.groupby(by=qry_id, sort=False)["overlap_len"].apply(
+        lambda s: s.idxmax() if s.notna().any() else s.index[0]
+    )
+    qry_out = qry.loc[max_ovlp_idx].sort_values(by=qry_id).reset_index(drop=True)
+    qry_out = qry_out.drop(columns="overlap_len")
+    return qry_out
+
+
+def feature_to_blocks(
+    adata: sc.AnnData,
+    blocks: pd.DataFrame,
+    assay_type: str,
+    feature_idx="feature_idx",
+    block_idx="region_id",
+    drop_cols=True,
 ):
     """
-    1. integrate HATCHet phases to correct initial phase.
-    2. build phased mats
+    filter features not in blocks, likely masked regions include centromeres
     """
-    snps = snps.copy(deep=True)
-    # map SNPs to CNV bins, align with HMM clustering step of HATCHet
-    snps["RAW_SNP_IDX"] = np.arange(len(snps))
-    snps = snp_to_region(snps, bbcs_df, data_type, region_id=region_id)
-    phase_inds = pd.merge(
-        left=snps, right=bbcs_df[[region_id, "PHASE-BBC"]], on=region_id, how="left"
-    )["PHASE-BBC"].to_numpy()
-    raw_phase = snps["PHASE"].to_numpy()
-    corr_phase = raw_phase * phase_inds + (1 - raw_phase) * (1 - phase_inds)
-    snps["PHASE-CORR"] = corr_phase
+    logging.info(f"assign {assay_type} features to blocks, {feature_idx}-{block_idx}")
+    adata.var[feature_idx] = np.arange(len(adata.var))
 
-    # filter mat rows with SNP not present in HATCHet CNV profile
-    raw_snp_ids = snps["RAW_SNP_IDX"].to_numpy()
-    tot_mat = tot_mat[raw_snp_ids, :]
-    ref_mat = ref_mat[raw_snp_ids, :]
-    alt_mat = alt_mat[raw_snp_ids, :]
-    a_mtx, b_mtx = apply_phase_to_mat(tot_mtx, ref_mtx, alt_mtx, corr_phase)
+    feature_df = adata.var.reset_index(drop=True)
+    logging.info(f"#{assay_type}-features (raw)={len(feature_df)}")
 
-    # aggregate SNP-level mats to CNV segment-level mats
-    snps = snp_to_region(snps, segs_df, data_type, region_id="seg_id")
-    seg_ids = snps["seg_id"].to_numpy()
-    num_segs = len(segs_df)
-    a_mtx_seg = matrix_segmentation(a_mtx, seg_ids, num_segs)
-    b_mtx_seg = matrix_segmentation(b_mtx, seg_ids, num_segs)
-    tot_mtx_seg = matrix_segmentation(tot_mtx, seg_ids, num_segs)
-    assert a_mtx_seg.shape[0] == num_segs
-    return (
-        snps,
-        tot_mat,
-        ref_mat,
-        alt_mat,
-        a_mtx,
-        b_mtx,
-        segs_df,
-        a_mtx_seg,
-        b_mtx_seg,
-        tot_mtx_seg,
+    feature_df = assign_largest_overlap(feature_df, blocks, feature_idx, block_idx)
+    isna_features = feature_df[block_idx].isna()
+    logging.info(
+        f"#{assay_type} feature outside any blocks={np.sum(isna_features) / len(feature_df):.3%}"
     )
+    feature_df.dropna(subset=block_idx, inplace=True)
+    feature_df[block_idx] = feature_df[block_idx].astype(np.int32)
+    logging.info(f"#{assay_type} feature (remain)={len(feature_df)}")
+
+    ##################################################
+    # map HB tag to adata.var, filter any out-of-range features
+    adata.var = (
+        adata.var.reset_index(drop=False)
+        .merge(
+            right=feature_df[[feature_idx, block_idx]],
+            on=feature_idx,
+            how="left",
+        )
+        .set_index("index")
+    )
+    adata = adata[:, adata.var[block_idx].notna()].copy()
+    if drop_cols:
+        adata.var.drop(columns=[feature_idx, block_idx], inplace=True)
+    else:
+        adata.var[block_idx] = adata.var[block_idx].astype(feature_df[block_idx].dtype)
+    return adata

@@ -21,8 +21,8 @@ from io_utils import *
 def canon_mat_one_replicate(
     parent_keys: pd.Index,
     vcf_file: str,
-    tot_mat_file: str,
-    ad_mat_file: str,
+    tot_mtx_file: str,
+    ad_mtx_file: str,
     ncells: int,
 ):
     """
@@ -32,8 +32,8 @@ def canon_mat_one_replicate(
     child_snps = read_VCF(vcf_file, addkey=True)
     m = len(child_snps)
 
-    tot_mtx: csr_matrix = mmread(tot_mat_file).tocsr()
-    ad_mtx: csr_matrix = mmread(ad_mat_file).tocsr()
+    tot_mtx: csr_matrix = mmread(tot_mtx_file).tocsr()
+    ad_mtx: csr_matrix = mmread(ad_mtx_file).tocsr()
     assert tot_mtx.shape == ad_mtx.shape
     assert tot_mtx.shape == (m, ncells)
 
@@ -46,7 +46,9 @@ def canon_mat_one_replicate(
     n_dup_rows = int(dup_mask.sum())
     if n_dup_rows > 0:
         n_dup_keys = int(child_snps.loc[dup_mask, "KEY"].nunique())
-        logging.warning(f"#found duplicated SNP #CHR/POS, #rows={n_dup_rows}/{m} #SNPs={n_dup_keys}, drop all")
+        logging.warning(
+            f"#found duplicated SNP #CHR/POS, #rows={n_dup_rows}/{m} #SNPs={n_dup_keys}, drop all"
+        )
         child_snps = child_snps.loc[~dup_mask].reset_index(drop=True)
         tot_mtx = tot_mtx[~dup_mask, :]
         ad_mtx = ad_mtx[~dup_mask, :]
@@ -93,6 +95,12 @@ def merge_mats(tot_list: list, ad_list: list):
     alt_mtx = hstack(ad_list, format="csr")
     ref_mtx = tot_mtx - alt_mtx
     return tot_mtx, ref_mtx, alt_mtx
+
+
+def hstack_mtx_list(mtx_list: list):
+    if len(mtx_list) == 1:
+        return mtx_list[0]
+    return hstack(mtx_list, format="csr")
 
 
 def apply_phase_to_mat(tot_mtx, ref_mtx, alt_mtx, phases):

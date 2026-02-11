@@ -22,4 +22,3 @@ dependencies:
   - squidpy
   - scanpy
   - snapatac2
-  - subset-bam

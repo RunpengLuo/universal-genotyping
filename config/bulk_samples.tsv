@@ -1,3 +1,3 @@
-SAMPLE	REP_ID	DATA_TYPE	PATH_to_bam	PATH_to_barcodes	PATH_to_10x_ranger
-HT001	normal	bulkDNA	s1.bam	N/A	N/A
-HT001	T1	bulkDNA	s2.bam	N/A	N/A
+SAMPLE	REP_ID	assay_type	sample_type	PATH_to_bam
+HT001	N1	bulkWGS	normal	s1.bam
+HT001	T1	bulkWGS	tumor	s2.bam

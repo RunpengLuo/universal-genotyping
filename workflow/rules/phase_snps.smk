@@ -1,11 +1,10 @@
-##################################################
 if config["phaser"] == "shapeit":
 
     rule phase_snps_shapeit:
         input:
-            chrom_vcf_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
+            snp_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
             phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
-            gmap_file=lambda wc: get_gmap_file(wc.chrname),
+            gmap_file=lambda wc: get_genetic_map(wc.chrname),
         output:
             phased_file=config["phase_dir"] + "/chr{chrname}.vcf.gz",
             bcf_file=temp(config["phase_dir"] + "/chr{chrname}.bcf"),
@@ -20,7 +19,7 @@ if config["phaser"] == "shapeit":
         shell:
             r"""
             {params.shapeit} \
-                --input "{input.chrom_vcf_file}" \
+                --input "{input.snp_file}" \
                 --map "{input.gmap_file}" \
                 --reference "{input.phasing_panel_file}" \
                 --region "{params.chrom}" \
@@ -32,14 +31,13 @@ if config["phaser"] == "shapeit":
             """
 
 
-##################################################
 if config["phaser"] == "eagle":
 
     rule phase_snps_eagle:
         input:
-            chrom_vcf_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
+            snp_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
             phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
-            gmap_file=lambda wc: get_gmap_file(wc.chrname),
+            gmap_file=lambda wc: get_genetic_map(wc.chrname),
         output:
             phased_file=config["phase_dir"] + "/chr{chrname}.vcf.gz",
         threads: config["threads"]["phase"]
@@ -52,7 +50,7 @@ if config["phaser"] == "eagle":
         shell:
             r"""
             {params.eagle} \
-                --vcfTarget "{input.chrom_vcf_file}" \
+                --vcfTarget "{input.snp_file}" \
                 --geneticMapFile "{input.gmap_file}" \
                 --vcfRef "{input.phasing_panel_file}" \
                 --vcfOutFormat z \
@@ -62,16 +60,15 @@ if config["phaser"] == "eagle":
             """
 
 
-##################################################
 if config["phaser"] == "longphase":
 
     rule phase_snps_longphase:
         input:
-            chrom_vcf_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
-            bam_file=lambda wc: branch(
-                has_normal, then=normal_bams[0], otherwise=tumor_bams[0]
+            snp_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
+            bams=lambda wc: branch(
+                len(normal_bams) > 0, then=normal_bams[0], otherwise=tumor_bams[0]
             ),
-            ref_fa=lambda wc: config["reference"],
+            reference=lambda wc: config["reference"],
         output:
             phased_file=config["phase_dir"] + "/chr{chrname}.vcf.gz",
         params:
@@ -86,9 +83,9 @@ if config["phaser"] == "longphase":
         shell:
             r"""
             {params.longphase} phase \
-                --bam-file={input.bam_file} \
-                --reference={input.ref_fa} \
-                --snp-file={input.chrom_vcf_file} \
+                --bam-file={input.bams} \
+                --reference={input.reference} \
+                --snp-file={input.snp_file} \
                 --mappingQuality={params.min_mapq} \
                 --out-prefix=config["phase_dir"] + "/{params.chrom}" \
                 --threads={threads} \
@@ -99,9 +96,12 @@ if config["phaser"] == "longphase":
 
 rule concat_and_extract_phased_het_snps:
     input:
-        vcf_files=expand(config["phase_dir"] + "/chr{chrname}.vcf.gz", chrname=config["chromosomes"]),
+        vcf_files=expand(
+            config["phase_dir"] + "/chr{chrname}.vcf.gz", chrname=config["chromosomes"]
+        ),
     output:
         phased_vcf=config["phase_dir"] + "/phased_snps.vcf.gz",
+        phased_vcf_tbi=config["phase_dir"] + "/phased_snps.vcf.gz.tbi",
         lst_file=temp(config["phase_dir"] + "/phased_snps.lst"),
     threads: 1
     params:
@@ -118,7 +118,7 @@ rule concat_and_extract_phased_het_snps:
 
 rule parse_genetic_map:
     input:
-        gmap_files=lambda wc: [get_gmap_file(c) for c in config["chromosomes"]],
+        gmap_files=lambda wc: [get_genetic_map(c) for c in config["chromosomes"]],
     output:
         gmap_tsv=config["phase_dir"] + "/genetic_map.tsv.gz",
     log:

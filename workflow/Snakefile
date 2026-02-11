@@ -2,201 +2,199 @@ import os
 import sys
 import numpy as np
 import pandas as pd
+from collections import OrderedDict
 
 ##################################################
 # parse sample file
-chroms = config["chromosomes"]
-refvers = config["reference_version"]
-
 sample_df = pd.read_table(config["sample_file"])
-
-required = ["SAMPLE", "REP_ID", "DATA_TYPE", "PATH_to_bam"]
-optional = ["PATH_to_barcodes", "PATH_to_10x_ranger"]
-
+required = ["SAMPLE", "REP_ID", "assay_type", "sample_type", "PATH_to_bam"]
+optional = ["PATH_to_barcodes", "PATH_to_10x_ranger", "PATH_to_celltypes"]
 missing = [c for c in required if c not in sample_df.columns]
 assert not missing, f"missing columns: {missing}"
-
 for c in optional:
     if c not in sample_df.columns:
         sample_df[c] = pd.NA
-
 SAMPLE_ID = sample_df["SAMPLE"].iloc[0]
 assert (sample_df["SAMPLE"] == SAMPLE_ID).all(), "identical SAMPLE required"
+assert sample_df["REP_ID"].notna().all(), "REP_ID required for all replicates"
+assert sample_df["PATH_to_bam"].notna().all(), "PATH_to_bam has missing values"
 
-sample_data_types = sample_df["DATA_TYPE"].unique().tolist()
-allowed_data_types = ["bulkDNA", "scATAC", "scRNA", "VISIUM", "VISIUM3prime"]
-assert all(dt in allowed_data_types for dt in sample_data_types)
-
-if "bulkDNA" in sample_data_types:
-    assert (
-        len(sample_data_types) == 1
-    ), "mode 1 must have only bulk samples. Run mode 1 with bulk-only samples to genotype then mode 2 on non-bulk samples."
-    workflow_mode = "bulk"
-else:
-    workflow_mode = "single_cell"
+uniq_sample_types = sample_df["sample_type"].unique().tolist()
+assert all(st in ["normal", "tumor"] for st in uniq_sample_types)
 
 rep_ids = sample_df["REP_ID"].unique().tolist()
-get_data = {}
-mod2reps = {}
+assay_types = sample_df["assay_type"].unique().tolist()
 
-normal_bams = []
-tumor_bams = []
-bam_types = []
-for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
-    rep_data_types = rep_df["DATA_TYPE"].unique().tolist()
-    barcodes = rep_df["PATH_to_barcodes"].iloc[0]
-    rangers = rep_df["PATH_to_10x_ranger"].iloc[0]
-    assert len(rep_data_types) <= 2, "at most 2 data types allowed per replicate"
-    if len(rep_data_types) == 2:
-        assert ("scRNA" in rep_data_types) and ("scATAC" in rep_data_types)
-        assert len(rep_df) == 2, "multiome data should have exactly 2 rows"
-        assert (
-            rep_df["PATH_to_barcodes"].nunique() == 1
-        ), f"multiome barcode paths differ"
-        assert (
-            rep_df["PATH_to_10x_ranger"].nunique() == 1
-        ), f"multiome 10x-ranger paths differ"
+nonbulk_assays = ["scATAC", "scRNA", "VISIUM", "VISIUM3prime"]
+bulk_assays = ["bulkWGS", "bulkWES"]
+allowed_assay_types = bulk_assays + nonbulk_assays
+assert all(dt in allowed_assay_types for dt in assay_types)
+assay_type2modality = {
+    "bulkWGS": "DNA",
+    "bulkWES": "DNA",
+    "scATAC": "DNA",
+    "scRNA": "RNA",
+    "VISIUM": "RNA",
+    "VISIUM3prime": "RNA",
+}
+assay_type2feature_type = {
+    "bulkWGS": "unknown",
+    "bulkWES": "exon",
+    "scATAC": "tile",
+    "scRNA": "gene",
+    "VISIUM": "gene",
+    "VISIUM3prime": "gene",
+}
+sample_df["modality"] = sample_df["assay_type"].map(assay_type2modality)
 
-        modality = "multiome"
-        gex_bam = rep_df.loc[rep_df["DATA_TYPE"] == "scRNA", "PATH_to_bam"].iloc[0]
-        atac_bam = rep_df.loc[rep_df["DATA_TYPE"] == "scATAC", "PATH_to_bam"].iloc[0]
-        tumor_bams.extend([gex_bam, atac_bam])
-        bam_types.extend(["scRNA", "scATAC"])
-        get_data[("scRNA", rep_id)] = [barcodes, gex_bam, rangers]
-        get_data[("scATAC", rep_id)] = [barcodes, atac_bam, rangers]
+has_het_snps = config.get("het_snp_file") is not None
+has_cn_profile = config.get("seg_ucn") is not None
+if has_cn_profile:
+    assert has_het_snps, "CN profile is provided, but missing <het_snp_file>"
+    run_genotype_snps = False
+    workflow_mode = "copytyping_preprocess"
+else:
+    run_genotype_snps = not has_het_snps
+    if any(assay_type in bulk_assays for assay_type in assay_types):
+        workflow_mode = "bulk_genotyping"
+        assert all(
+            assay_type in bulk_assays for assay_type in assay_types
+        ), "bulk mode must have only bulk samples"
+        assert len(assay_types) == 1, "mixing bulk assay types are not supported yet"
+        assert sample_df["REP_ID"].nunique() == len(
+            sample_df
+        ), "bulk mode must have no duplicated replicate IDs"
     else:
-        data_type = rep_data_types[0]
-        modality = data_type
-        bam = rep_df["PATH_to_bam"].iloc[0]
-        get_data[(data_type, rep_id)] = [barcodes, bam, rangers]
-        if data_type == "bulkDNA":
+        workflow_mode = "single_cell_genotyping"
+        assert (
+            sample_df["PATH_to_barcodes"].notna().all()
+        ), "PATH_to_barcodes has missing values"
+        assert (
+            sample_df["PATH_to_10x_ranger"].notna().all()
+        ), "PATH_to_10x_ranger has missing values"
+        # validate per-replicate records
+        for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
+            rep_assay_types = rep_df["assay_type"].unique().tolist()
             assert (
-                rep_id == "normal" or rep_id[0] == "T"
-            ), "bulk REP_ID must be either normal or starts with T"
-            if rep_id == "normal":
-                normal_bams.append(bam)
-            else:
-                tumor_bams.append(bam)
-        else:
-            tumor_bams.append(bam)
-            if data_type in ["scRNA", "VISIUM", "VISIUM3prime"]:
-                bam_types.append("scRNA")
-            else:
-                bam_types.append("scATAC")
-    if modality not in mod2reps:
-        mod2reps[modality] = []
-    mod2reps[modality].append(rep_id)
+                len(rep_assay_types) <= 2
+            ), "at most 2 data types allowed per replicate"
+            if len(rep_assay_types) == 2:
+                assert ("scRNA" in rep_assay_types) and ("scATAC" in rep_assay_types)
+
+modalities = sample_df["modality"].unique().tolist()
+normal_bams = sample_df.loc[
+    sample_df["sample_type"] == "normal", "PATH_to_bam"
+].to_list()
+tumor_bams = sample_df.loc[sample_df["sample_type"] == "tumor", "PATH_to_bam"].to_list()
+
+modality2bams = OrderedDict()
+for modality, rows in sample_df.groupby("modality", sort=False):
+    modality2bams[modality] = rows["PATH_to_bam"].tolist()
+
+assay2rep_ids = OrderedDict()
+for assay_type, rows in sample_df.groupby("assay_type", sort=False):
+    assay2rep_ids[assay_type] = rows["REP_ID"].tolist()
+
+get_data = OrderedDict()
+rep2modalities = OrderedDict()
+rep2celltypes = OrderedDict()
+rep2isMultiome = OrderedDict()
+for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
+    rep2modalities[rep_id] = rep_df["modality"].tolist()
+    celltype_file = rep_df["PATH_to_celltypes"].tolist()[0]
+    if not pd.isna(celltype_file):
+        rep2celltypes[rep_id] = str(celltype_file)
+    is_multiome = len(rep_df) > 1
+    rep2isMultiome[rep_id] = is_multiome
+    for _, row in rep_df.iterrows():
+        assay_type = row["assay_type"]
+        get_data[(assay_type, rep_id)] = [
+            row["PATH_to_barcodes"],
+            row["PATH_to_bam"],
+            row["PATH_to_10x_ranger"],
+        ]
+
+if any(is_multiome for is_multiome in rep2isMultiome.values()) and len(rep_ids) > 1:
+    print("genotyping >1 replicates involving multiome data, warning")
+assay_type_rep_ids = list(get_data.keys())
 
 ##################################################
-# parse reference SNP file, if exists
-ref_snp_file = config.get("ref_snp_file")
-run_genotype_snps = ref_snp_file is None
+# parse phase_snps inputs
+refvers = config["reference_version"]
+allowed_refvers = ["hg19", "hg38", "chm13v2"]
+get_refvers2 = {"hg19": "b37", "hg38": "b38"}
+assert refvers in allowed_refvers, "unsupported reference version"
 
-##################################################
-# parse genotype_snps and phase_snps inputs.
-has_normal = len(normal_bams) > 0
 phaser = config.get("phaser", "undefined")
+
+# population-based phasing required to estimate switchprobs
+require_genetic_map = run_genotype_snps and phaser not in ["longphase"]
 if run_genotype_snps:
-    ##################################################
-    # parse phase_snps inputs
     if phaser == "eagle":
         assert config.get("eagle_dir") is not None
         gmap_dir = os.path.join(config["eagle_dir"], "tables")
         assert os.path.isdir(gmap_dir), "failed to locate gmap directory"
-        assert refvers in [
-            "hg17",
-            "hg18",
-            "hg19",
-            "hg38",
-        ], "unsupported reference version"
-        get_gmap_file = lambda chrname: os.path.join(
+        get_genetic_map = lambda chrname: os.path.join(
             gmap_dir, f"genetic_map_{refvers}_withX.txt.gz"
         )
-
     elif phaser == "shapeit":
         assert config.get("shapeit_dir") is not None
         gmap_dir = os.path.join(config["shapeit_dir"], f"resources/maps")
         assert os.path.isdir(gmap_dir), "failed to locate gmap directory"
-        assert refvers in ["hg19", "hg38"], "unsupported reference version"
-        refvers2 = {"hg19": "b37", "hg38": "b38"}[refvers]
-        get_gmap_file = lambda chrname: os.path.join(
+        refvers2 = get_refvers2[refvers]
+        get_genetic_map = lambda chrname: os.path.join(
             gmap_dir, f"{refvers2}/chr{chrname}.{refvers2}.gmap.gz"
         )
     else:
         assert phaser in ["longphase"], f"unknown phaser: {phaser}"
-
     if phaser in ["eagle", "shapeit"]:
         assert all(
-            os.path.exists(get_gmap_file(chrname)) for chrname in chroms
+            os.path.exists(get_genetic_map(chrname))
+            for chrname in config["chromosomes"]
         ), "failed to locate gmap files"
         phasing_panel_version = config["phasing_panel_version"]
         phasing_panel = config["phasing_panel"]
         assert os.path.isdir(phasing_panel), "failed to locate phasing panel"
-        if phasing_panel_version == "1000G_hg38":
-            get_phasing_panel = lambda chrname: os.path.join(
-                phasing_panel, f"chr{chrname}.genotypes.bcf"
-            )
-        else:
-            raise ValueError(
-                f"unsupported phasing_panel_version: {phasing_panel_version}"
-            )
+        get_phasing_panel = lambda chrname: os.path.join(
+            phasing_panel, f"chr{chrname}.genotypes.bcf"
+        )
         assert all(
-            os.path.exists(get_phasing_panel(chrname)) for chrname in chroms
+            os.path.exists(get_phasing_panel(chrname))
+            for chrname in config["chromosomes"]
         ), "failed to locate panel files"
 
 ##################################################
 # final target files
+pre_qc = False  # TODO add more files
 final_targets = []
+if workflow_mode == "copytyping_preprocess":
+    for assay_type in assay_types:
+        final_targets.append(config["allele_dir"] + f"/{assay_type}/cnv_segments.tsv")
+        final_targets.append(config["allele_dir"] + f"/{assay_type}/X_count.npz")
+        final_targets.append(config["allele_dir"] + f"/{assay_type}/Y_count.npz")
+        final_targets.append(config["allele_dir"] + f"/{assay_type}/D_count.npz")
 
-# flags
-require_genetic_map = run_genotype_snps and phaser not in ["longphase"]
-has_cn_profile = config.get("seg_ucn") is not None
-for mod, rep_ids in mod2reps.items():
-    data_types = ["scRNA", "scATAC"] if mod == "multiome" else [mod]
-    if mod == "bulkDNA":
-        # HATCHet input
-        final_targets.append(config["allele_dir"] + f"/{mod}/sample_ids.tsv")
-        final_targets.append(config["allele_dir"] + f"/{mod}/bb.tsv.gz")
-        final_targets.append(config["allele_dir"] + f"/{mod}/bb.Tallele.npz")
-        final_targets.append(config["allele_dir"] + f"/{mod}/bb.Aallele.npz")
-        final_targets.append(config["allele_dir"] + f"/{mod}/bb.Ballele.npz")
-        final_targets.append(config["allele_dir"] + f"/{mod}/bb.depth.npz")
-        final_targets.append(config["allele_dir"] + f"/{mod}/bb.rdr.npz")
-    elif mod == "multiome":
-        assert has_cn_profile, "adaptive binning for multiome data TODO"
-        if has_cn_profile:
-            for rep_id in rep_ids:
-                final_targets.append(config["allele_dir"] + f"/{mod}_{rep_id}/sample_ids.tsv")
-                final_targets.append(config["allele_dir"] + f"/{mod}_{rep_id}/barcodes.txt")
-                # final_targets.append(config["allele_dir"] + f"/{mod}_{rep_id}/haplotype_blocks.tsv")
-                # for data_type in data_types:
-                #     final_targets.append(config["allele_dir"] + f"/{mod}_{rep_id}/Y_count.{data_type}.npz")
-                #     final_targets.append(config["allele_dir"] + f"/{mod}_{rep_id}/D_count.{data_type}.npz")
-    else:
-        final_targets.append(config["allele_dir"] + f"/{mod}/sample_ids.tsv")
-        final_targets.append(config["allele_dir"] + f"/{mod}/barcodes.txt")
-        # final_targets.append(config["allele_dir"] + f"/{mod}/meta.tsv.gz")
-        # final_targets.append(config["allele_dir"] + f"/{mod}/meta.Tallele.npz")
-        # final_targets.append(config["allele_dir"] + f"/{mod}/meta.Aallele.npz")
-        # final_targets.append(config["allele_dir"] + f"/{mod}/meta.Ballele.npz")
-        # final_targets.append(config["allele_dir"] + f"/{mod}/bb.tsv.gz")
-        # final_targets.append(config["allele_dir"] + f"/{mod}/bb.Tallele.npz")
-        # final_targets.append(config["allele_dir"] + f"/{mod}/bb.Aallele.npz")
-        # final_targets.append(config["allele_dir"] + f"/{mod}/bb.Ballele.npz")
-        # if mod in ["VISIUM", "VISIUM3prime"]:
-        #     # legacy CalicoST inputs
-        #     final_targets.append(config["allele_dir"] + f"/{mod}/unique_snp_ids.npy")
-        #     final_targets.append(config["allele_dir"] + f"/{mod}/cell_snp_Aallele.npz")
-        #     final_targets.append(config["allele_dir"] + f"/{mod}/cell_snp_Ballele.npz")
-
+else:
+    for assay_type in assay_types:
+        final_targets.append(config["allele_dir"] + f"/{assay_type}/sample_ids.tsv")
+        final_targets.append(config["allele_dir"] + f"/{assay_type}/bb.tsv.gz")
+        final_targets.append(config["allele_dir"] + f"/{assay_type}/bb.Tallele.npz")
+        final_targets.append(config["allele_dir"] + f"/{assay_type}/bb.Aallele.npz")
+        final_targets.append(config["allele_dir"] + f"/{assay_type}/bb.Ballele.npz")
+        if assay_type in bulk_assays:
+            final_targets.append(config["allele_dir"] + f"/{assay_type}/bb.depth.npz")
+            final_targets.append(config["allele_dir"] + f"/{assay_type}/bb.rdr.npz")
+        else:
+            final_targets.append(
+                config["allele_dir"] + f"/{assay_type}/barcodes.tsv.gz"
+            )
 
 ##################################################
 # entrypoint
 include: "rules/genotype_snps.smk"
 include: "rules/phase_snps.smk"
 include: "rules/pileup_snps.smk"
-include: "rules/postprocess_bulk.smk"
-include: "rules/postprocess_single_cell.smk"
+include: "rules/postprocess.smk"
 
 
 rule all:
