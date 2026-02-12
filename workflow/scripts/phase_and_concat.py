@@ -195,7 +195,7 @@ plot_allele_freqs(
 
 ##################################################
 logging.info(f"saving output files")
-snps[["#CHR", "POS", "START", "END", "GT", "PHASE", "region_id", "feature_id"]].to_csv(
+snps[["#CHR", "POS", "POS0", "START", "END", "GT", "PHASE", "region_id", "feature_id"]].to_csv(
     sm.output["snp_info"], sep="\t", header=True, index=False
 )
 if is_bulk_assay:
