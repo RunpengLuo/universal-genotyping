@@ -31,6 +31,7 @@ mappability_file = maybe_path(sm.input["mappability_file"])
 
 sample_name = sm.params["sample_name"]
 qc_dir = sm.output["qc_dir"]
+os.makedirs(qc_dir, exist_ok=True)
 mosdepth_dir = sm.params["mosdepth_dir"]
 gc_correct = bool(sm.params["gc_correct"])
 
