@@ -102,6 +102,7 @@ if workflow_mode == "bulk_genotyping":
         output:
             dp_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.depth.npz",
             rdr_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.rdr.npz",
+            corr_factors=config["allele_dir"] + "/{assay_type}/corr_factors.tsv.gz",
             qc_dir=directory(config["qc_dir"] + "/{assay_type}/compute_rdr_bulk/"),
         wildcard_constraints:
             assay_type="(bulkDNA|bulkWGS|bulkWES)",

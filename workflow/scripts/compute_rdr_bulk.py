@@ -80,24 +80,44 @@ rdr_ylim = np.round(rdr_mtx_bb.max()).astype(int) + 1
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
     plot_file = os.path.join(qc_dir, f"rdr_bb_before_correction.{rep_id}.pdf")
     plot_1d_sample(
-        bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR", max_ylim=rdr_ylim
+        bbs,
+        rdr_mtx_bb[:, i],
+        genome_size,
+        plot_file,
+        unit="bb",
+        val_type="RDR",
+        max_ylim=rdr_ylim,
     )
 
 ##################################################
+corr_factors = compute_gc_content(bbs, reference, mappability_file, genome_size)
+corr_factors.to_csv(sm.output["corr_factors"], sep="\t", header=True, index=False)
 if gc_correct:
     has_mapp = mappability_file is not None
-    gc_df = compute_gc_content(bbs, reference, mappability_file, genome_size)
     rdr_mtx_bb = bias_correction_rdr(
-        rdr_mtx_bb, gc_df, rep_ids[tumor_sidx:], has_mapp, qc_dir
+        rdr_mtx_bb, corr_factors, rep_ids[tumor_sidx:], has_mapp, qc_dir
     )
     plot_file = os.path.join(qc_dir, f"gc_content_bb.pdf")
-    plot_1d_sample(gc_df, gc_df["GC"].to_numpy(), genome_size, plot_file, unit="bb", val_type="GC")
+    plot_1d_sample(
+        corr_factors,
+        corr_factors["GC"].to_numpy(),
+        genome_size,
+        plot_file,
+        unit="bb",
+        val_type="GC",
+    )
 
 # plot per-sample RDRs (after corrections)
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
     plot_file = os.path.join(qc_dir, f"rdr_bb.{rep_id}.pdf")
     plot_1d_sample(
-        bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR", max_ylim=rdr_ylim
+        bbs,
+        rdr_mtx_bb[:, i],
+        genome_size,
+        plot_file,
+        unit="bb",
+        val_type="RDR",
+        max_ylim=rdr_ylim,
     )
 
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=rdr_mtx_bb)

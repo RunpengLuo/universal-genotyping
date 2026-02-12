@@ -140,7 +140,9 @@ def read_ucn_file(seg_ucn_file: str):
 
 
 def read_barcodes(bc_file: str):
-    barcodes = pd.read_table(bc_file, sep="\t", header=None, dtype=str).iloc[:, 0].tolist()
+    barcodes = (
+        pd.read_table(bc_file, sep="\t", header=None, dtype=str).iloc[:, 0].tolist()
+    )
     return barcodes
 
 

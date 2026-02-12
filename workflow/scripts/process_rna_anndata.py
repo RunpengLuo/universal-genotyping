@@ -99,7 +99,9 @@ logging.info(f"#concat barcodes={num_total_barcodes}, #union features={adata.n_v
 # filter genes not found in reference GTF file
 # invalid case: user should use same GTF file for space-ranger and genotyping.
 gene_id_colname = str(sm.params["gene_id_colname"])
-genes_gtf = read_genes_gtf_file(sm.input["gtf_file"], id_col=gene_id_colname)[[gene_id_colname, "#CHR", "START", "END"]]
+genes_gtf = read_genes_gtf_file(sm.input["gtf_file"], id_col=gene_id_colname)[
+    [gene_id_colname, "#CHR", "START", "END"]
+]
 logging.info(f"loaded #{len(genes_gtf)} unique genes from GTF.")
 
 var_coords = adata.var.merge(
@@ -141,7 +143,9 @@ if gene_blacklist_file is not None:
 sum_count_before_filtering = float(adata.X.sum())
 min_frac_barcodes = float(sm.params["min_frac_barcodes"])
 min_expressed_barcodes = round(min_frac_barcodes * num_total_barcodes)
-logging.info(f"min_frac_barcodes={min_frac_barcodes}, min_expressed_barcodes={min_expressed_barcodes}/{num_total_barcodes}")
+logging.info(
+    f"min_frac_barcodes={min_frac_barcodes}, min_expressed_barcodes={min_expressed_barcodes}/{num_total_barcodes}"
+)
 
 nnz_per_gene = adata.X.getnnz(axis=0)
 ind_sufficient_expressed_genes = np.asarray(
@@ -149,7 +153,7 @@ ind_sufficient_expressed_genes = np.asarray(
 ).ravel()
 adata = adata[:, ind_sufficient_expressed_genes]
 count_ratio = float(adata.X.sum()) / sum_count_before_filtering
-# FIXME 
+# FIXME
 logging.info(
     f"Retaining {100.0 * np.mean(ind_sufficient_expressed_genes):.3f}% of genes with sufficient expression across spots ({100.0 * count_ratio:.2f}% of total UMIs) @ {min_frac_barcodes} fraction of barcodes."
 )

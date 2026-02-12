@@ -195,9 +195,9 @@ plot_allele_freqs(
 
 ##################################################
 logging.info(f"saving output files")
-snps[["#CHR", "POS", "POS0", "START", "END", "GT", "PHASE", "region_id", "feature_id"]].to_csv(
-    sm.output["snp_info"], sep="\t", header=True, index=False
-)
+snps[
+    ["#CHR", "POS", "POS0", "START", "END", "GT", "PHASE", "region_id", "feature_id"]
+].to_csv(sm.output["snp_info"], sep="\t", header=True, index=False)
 if is_bulk_assay:
     np.savez_compressed(sm.output["tot_mtx_snp"], mat=tot_mtx)
     np.savez_compressed(sm.output["a_mtx_snp"], mat=a_mtx)

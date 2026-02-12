@@ -326,7 +326,7 @@ def plot_1d_sample(
     alpha=0.6,
     figsize=(40, 3),
     min_ylim=0.0,
-    max_ylim=1.0
+    max_ylim=1.0,
 ):
     """
     plot any features like AF, RDR, etc., in 1d chromosome scatter plot.
