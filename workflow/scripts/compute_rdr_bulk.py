@@ -78,7 +78,7 @@ else:
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
     plot_file = os.path.join(qc_dir, f"rdr_bb_before_correction.{rep_id}.pdf")
     plot_1d_sample(
-        bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR"
+        bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR", max_ylim=10
     )
 
 ##################################################
@@ -95,7 +95,7 @@ if gc_correct:
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
     plot_file = os.path.join(qc_dir, f"rdr_bb.{rep_id}.pdf")
     plot_1d_sample(
-        bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR"
+        bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR", max_ylim=10
     )
 
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=rdr_mtx_bb)
