@@ -205,9 +205,14 @@ plot_allele_freqs(
     unit="meta-snp",
 )
 meta_snps.to_csv(sm.output["meta_file"], sep="\t", header=True, index=False)
-save_npz(sm.output["tot_mtx_meta"], tot_mtx_meta)
-save_npz(sm.output["a_mtx_meta"], a_mtx_meta)
-save_npz(sm.output["b_mtx_meta"], b_mtx_meta)
+if is_bulk_assay:
+    np.savez_compressed(sm.output["tot_mtx_meta"], mat=tot_mtx_meta)
+    np.savez_compressed(sm.output["a_mtx_meta"], mat=a_mtx_meta)
+    np.savez_compressed(sm.output["b_mtx_meta"], mat=b_mtx_meta)
+else:
+    save_npz(sm.output["tot_mtx_meta"], tot_mtx_meta)
+    save_npz(sm.output["a_mtx_meta"], a_mtx_meta)
+    save_npz(sm.output["b_mtx_meta"], b_mtx_meta)
 
 ##################################################
 # MSR&MSPB block segmentation
