@@ -62,7 +62,7 @@ if workflow_mode == "bulk_genotyping":
             sample_name=SAMPLE_ID,
             assay_type=lambda wc: wc.assay_type,
             mosdepth=config["mosdepth"],
-            out_prefix=config["allele_dir"] + "/out_mosdepth/{rep_id}",
+            out_prefix=config["allele_dir"] + "/{assay_type}/out_mosdepth/{rep_id}",
             read_quality=config["params_mosdepth"]["read_quality"],
             extra_params=config["params_mosdepth"].get("extra_params", ""),
         log:
