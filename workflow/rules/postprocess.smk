@@ -148,6 +148,8 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             rep2celltypes=lambda wc: rep2celltypes,
         wildcard_constraints:
             assay_type="(scRNA|VISIUM|VISIUM3prime)",
+        log:
+            config["log_dir"] + "/process_rna_anndata.{assay_type}.log",
         script:
             """../scripts/process_rna_anndata.py"""
 
@@ -178,6 +180,8 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             rep2celltypes=lambda wc: rep2celltypes,
         wildcard_constraints:
             assay_type="scATAC",
+        log:
+            config["log_dir"] + "/process_atac_fragments.{assay_type}.log",
         script:
             """../scripts/process_atac_fragments.py"""
 
