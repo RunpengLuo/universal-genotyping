@@ -156,7 +156,8 @@ logging.info(
 
 ## 3. filter genes by region file, e.g., centromeric and HLA regions.
 ## each gene gets a feature_idx
-regions = read_region_file(sm.input["region_bed"])
+regions = read_region_file(sm.input["region_bed"])[["#CHR", "START", "END"]]
+regions["region_id"] = np.arange(len(regions))
 adata = feature_to_blocks(adata, regions, assay_type)
 
 ## 4. filter outlier genes by outlier detection algorithm TODO

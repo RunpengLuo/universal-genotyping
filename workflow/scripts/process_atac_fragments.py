@@ -120,6 +120,7 @@ adata.var["END"] = (
 # filter tiles
 ## 1. filter files by region file, e.g., centromeric and HLA regions.
 regions = read_region_file(sm.input["region_bed"])
+regions["region_id"] = np.arange(len(regions))
 adata = feature_to_blocks(adata, regions, assay_type)
 
 ##################################################

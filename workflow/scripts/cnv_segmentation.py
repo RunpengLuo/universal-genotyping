@@ -70,7 +70,7 @@ else:
 # load cnv profile
 segs_df, clones = read_ucn_file(sm.input["seg_ucn"])
 num_segs = len(segs_df)
-segs_df["seg_id"] = segs_df.index
+segs_df["seg_id"] = np.arange(len(segs_df))
 
 bbcs_df, _ = read_ucn_file(sm.input["bbc_ucn"])
 num_bbcs = len(bbcs_df)
