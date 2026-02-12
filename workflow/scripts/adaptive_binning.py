@@ -204,10 +204,10 @@ plot_allele_freqs(
     allele="B",
     unit="meta-snp",
 )
-meta_snps.to_csv(sm.params["meta_file"], sep="\t", header=True, index=False)
-save_npz(sm.params["tot_mtx_meta"], tot_mtx_meta)
-save_npz(sm.params["a_mtx_meta"], a_mtx_meta)
-save_npz(sm.params["b_mtx_meta"], b_mtx_meta)
+meta_snps.to_csv(sm.output["meta_file"], sep="\t", header=True, index=False)
+save_npz(sm.output["tot_mtx_meta"], tot_mtx_meta)
+save_npz(sm.output["a_mtx_meta"], a_mtx_meta)
+save_npz(sm.output["b_mtx_meta"], b_mtx_meta)
 
 ##################################################
 # MSR&MSPB block segmentation
