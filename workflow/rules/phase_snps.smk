@@ -45,6 +45,7 @@ if config["phaser"] == "eagle":
             chrom="chr{chrname}",
             eagle=config["eagle"],
             bcftools=config["bcftools"],
+            out_prefix=config["phase_dir"] + "/chr{chrname}",
         log:
             config["log_dir"] + "/phase_snps.chr{chrname}.log",
         shell:
@@ -55,7 +56,7 @@ if config["phaser"] == "eagle":
                 --vcfRef "{input.phasing_panel_file}" \
                 --vcfOutFormat z \
                 --numThreads "{threads}" \
-                --outPrefix config["phase_dir"] + "/{params.chrom}" > {log} 2>&1
+                --outPrefix {params.out_prefix} > {log} 2>&1
             tabix -f -p vcf "{output.phased_file}"
             """
 
