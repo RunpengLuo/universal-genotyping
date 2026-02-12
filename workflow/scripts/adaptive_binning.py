@@ -178,6 +178,7 @@ if is_bulk_assay:
         tot_mtx,
         grp_cols,
         colname="meta_id",
+        tumor_sidx=tumor_sidx,
     )
 else:
     meta_snps = adaptive_binning(
@@ -216,15 +217,25 @@ else:
 
 ##################################################
 # MSR&MSPB block segmentation
-bbs = adaptive_binning(
-    snps,
-    int(sm.params["min_snp_reads"]),
-    int(sm.params["min_snp_per_block"]),
-    tot_mtx,
-    grp_cols,
-    colname="bb_id",
-    tumor_sidx=tumor_sidx,
-)
+if is_bulk_assay:
+    bbs = adaptive_binning(
+        snps,
+        int(sm.params["min_snp_reads"]),
+        int(sm.params["min_snp_per_block"]),
+        tot_mtx,
+        grp_cols,
+        colname="bb_id",
+        tumor_sidx=tumor_sidx,
+    )
+else:
+    bbs = adaptive_binning(
+        snps,
+        int(sm.params["min_snp_reads"]),
+        int(sm.params["min_snp_per_block"]),
+        tot_vec[:, None],
+        grp_cols,
+        colname="bb_id",
+    )
 
 bb_ids = snps["bb_id"].to_numpy()
 num_bbs = len(bbs)
