@@ -107,6 +107,8 @@ grp_cols.append("PS")
 
 # 2. estimate phase error bounderies
 binom_test = bool(sm.params["binom_test"])
+b_vec = np.asarray(b_mtx.sum(axis=1)).ravel()
+tot_vec = np.asarray(tot_mtx.sum(axis=1)).ravel()
 if binom_test:
     if is_bulk_assay:
         baf_mtx = b_mtx / tot_mtx
@@ -140,8 +142,6 @@ if binom_test:
     else:
         # binomial test on pseudobulk sample,
         # TODO use spatial information to use tumor-like spots?
-        b_vec = np.asarray(b_mtx.sum(axis=1)).ravel()
-        tot_vec = np.asarray(tot_mtx.sum(axis=1)).ravel()
         baf_vec = compute_af_pseudobulk(tot_mtx, b_mtx)
         switches = binom_2prop_test(
             b_vec,
@@ -170,14 +170,24 @@ if binom_test:
 # 4. restrict within gene binning by feature_id? TODO
 ##################################################
 # meta-snp segmentation
-meta_snps = adaptive_binning(
-    snps,
-    0,
-    int(sm.params["nsnp_meta"]),
-    tot_vec[:, None],
-    grp_cols,
-    colname="meta_id",
-)
+if is_bulk_assay:
+    meta_snps = adaptive_binning(
+        snps,
+        0,
+        int(sm.params["nsnp_meta"]),
+        tot_mtx,
+        grp_cols,
+        colname="meta_id",
+    )
+else:
+    meta_snps = adaptive_binning(
+        snps,
+        0,
+        int(sm.params["nsnp_meta"]),
+        tot_vec[:, None],
+        grp_cols,
+        colname="meta_id",
+    )
 meta_ids = snps["meta_id"].to_numpy()
 a_mtx_meta = matrix_segmentation(a_mtx, meta_ids, len(meta_snps))
 b_mtx_meta = matrix_segmentation(b_mtx, meta_ids, len(meta_snps))
