@@ -59,6 +59,10 @@ if workflow_mode == "single_cell_genotyping":
             snp_panel=config["snp_panel"],
         output:
             out_dir=directory(config["snp_dir"] + "/pseudobulk_{modality}"),
+            out_vcf=config["snp_dir"] + "/pseudobulk_{modality}/cellSNP.base.vcf.gz",
+            out_tsv=config["snp_dir"] + "/pseudobulk_{modality}/cellSNP.samples.tsv",
+            out_dp=config["snp_dir"] + "/pseudobulk_{modality}/cellSNP.tag.DP.mtx",
+            out_ad=config["snp_dir"] + "/pseudobulk_{modality}/cellSNP.tag.AD.mtx",
             bam_lst=temp("tmp/bams.{modality}.lst"),
         log:
             config["log_dir"] + "/genotype_snps_pseudobulk.{modality}.log",
