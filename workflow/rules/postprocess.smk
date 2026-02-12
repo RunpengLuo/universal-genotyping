@@ -88,7 +88,7 @@ if workflow_mode == "bulk_genotyping":
             + f"/{wc.assay_type}/sample_ids.tsv",
             bb_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/bb.tsv.gz",
             mosdepth_files=lambda wc: expand(
-                config["allele_dir"] + "/out_mosdepth/{rep_id}.regions.bed.gz",
+                config["allele_dir"] + "/{assay_type}/out_mosdepth/{rep_id}.regions.bed.gz",
                 rep_id=assay2rep_ids.get(wc.assay_type, []),
             ),
             reference=config["reference"],

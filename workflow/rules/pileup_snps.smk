@@ -14,7 +14,6 @@ rule pileup_snps_bulk_mode1b:
         out_ad=config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.tag.AD.mtx",
     wildcard_constraints:
         assay_type="(bulkDNA|bulkWGS|bulkWES)",
-        rep_id=rep_ids,
     threads: config["threads"]["pileup"]
     params:
         cellsnp_lite=config["cellsnp_lite"],
@@ -54,7 +53,6 @@ rule pileup_snps_single_cell_mode1a:
         out_ad=config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.tag.AD.mtx",
     wildcard_constraints:
         assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
-        rep_id=rep_ids,
     threads: config["threads"]["pileup"]
     params:
         cellsnp_lite=config["cellsnp_lite"],
