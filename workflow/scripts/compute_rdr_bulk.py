@@ -74,11 +74,13 @@ if has_normal:
 else:
     raise ValueError("no normal sample, TODO")
 
+rdr_ylim = np.round(rdr_mtx_bb.max()).astype(int) + 1
+
 # plot per-sample RDRs (before corrections)
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
     plot_file = os.path.join(qc_dir, f"rdr_bb_before_correction.{rep_id}.pdf")
     plot_1d_sample(
-        bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR", max_ylim=10
+        bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR", max_ylim=rdr_ylim
     )
 
 ##################################################
@@ -95,7 +97,7 @@ if gc_correct:
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
     plot_file = os.path.join(qc_dir, f"rdr_bb.{rep_id}.pdf")
     plot_1d_sample(
-        bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR", max_ylim=10
+        bbs, rdr_mtx_bb[:, i], genome_size, plot_file, unit="bb", val_type="RDR", max_ylim=rdr_ylim
     )
 
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=rdr_mtx_bb)
