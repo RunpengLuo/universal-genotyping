@@ -55,7 +55,7 @@ if workflow_mode == "bulk_genotyping":
     rule run_mosdepth_bulk:
         input:
             bam=lambda wc: get_data[(wc.assay_type, wc.rep_id)][1],
-            bed_file=config["allele_dir"] + f"/{wc.assay_type}/bb.bed.gz",
+            bed_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/bb.bed.gz",
         output:
             mosdepth_file=config["allele_dir"]
             + "/{assay_type}/out_mosdepth/{rep_id}.regions.bed.gz",

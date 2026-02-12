@@ -27,7 +27,7 @@ assay_types = sample_df["assay_type"].unique().tolist()
 
 nonbulk_assays = ["scATAC", "scRNA", "VISIUM", "VISIUM3prime"]
 bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
-allowed_assay_types = bulk_assays + nonbulk_assays
+allowed_assay_types = list(bulk_assays) + list(nonbulk_assays)
 assert all(dt in allowed_assay_types for dt in assay_types)
 assay_type2modality = {
     "bulkDNA": "DNA",

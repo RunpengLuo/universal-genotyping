@@ -7,9 +7,14 @@ rule pileup_snps_bulk_mode1b:
             otherwise=config["het_snp_vcf"],
         ),
     output:
-        out_dir=directory(config["pileup_dir"] + "/{assay_type}_{rep_id}"),
+        out_dir=directory(config["pileup_dir"] + "/{assay_type}_{rep_id}/"),
+        out_vcf=config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.base.vcf.gz",
+        out_tsv=config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.samples.tsv",
+        out_dp=config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.tag.DP.mtx",
+        out_ad=config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.tag.AD.mtx",
     wildcard_constraints:
         assay_type="(bulkDNA|bulkWGS|bulkWES)",
+        rep_id=rep_ids,
     threads: config["threads"]["pileup"]
     params:
         cellsnp_lite=config["cellsnp_lite"],
@@ -42,9 +47,14 @@ rule pileup_snps_single_cell_mode1a:
             otherwise=config["het_snp_vcf"],
         ),
     output:
-        out_dir=directory(config["pileup_dir"] + "/{assay_type}_{rep_id}"),
+        out_dir=directory(config["pileup_dir"] + "/{assay_type}_{rep_id}/"),
+        out_vcf=config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.base.vcf.gz",
+        out_tsv=config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.samples.tsv",
+        out_dp=config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.tag.DP.mtx",
+        out_ad=config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.tag.AD.mtx",
     wildcard_constraints:
         assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
+        rep_id=rep_ids,
     threads: config["threads"]["pileup"]
     params:
         cellsnp_lite=config["cellsnp_lite"],
