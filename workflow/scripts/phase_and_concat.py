@@ -102,11 +102,12 @@ if is_bulk_assay:
 ##################################################
 # annotate&filter SNPs
 num_snps_before = len(snps)
+
+snp_mask = np.ones(len(snps), dtype=bool)
 # define continguous autosome segments
 regions = read_region_file(region_bed)
+snp_mask = snp_mask & get_mask_by_region(snps, regions)
 if is_bulk_assay:
-    snp_mask = np.ones(len(snps), dtype=bool)
-    snp_mask = snp_mask & get_mask_by_region(snps, regions)
     snp_mask = snp_mask & get_mask_by_depth(
         snps, tot_mtx, min_dp=max(int(sm.params["min_depth"]), 1)
     )
@@ -132,7 +133,7 @@ else:
     feature_df["feature_idx"] = np.arange(len(feature_df))
 
     snps = assign_pos_to_range(snps, feature_df, ref_id="feature_idx", pos_col="POS0")
-    snp_mask = snps["feature_idx"].notna().to_numpy()
+    snp_mask = snp_mask & snps["feature_idx"].notna().to_numpy()
     logging.info(
         f"#SNPs overlap with {assay_type} features={np.sum(snp_mask) / len(snps):.3%}"
     )
@@ -160,6 +161,9 @@ alt_mtx = alt_mtx[snp_mask, :]
 a_mtx = a_mtx[snp_mask, :]
 b_mtx = b_mtx[snp_mask, :]
 
+# TODO
+# BAF HMM phase correction here?
+# record genotypes. potentially save another vcf file for copytyping preprocess input.
 
 ##################################################
 # QC plots
