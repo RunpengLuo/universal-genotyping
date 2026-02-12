@@ -126,6 +126,7 @@ adata.var["END"] = adata.var["END"].astype(int)
 ## 0. filter complete zero counts
 adata.var["pseudobulk_counts"] = np.asarray(adata.X.sum(axis=0)).flatten()
 adata = adata[:, adata.var["pseudobulk_counts"] > 0].copy()
+logging.info(f"#genes after filtering by zero pseudobulk_counts: {adata.n_vars}")
 
 ## 1. filter genes by blacklist file
 gene_blacklist_file = maybe_path(sm.input["gene_blacklist_file"])
