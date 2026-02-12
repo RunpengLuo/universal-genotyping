@@ -269,7 +269,7 @@ if is_bulk_assay:
     np.savez_compressed(sm.output["a_mtx_bb"], mat=a_mtx_bb)
     np.savez_compressed(sm.output["b_mtx_bb"], mat=b_mtx_bb)
 else:
-    save_npz(sm.params["tot_mtx_bb"], tot_mtx_bb)
-    save_npz(sm.params["a_mtx_bb"], a_mtx_bb)
-    save_npz(sm.params["b_mtx_bb"], b_mtx_bb)
+    save_npz(sm.output["tot_mtx_bb"], tot_mtx_bb)
+    save_npz(sm.output["a_mtx_bb"], a_mtx_bb)
+    save_npz(sm.output["b_mtx_bb"], b_mtx_bb)
 logging.info(f"finished.")
