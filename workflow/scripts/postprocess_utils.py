@@ -325,6 +325,8 @@ def plot_1d_sample(
     dpi=150,
     alpha=0.6,
     figsize=(40, 3),
+    min_ylim=0.0,
+    max_ylim=1.0
 ):
     """
     plot any features like AF, RDR, etc., in 1d chromosome scatter plot.
@@ -367,6 +369,8 @@ def plot_1d_sample(
         if val_type in ["AF", "BAF"]:
             ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
             ax.set_ylim(-0.05, 1.05)
+        else:
+            ax.set_ylim(min_ylim, max_ylim)
 
         ax.set_xlabel(val_type)
         ax.set_xlim(0, chr_end)

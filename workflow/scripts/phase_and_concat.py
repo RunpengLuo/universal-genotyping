@@ -163,7 +163,8 @@ b_mtx = b_mtx[snp_mask, :]
 
 # TODO
 # BAF HMM phase correction here?
-# record genotypes. potentially save/soft-link corrected vcf file for copytyping preprocess input.
+# record genotypes GT in snp_info for copy-typing recovery.
+# a/b mtx got updated.
 
 ##################################################
 # QC plots
