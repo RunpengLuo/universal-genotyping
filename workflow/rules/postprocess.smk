@@ -34,7 +34,7 @@ if workflow_mode == "bulk_genotyping":
             a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
             b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
             sample_file=config["allele_dir"] + "/{assay_type}/sample_ids.tsv",
-            qc_dir=directory(config["qc_dir"] + "/phase_and_concat/{assay_type}"),
+            qc_dir=directory(config["qc_dir"] + "/{assay_type}/phase_and_concat/"),
         wildcard_constraints:
             assay_type="(bulkDNA|bulkWGS|bulkWES)",
         params:
@@ -102,7 +102,7 @@ if workflow_mode == "bulk_genotyping":
         output:
             dp_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.depth.npz",
             rdr_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.rdr.npz",
-            qc_dir=directory(config["qc_dir"] + "/compute_rdr_bulk/{assay_type}"),
+            qc_dir=directory(config["qc_dir"] + "/{assay_type}/compute_rdr_bulk/"),
         wildcard_constraints:
             assay_type="(bulkDNA|bulkWGS|bulkWES)",
         params:
@@ -221,7 +221,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
             b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
             sample_file=config["allele_dir"] + "/{assay_type}/sample_ids.tsv",
-            qc_dir=directory(config["qc_dir"] + "/phase_and_concat/{assay_type}"),
+            qc_dir=directory(config["qc_dir"] + "/{assay_type}/phase_and_concat/"),
             unique_snp_ids=config["allele_dir"] + "/{assay_type}/unique_snp_ids.npy",
             cell_snp_Aallele=config["allele_dir"] + "/{assay_type}/cell_snp_Aallele.npz",
             cell_snp_Ballele=config["allele_dir"] + "/{assay_type}/cell_snp_Ballele.npz",
@@ -262,7 +262,7 @@ rule adaptive_binning:
         a_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.Aallele.npz",
         b_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.Ballele.npz",
         bed_file=config["allele_dir"] + "/{assay_type}/bb.bed.gz",
-        qc_dir=directory(config["qc_dir"] + "/adaptive_binning/{assay_type}"),
+        qc_dir=directory(config["qc_dir"] + "/{assay_type}/adaptive_binning/"),
     params:
         sample_name=SAMPLE_ID,
         assay_type=lambda wc: wc.assay_type,
@@ -301,7 +301,7 @@ rule cnv_segmentation:
         x_count=config["allele_dir"] + "/{assay_type}/X_count.npz",
         y_count=config["allele_dir"] + "/{assay_type}/Y_count.npz",
         d_count=config["allele_dir"] + "/{assay_type}/D_count.npz",
-        qc_dir=directory(config["qc_dir"] + "/cnv_segmentation/{assay_type}"),
+        qc_dir=directory(config["qc_dir"] + "/{assay_type}/cnv_segmentation/"),
     wildcard_constraints:
         assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
     params:
