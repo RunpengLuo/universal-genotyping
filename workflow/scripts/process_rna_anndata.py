@@ -91,7 +91,8 @@ if len(adatas) > 1:
 else:
     adata = adatas[rep_ids[0]]
 adata.X = adata.X.tocsr()
-logging.info(f"#concat barcodes={adata.n_obs}, #union features={adata.n_vars}")
+num_total_barcodes = adata.n_obs
+logging.info(f"#concat barcodes={num_total_barcodes}, #union features={adata.n_vars}")
 
 ##################################################
 # annotate gene interval in BED format by reference GTF file
@@ -139,10 +140,12 @@ if gene_blacklist_file is not None:
 ## 2. filter lowly expressed genes by counting #epressed barcodes
 sum_count_before_filtering = float(adata.X.sum())
 min_frac_barcodes = float(sm.params["min_frac_barcodes"])
+min_expressed_barcodes = round(min_frac_barcodes * num_total_barcodes)
+logging.info(f"min_frac_barcodes={min_frac_barcodes}, min_expressed_barcodes={min_expressed_barcodes}/{num_total_barcodes}")
 
 nnz_per_gene = adata.X.getnnz(axis=0)
 ind_sufficient_expressed_genes = np.asarray(
-    nnz_per_gene >= (min_frac_barcodes * adata.n_obs)
+    nnz_per_gene >= min_expressed_barcodes
 ).ravel()
 adata = adata[:, ind_sufficient_expressed_genes]
 count_ratio = float(adata.X.sum()) / sum_count_before_filtering
