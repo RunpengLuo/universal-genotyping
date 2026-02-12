@@ -39,7 +39,9 @@ gtf_file = maybe_path(sm.input["gtf_file"])
 
 sample_name = sm.params["sample_name"]
 assay_type = sm.params["assay_type"]
-rep_ids = list(sm.params["rep_ids"])
+rep_ids = sm.params["rep_ids"]
+sample_types = sm.params["sample_types"]
+
 
 bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
 is_bulk_assay = assay_type in bulk_assays
@@ -55,10 +57,10 @@ parent_keys = pd.Index(snps["KEY"])
 assert not parent_keys.duplicated().any(), "invalid bi-allelic SNP VCF file"
 
 if is_bulk_assay:
-    has_normal = "normal" in rep_ids
+    has_normal = "normal" in sample_types
     # If normal sample exists, make first column be normal sample.
     if has_normal:
-        normal_idx = list(rep_ids).index("normal")
+        normal_idx = list(sample_types).index("normal")
         rep_ids[0], rep_ids[normal_idx] = rep_ids[normal_idx], rep_ids[0]
         vcf_files[0], vcf_files[normal_idx] = vcf_files[normal_idx], vcf_files[0]
         tot_mtx_files[0], tot_mtx_files[normal_idx] = (
@@ -215,5 +217,6 @@ all_barcodes.to_csv(sm.output["all_barcodes"], sep="\t", header=False, index=Fal
 sample_df = pd.DataFrame({"SAMPLE": [f"{sample_name}_{rep_id}" for rep_id in rep_ids]})
 sample_df["SAMPLE_NAME"] = sample_name
 sample_df["REP_ID"] = rep_ids
+sample_df["sample_type"] = sample_types
 sample_df.to_csv(sm.output["sample_file"], sep="\t", header=True, index=False)
 logging.info(f"finished.")

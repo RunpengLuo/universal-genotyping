@@ -94,11 +94,15 @@ for modality, rows in sample_df.groupby("modality", sort=False):
     modality2bams[modality] = rows["PATH_to_bam"].tolist()
 
 assay2rep_ids = OrderedDict()
+assay2sample_types = OrderedDict()
 for assay_type, rows in sample_df.groupby("assay_type", sort=False):
     assay2rep_ids[assay_type] = rows["REP_ID"].tolist()
+    assay2sample_types[assay_type] = rows["sample_type"].tolist()
+    
 for assay_type in allowed_assay_types:
     if assay_type not in assay2rep_ids:
         assay2rep_ids[assay_type] = []
+        assay2sample_types[assay_type] = []
 
 get_data = OrderedDict()
 rep2modalities = OrderedDict()

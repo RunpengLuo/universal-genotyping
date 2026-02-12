@@ -46,11 +46,12 @@ gtf_file = maybe_path(sm.input["gtf_file"])
 sample_df = pd.read_table(sm.input["sample_file"])
 sample_name = sample_df["SAMPLE"].iloc[0]
 rep_ids = sample_df["REP_ID"].tolist()
+sample_types = sample_df["sample_type"].tolist()
 assay_type = sm.params["assay_type"]
 
 bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
 is_bulk_assay = assay_type in bulk_assays
-has_normal = "normal" in rep_ids
+has_normal = "normal" in sample_types
 tumor_sidx = {False: 0, True: 1}[has_normal]
 
 ##################################################

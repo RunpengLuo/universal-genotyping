@@ -41,6 +41,7 @@ if workflow_mode == "bulk_genotyping":
             sample_name=SAMPLE_ID,
             assay_type=lambda wc: wc.assay_type,
             rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
+            sample_types=lambda wc: assay2sample_types[wc.assay_type],
             min_depth=config["params_postprocess"]["min_depth"],
             gamma=config["params_postprocess"]["gamma"],
         log:
@@ -143,6 +144,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
         params:
             assay_type=lambda wc: wc.assay_type,
             rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
+            sample_types=lambda wc: assay2sample_types[wc.assay_type],
             min_frac_barcodes=lambda wc: config["params_postprocess"][
                 "min_frac_barcodes"
             ],
@@ -178,6 +180,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
         params:
             assay_type=lambda wc: wc.assay_type,
             rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
+            sample_types=lambda wc: assay2sample_types[wc.assay_type],
             tile_width=lambda wc: config["params_postprocess"]["tile_width"],
             rep2celltypes=lambda wc: rep2celltypes,
         wildcard_constraints:
@@ -232,6 +235,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             sample_name=SAMPLE_ID,
             assay_type=lambda wc: wc.assay_type,
             rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
+            sample_types=lambda wc: assay2sample_types[wc.assay_type],
         log:
             config["log_dir"] + "/phase_and_concat.{assay_type}.log",
         script:

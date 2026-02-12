@@ -39,9 +39,10 @@ logging.info("run compute_rdr_bulk")
 
 ##################################################
 logging.info("concat mosdepth per-sample depth data")
-samples_df = pd.read_table(sample_file, sep="\t")
-rep_ids = samples_df["REP_ID"].astype(str).tolist()
-nsamples = len(samples_df)
+sample_df = pd.read_table(sample_file, sep="\t")
+rep_ids = sample_df["REP_ID"].astype(str).tolist()
+sample_types = sample_df["sample_type"].tolist()
+nsamples = len(sample_df)
 bbs = pd.read_table(bb_file, sep="\t")
 for rep_id in rep_ids:
     mos_file = os.path.join(mosdepth_dir, f"{rep_id}.regions.bed.gz")
@@ -58,7 +59,7 @@ dp_mtx_bb = bbs[rep_ids].to_numpy(dtype=np.float32)
 np.savez_compressed(sm.output["dp_mtx_bb"], mat=dp_mtx_bb)
 
 ##################################################
-has_normal = "normal" in rep_ids
+has_normal = "normal" in sample_types
 logging.info(f"compute RDRs, has_normal={has_normal}, gc_correct={gc_correct}")
 assert has_normal, "no normal sample, TODO"
 tumor_sidx = {False: 0, True: 1}[has_normal]
