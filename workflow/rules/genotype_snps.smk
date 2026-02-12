@@ -20,7 +20,7 @@ if workflow_mode == "bulk_genotyping":
             target_pos=lambda wc: config["snp_targets"] + "/target.chr{chrname}.pos.gz",
             reference=config["reference"],
         output:
-            snp_file=config["snp_dir"] + "/chr{chrname}.vcf.gz",
+            snp_vcf=config["snp_dir"] + "/chr{chrname}.vcf.gz",
         log:
             config["log_dir"] + "/genotype_snps_bulk/chr{chrname}.log",
         threads: config["threads"]["genotype"]
@@ -45,9 +45,9 @@ if workflow_mode == "bulk_genotyping":
             | {params.bcftools} call -m -Ou \
             | {params.bcftools} view -v snps -m2 -M2 \
                 -i 'GT="alt" && FMT/DP>={params.min_dp}' \
-                -Oz -o {output.snp_file} > {log} 2>&1
+                -Oz -o {output.snp_vcf} > {log} 2>&1
 
-            tabix -p vcf {output.snp_file}
+            tabix -p vcf {output.snp_vcf}
             """
 
 
@@ -90,17 +90,17 @@ if workflow_mode == "single_cell_genotyping":
 
     rule annotate_snps_pseudobulk:
         input:
-            raw_snp_files=[
+            raw_snp_vcfs=[
                 config["snp_dir"] + f"/pseudobulk_{modality}/cellSNP.base.vcf.gz"
                 for modality in modalities
             ],
             genome_size=config["genome_size"],
         output:
-            snp_files=expand(
+            snp_vcfs=expand(
                 config["snp_dir"] + "/chr{chrname}.vcf.gz",
                 chrname=config["chromosomes"],
             ),
-            snp_files_tbi=expand(
+            snp_vcfs_tbi=expand(
                 config["snp_dir"] + "/chr{chrname}.vcf.gz.tbi",
                 chrname=config["chromosomes"],
             ),

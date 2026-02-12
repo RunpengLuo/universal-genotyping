@@ -2,7 +2,7 @@ if config["phaser"] == "shapeit":
 
     rule phase_snps_shapeit:
         input:
-            snp_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
+            snp_vcf=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
             phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
             gmap_file=lambda wc: get_genetic_map(wc.chrname),
         output:
@@ -19,7 +19,7 @@ if config["phaser"] == "shapeit":
         shell:
             r"""
             {params.shapeit} \
-                --input "{input.snp_file}" \
+                --input "{input.snp_vcf}" \
                 --map "{input.gmap_file}" \
                 --reference "{input.phasing_panel_file}" \
                 --region "{params.chrom}" \
@@ -35,7 +35,7 @@ if config["phaser"] == "eagle":
 
     rule phase_snps_eagle:
         input:
-            snp_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
+            snp_vcf=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
             phasing_panel_file=lambda wc: get_phasing_panel(wc.chrname),
             gmap_file=lambda wc: get_genetic_map(wc.chrname),
         output:
@@ -50,7 +50,7 @@ if config["phaser"] == "eagle":
         shell:
             r"""
             {params.eagle} \
-                --vcfTarget "{input.snp_file}" \
+                --vcfTarget "{input.snp_vcf}" \
                 --geneticMapFile "{input.gmap_file}" \
                 --vcfRef "{input.phasing_panel_file}" \
                 --vcfOutFormat z \
@@ -64,7 +64,7 @@ if config["phaser"] == "longphase":
 
     rule phase_snps_longphase:
         input:
-            snp_file=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
+            snp_vcf=lambda wc: config["snp_dir"] + f"/chr{wc.chrname}.vcf.gz",
             bams=lambda wc: branch(
                 len(normal_bams) > 0, then=normal_bams[0], otherwise=tumor_bams[0]
             ),
@@ -85,7 +85,7 @@ if config["phaser"] == "longphase":
             {params.longphase} phase \
                 --bam-file={input.bams} \
                 --reference={input.reference} \
-                --snp-file={input.snp_file} \
+                --snp-file={input.snp_vcf} \
                 --mappingQuality={params.min_mapq} \
                 --out-prefix=config["phase_dir"] + "/{params.chrom}" \
                 --threads={threads} \

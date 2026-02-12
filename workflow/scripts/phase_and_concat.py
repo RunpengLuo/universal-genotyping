@@ -29,7 +29,7 @@ vcf_files = sm.input["vcfs"]
 sample_tsvs = sm.input["sample_tsvs"]
 tot_mtx_files = sm.input["tot_mtxs"]
 ad_mtx_files = sm.input["ad_mtxs"]
-snp_file = sm.input["snp_file"]
+snp_vcf = sm.input["snp_vcf"]
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 
@@ -50,7 +50,7 @@ logging.info(
 )
 logging.info(f"rep_ids={rep_ids}")
 
-snps = read_VCF(snp_file, addkey=True, add_phase1=True, add_pos0=True)
+snps = read_VCF(snp_vcf, addkey=True, add_phase1=True, add_pos0=True)
 parent_keys = pd.Index(snps["KEY"])
 assert not parent_keys.duplicated().any(), "invalid bi-allelic SNP VCF file"
 
@@ -163,7 +163,7 @@ b_mtx = b_mtx[snp_mask, :]
 
 # TODO
 # BAF HMM phase correction here?
-# record genotypes. potentially save another vcf file for copytyping preprocess input.
+# record genotypes. potentially save/soft-link corrected vcf file for copytyping preprocess input.
 
 ##################################################
 # QC plots
@@ -195,7 +195,7 @@ plot_allele_freqs(
 ##################################################
 logging.info(f"saving output files")
 snps[["#CHR", "POS", "START", "END", "GT", "PHASE", "region_id", "feature_id"]].to_csv(
-    sm.output["snp_file"], sep="\t", header=True, index=False
+    sm.output["snp_info"], sep="\t", header=True, index=False
 )
 if is_bulk_assay:
     np.savez_compressed(sm.output["tot_mtx_snp"], mat=tot_mtx)

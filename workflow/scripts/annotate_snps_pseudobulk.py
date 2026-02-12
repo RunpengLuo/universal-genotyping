@@ -55,10 +55,10 @@ def get_genotype(row):
 KEY = ["#CHROM", "POS", "REF", "ALT"]
 CNT = ["DP", "AD", "OTH"]
 modalities = list(sm.params["modalities"])
-raw_snp_files = list(sm.input["raw_snp_files"])
+raw_snp_vcfs = list(sm.input["raw_snp_vcfs"])
 raw_snps_list = []
 for idx, modality in enumerate(modalities):
-    raw_snps = read_VCF(raw_snp_files[idx], addkey=True)
+    raw_snps = read_VCF(raw_snp_vcfs[idx], addkey=True)
     assert all(c in raw_snps.columns for c in KEY + CNT), "invalid cellsnp-lite format"
     for cnt in CNT:
         raw_snps[f"{cnt}{idx}"] = raw_snps[cnt].astype(np.int64)
@@ -200,10 +200,10 @@ final_snps = final_snps[cols]
 
 final_snps_chs = final_snps.groupby("#CHROM", sort=False)
 chrom_sizes = get_chr_sizes(sm.input["genome_size"])
-for chrname, out_snp_file in zip(chroms, sm.output["snp_files"]):
+for chrname, out_snp_vcf in zip(chroms, sm.output["snp_vcfs"]):
     chrom = f"chr{chrname}"
     chrom_length = chrom_sizes[chrname]
-    with open(out_snp_file[:-3], "w") as fd:
+    with open(out_snp_vcf[:-3], "w") as fd:
         fd.writelines(
             [
                 "##fileformat=VCFv4.2\n",
@@ -220,7 +220,7 @@ for chrname, out_snp_file in zip(chroms, sm.output["snp_files"]):
                 fd, sep="\t", index=False, header=False
             )
 
-    # out_snp_file[:-3] will be removed by bgzip.
-    subprocess.run(["bgzip", "-f", out_snp_file[:-3]], check=True)
-    subprocess.run(["tabix", "-f", "-p", "vcf", out_snp_file], check=True)
+    # out_snp_vcf[:-3] will be removed by bgzip.
+    subprocess.run(["bgzip", "-f", out_snp_vcf[:-3]], check=True)
+    subprocess.run(["tabix", "-f", "-p", "vcf", out_snp_vcf], check=True)
 logging.info("finished annotate_snps_pseudobulk")

@@ -1,7 +1,7 @@
 rule pileup_snps_bulk_mode1b:
     input:
         bam=lambda wc: get_data[(wc.assay_type, wc.rep_id)][1],
-        snp_file=lambda wc: branch(
+        snp_vcf=lambda wc: branch(
             run_genotype_snps,
             then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
             otherwise=config["het_snp_vcf"],
@@ -21,7 +21,7 @@ rule pileup_snps_bulk_mode1b:
         r"""
         {params.cellsnp_lite} \
             -s "{input.bam}" \
-            -R "{input.snp_file}" \
+            -R "{input.snp_vcf}" \
             -O "{output.out_dir}" \
             -p {threads} \
             --minMAF {params.minMAF} \
@@ -36,7 +36,7 @@ rule pileup_snps_single_cell_mode1a:
     input:
         barcode=lambda wc: get_data[(wc.assay_type, wc.rep_id)][0],
         bam=lambda wc: get_data[(wc.assay_type, wc.rep_id)][1],
-        snp_file=lambda wc: branch(
+        snp_vcf=lambda wc: branch(
             run_genotype_snps,
             then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
             otherwise=config["het_snp_vcf"],
@@ -64,7 +64,7 @@ rule pileup_snps_single_cell_mode1a:
         {params.cellsnp_lite} \
             -b "{input.barcode}" \
             -s "{input.bam}" \
-            -R "{input.snp_file}" \
+            -R "{input.snp_vcf}" \
             -O "{output.out_dir}" \
             -p {threads} \
             --minMAF {params.minMAF} \

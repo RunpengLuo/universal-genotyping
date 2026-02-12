@@ -23,7 +23,7 @@ if workflow_mode == "bulk_genotyping":
                 assay_type=wc.assay_type,
                 rep_id=assay2rep_ids[wc.assay_type],
             ),
-            snp_file=lambda wc: branch(
+            snp_vcf=lambda wc: branch(
                 run_genotype_snps,
                 then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
                 otherwise=config["het_snp_vcf"],
@@ -33,7 +33,7 @@ if workflow_mode == "bulk_genotyping":
             gtf_file=lambda wc: config["gtf_file"],
         output:
             all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
-            snp_file=config["allele_dir"] + "/{assay_type}/snps.tsv.gz",
+            snp_info=config["allele_dir"] + "/{assay_type}/snps.tsv.gz",
             tot_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Tallele.npz",
             a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
             b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
@@ -204,7 +204,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
                 assay_type=wc.assay_type,
                 rep_id=assay2rep_ids[wc.assay_type],
             ),
-            snp_file=lambda wc: branch(
+            snp_vcf=lambda wc: branch(
                 run_genotype_snps,
                 then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
                 otherwise=config["het_snp_vcf"],
@@ -216,7 +216,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             gtf_file=lambda wc: config["gtf_file"],
         output:
             all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
-            snp_file=config["allele_dir"] + "/{assay_type}/snps.tsv.gz",
+            snp_info=config["allele_dir"] + "/{assay_type}/snps.tsv.gz",
             tot_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Tallele.npz",
             a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
             b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
@@ -239,7 +239,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
 
 rule adaptive_binning:
     input:
-        snp_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snps.tsv.gz",
+        snp_info=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snps.tsv.gz",
         tot_mtx_snp=lambda wc: config["allele_dir"]
         + f"/{wc.assay_type}/snp.Tallele.npz",
         a_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Aallele.npz",
@@ -284,7 +284,7 @@ rule adaptive_binning:
 
 rule cnv_segmentation:
     input:
-        snp_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snps.tsv.gz",
+        snp_info=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snps.tsv.gz",
         tot_mtx_snp=lambda wc: config["allele_dir"]
         + f"/{wc.assay_type}/snp.Tallele.npz",
         a_mtx_snp=lambda wc: config["allele_dir"]

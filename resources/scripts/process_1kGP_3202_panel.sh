@@ -6,7 +6,7 @@ BASE="https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_hig
 OUT=$1
 mkdir -p "${OUT}"/{raw,snps,target_positions,phasing_panel}
 
-: > "${OUT}/snp_files.lst"
+: > "${OUT}/snp_vcfs.lst"
 for chr in $(seq 1 22) X; do
   date
   echo "chr$chr"
@@ -28,7 +28,7 @@ for chr in $(seq 1 22) X; do
     bcftools view -v snps -G -Oz -o "${OUT}/snps/chr${chr}.vcf.gz" "${OUT}/raw/${vcfgz}"
     tabix -p vcf "${OUT}/snps/chr${chr}.vcf.gz"
   fi
-  echo "${OUT}/snps/chr${chr}.vcf.gz" >> "${OUT}/snp_files.lst"
+  echo "${OUT}/snps/chr${chr}.vcf.gz" >> "${OUT}/snp_vcfs.lst"
 
   if [ ! -f "${OUT}/target_positions/target.chr${chr}.pos.gz" ]; then
     date
@@ -48,7 +48,7 @@ for chr in $(seq 1 22) X; do
   fi
 done
 
-bcftools concat -f "${OUT}/snp_files.lst" -Oz -o "${OUT}/snps.vcf.gz"
+bcftools concat -f "${OUT}/snp_vcfs.lst" -Oz -o "${OUT}/snps.vcf.gz"
 tabix -p vcf "${OUT}/snps.vcf.gz"
 
 date

@@ -29,7 +29,7 @@ Input for HATCHet3 and CalicoST.
 """
 setup_logging(sm.log[0])
 
-snp_file = sm.input["snp_file"]
+snp_info = sm.input["snp_info"]
 tot_mtx_snp = sm.input["tot_mtx_snp"]
 a_mtx_snp = sm.input["a_mtx_snp"]
 b_mtx_snp = sm.input["b_mtx_snp"]
@@ -58,7 +58,7 @@ logging.info(
     f"adaptive binning, sample name={sample_name}, assay_type={assay_type}, is_bulk_assay={is_bulk_assay}"
 )
 logging.info(f"rep_ids={rep_ids}")
-snps = pd.read_table(snp_file, sep="\t")
+snps = pd.read_table(snp_info, sep="\t")
 # barcodes = pd.read_table(all_barcodes, sep="\t", header=None, names=["BARCODE"])
 
 if is_bulk_assay:

@@ -25,7 +25,7 @@ Input for Copy-typing.
 setup_logging(sm.log[0])
 
 # inputs
-snp_file = sm.input["snp_file"]
+snp_info = sm.input["snp_info"]
 tot_mtx_snp = sm.input["tot_mtx_snp"]
 a_mtx_snp = sm.input["a_mtx_snp"]
 b_mtx_snp = sm.input["b_mtx_snp"]
@@ -53,7 +53,7 @@ assert not is_bulk_assay, "bulk sample CNV segmentation unsupported yet"
 ##################################################
 logging.info(f"cnv segmentation, sample name={sample_name}, assay_type={assay_type}")
 logging.info(f"rep_ids={rep_ids}")
-snps = pd.read_table(snp_file, sep="\t")
+snps = pd.read_table(snp_info, sep="\t")
 
 if is_bulk_assay:
     # dense matrix
