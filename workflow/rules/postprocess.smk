@@ -261,6 +261,7 @@ rule adaptive_binning:
         a_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.Aallele.npz",
         b_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.Ballele.npz",
         bed_file=config["allele_dir"] + "/{assay_type}/bb.bed.gz",
+        qc_dir=directory(config["qc_dir"] + "/adaptive_binning/{assay_type}"),
     params:
         sample_name=SAMPLE_ID,
         assay_type=lambda wc: wc.assay_type,
@@ -302,6 +303,7 @@ rule cnv_segmentation:
         x_count=config["allele_dir"] + "/{assay_type}/X_count.npz",
         y_count=config["allele_dir"] + "/{assay_type}/Y_count.npz",
         d_count=config["allele_dir"] + "/{assay_type}/D_count.npz",
+        qc_dir=directory(config["qc_dir"] + "/cnv_segmentation/{assay_type}"),
     wildcard_constraints:
         assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
     params:
