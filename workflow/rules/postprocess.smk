@@ -3,26 +3,22 @@ if workflow_mode == "bulk_genotyping":
 
     rule phase_and_concat_bulk:
         input:
-            vcfs=lambda wc: expand(
-                config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.base.vcf.gz",
-                assay_type=wc.assay_type,
-                rep_id=assay2rep_ids[wc.assay_type],
-            ),
-            sample_tsvs=lambda wc: expand(
-                config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.samples.tsv",
-                assay_type=wc.assay_type,
-                rep_id=assay2rep_ids[wc.assay_type],
-            ),
-            tot_mtxs=lambda wc: expand(
-                config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.tag.DP.mtx",
-                assay_type=wc.assay_type,
-                rep_id=assay2rep_ids[wc.assay_type],
-            ),
-            ad_mtxs=lambda wc: expand(
-                config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.tag.AD.mtx",
-                assay_type=wc.assay_type,
-                rep_id=assay2rep_ids[wc.assay_type],
-            ),
+            vcfs=lambda wc: [
+                config["pileup_dir"] + f"/{wc.assay_type}_{rep_id}/cellSNP.base.vcf.gz"
+                for rep_id in assay2rep_ids[wc.assay_type]
+            ],
+            sample_tsvs=lambda wc: [
+                config["pileup_dir"] + f"/{wc.assay_type}_{rep_id}/cellSNP.samples.tsv"
+                for rep_id in assay2rep_ids[wc.assay_type]
+            ],
+            tot_mtxs=lambda wc: [
+                config["pileup_dir"] + f"/{wc.assay_type}_{rep_id}/cellSNP.tag.DP.mtx"
+                for rep_id in assay2rep_ids[wc.assay_type]
+            ],
+            ad_mtxs=lambda wc: [
+                config["pileup_dir"] + f"/{wc.assay_type}_{rep_id}/cellSNP.tag.AD.mtx"
+                for rep_id in assay2rep_ids[wc.assay_type]
+            ],
             snp_vcf=lambda wc: branch(
                 run_genotype_snps,
                 then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
@@ -87,9 +83,14 @@ if workflow_mode == "bulk_genotyping":
             sample_file=lambda wc: config["allele_dir"]
             + f"/{wc.assay_type}/sample_ids.tsv",
             bb_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/bb.tsv.gz",
-            mosdepth_files=lambda wc: expand(
-                config["allele_dir"] + f"/{wc.assay_type}/out_mosdepth" + "/{rep_id}.regions.bed.gz",
-                rep_id=assay2rep_ids.get(wc.assay_type, []),
+            mosdepth_files=lambda wc: branch(
+                assay2rep_ids.get(wc.assay_type) is not None,
+                then=[
+                    config["allele_dir"]
+                    + f"/{wc.assay_type}/out_mosdepth/{rep_id}.regions.bed.gz"
+                    for rep_id in assay2rep_ids[wc.assay_type]
+                ],
+                otherwise=[],
             ),
             reference=config["reference"],
             genome_size=config["genome_size"],
@@ -120,14 +121,14 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
 
     rule process_rna_anndata:
         input:
-            barcodes=lambda wc: expand(
-                get_data[(wc.assay_type, rep_id)][0],
-                rep_id=assay2rep_ids[wc.assay_type],
-            ),
-            ranger_dirs=lambda wc: expand(
-                get_data[(wc.assay_type, rep_id)][2],
-                rep_id=assay2rep_ids[wc.assay_type],
-            ),
+            barcodes=lambda wc: [
+                get_data[(wc.assay_type, rid)][0]
+                for rid in assay2rep_ids[wc.assay_type]
+            ],
+            ranger_dirs=lambda wc: [
+                get_data[(wc.assay_type, rid)][2]
+                for rid in assay2rep_ids[wc.assay_type]
+            ],
             region_bed=lambda wc: config["region_bed"],
             genome_size=lambda wc: config["genome_size"],
             gene_blacklist_file=lambda wc: branch(
@@ -155,14 +156,14 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
 
     rule process_atac_fragments:
         input:
-            barcodes=lambda wc: expand(
-                get_data[(wc.assay_type, rep_id)][0],
-                rep_id=assay2rep_ids[wc.assay_type],
-            ),
-            ranger_dirs=lambda wc: expand(
-                get_data[(wc.assay_type, rep_id)][2],
-                rep_id=assay2rep_ids[wc.assay_type],
-            ),
+            barcodes=lambda wc: [
+                get_data[(wc.assay_type, rid)][0]
+                for rid in assay2rep_ids[wc.assay_type]
+            ],
+            ranger_dirs=lambda wc: [
+                get_data[(wc.assay_type, rid)][2]
+                for rid in assay2rep_ids[wc.assay_type]
+            ],
             region_bed=lambda wc: config["region_bed"],
             genome_size=lambda wc: config["genome_size"],
             gene_blacklist_file=lambda wc: branch(
@@ -187,26 +188,22 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
 
     rule phase_and_concat_single_cell:
         input:
-            vcfs=lambda wc: expand(
-                config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.base.vcf.gz",
-                assay_type=wc.assay_type,
-                rep_id=assay2rep_ids[wc.assay_type],
-            ),
-            sample_tsvs=lambda wc: expand(
-                config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.samples.tsv",
-                assay_type=wc.assay_type,
-                rep_id=assay2rep_ids[wc.assay_type],
-            ),
-            tot_mtxs=lambda wc: expand(
-                config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.tag.DP.mtx",
-                assay_type=wc.assay_type,
-                rep_id=assay2rep_ids[wc.assay_type],
-            ),
-            ad_mtxs=lambda wc: expand(
-                config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.tag.AD.mtx",
-                assay_type=wc.assay_type,
-                rep_id=assay2rep_ids[wc.assay_type],
-            ),
+            vcfs=lambda wc: [
+                config["pileup_dir"] + f"/{wc.assay_type}_{rep_id}/cellSNP.base.vcf.gz"
+                for rep_id in assay2rep_ids[wc.assay_type]
+            ],
+            sample_tsvs=lambda wc: [
+                config["pileup_dir"] + f"/{wc.assay_type}_{rep_id}/cellSNP.samples.tsv"
+                for rep_id in assay2rep_ids[wc.assay_type]
+            ],
+            tot_mtxs=lambda wc: [
+                config["pileup_dir"] + f"/{wc.assay_type}_{rep_id}/cellSNP.tag.DP.mtx"
+                for rep_id in assay2rep_ids[wc.assay_type]
+            ],
+            ad_mtxs=lambda wc: [
+                config["pileup_dir"] + f"/{wc.assay_type}_{rep_id}/cellSNP.tag.AD.mtx"
+                for rep_id in assay2rep_ids[wc.assay_type]
+            ],
             snp_vcf=lambda wc: branch(
                 run_genotype_snps,
                 then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
@@ -291,12 +288,9 @@ rule cnv_segmentation:
         snp_info=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snps.tsv.gz",
         tot_mtx_snp=lambda wc: config["allele_dir"]
         + f"/{wc.assay_type}/snp.Tallele.npz",
-        a_mtx_snp=lambda wc: config["allele_dir"]
-        + f"/{wc.assay_type}/snp.Aallele.npz",
-        b_mtx_snp=lambda wc: config["allele_dir"]
-        + f"/{wc.assay_type}/snp.Ballele.npz",
-        sample_file=lambda wc: config["allele_dir"]
-        + f"/{wc.assay_type}/sample_ids.tsv",
+        a_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Aallele.npz",
+        b_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Ballele.npz",
+        sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
         all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
         h5ad_file=config["allele_dir"] + "/{assay_type}/{assay_type}.h5ad",
         seg_ucn=lambda wc: config["seg_ucn"],

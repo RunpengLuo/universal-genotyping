@@ -194,6 +194,7 @@ else:
                 config["allele_dir"] + f"/{assay_type}/barcodes.tsv.gz"
             )
 
+
 ##################################################
 # entrypoint
 include: "rules/genotype_snps.smk"
