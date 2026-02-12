@@ -96,6 +96,9 @@ for modality, rows in sample_df.groupby("modality", sort=False):
 assay2rep_ids = OrderedDict()
 for assay_type, rows in sample_df.groupby("assay_type", sort=False):
     assay2rep_ids[assay_type] = rows["REP_ID"].tolist()
+for assay_type in allowed_assay_types:
+    if assay_type not in assay2rep_ids:
+        assay2rep_ids[assay_type] = []
 
 get_data = OrderedDict()
 rep2modalities = OrderedDict()

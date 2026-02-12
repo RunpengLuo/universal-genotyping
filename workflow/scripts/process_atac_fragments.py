@@ -63,7 +63,7 @@ for idx, rep_id in enumerate(rep_ids):
         whitelist=barcodes,
         min_num_fragments=0,
         sorted_by_barcode=False,
-        tempdir=sm.output["tmp_dir"],
+        tempdir=None,
         n_jobs=int(sm.threads),
     )
     adata.obs_names = adata.obs_names.astype(str)

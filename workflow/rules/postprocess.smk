@@ -38,7 +38,7 @@ if workflow_mode == "bulk_genotyping":
             a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
             b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
             sample_file=config["allele_dir"] + "/{assay_type}/sample_ids.tsv",
-            qc_dir=directory(config["qc_dir"] + "/{assay_type}"),
+            qc_dir=directory(config["qc_dir"] + "/phase_and_concat/{assay_type}"),
         wildcard_constraints:
             assay_type="(bulkDNA|bulkWGS|bulkWES)",
         params:
@@ -88,7 +88,7 @@ if workflow_mode == "bulk_genotyping":
             + f"/{wc.assay_type}/sample_ids.tsv",
             bb_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/bb.tsv.gz",
             mosdepth_files=lambda wc: expand(
-                config["allele_dir"] + "/{assay_type}/out_mosdepth/{rep_id}.regions.bed.gz",
+                config["allele_dir"] + f"/{wc.assay_type}/out_mosdepth" + "/{rep_id}.regions.bed.gz",
                 rep_id=assay2rep_ids.get(wc.assay_type, []),
             ),
             reference=config["reference"],
@@ -101,7 +101,7 @@ if workflow_mode == "bulk_genotyping":
         output:
             dp_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.depth.npz",
             rdr_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.rdr.npz",
-            qc_dir=directory(config["qc_dir"] + "/{assay_type}"),
+            qc_dir=directory(config["qc_dir"] + "/compute_rdr_bulk/{assay_type}"),
         wildcard_constraints:
             assay_type="(bulkDNA|bulkWGS|bulkWES)",
         params:
@@ -171,7 +171,6 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             gtf_file=lambda wc: config["gtf_file"],
         output:
             h5ad_file=config["allele_dir"] + "/{assay_type}/{assay_type}.h5ad",
-            tmp_dir=temp(config["allele_dir"] + "/snapatac_tmp/"),
         params:
             assay_type=lambda wc: wc.assay_type,
             rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
@@ -221,7 +220,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
             b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
             sample_file=config["allele_dir"] + "/{assay_type}/sample_ids.tsv",
-            qc_dir=directory(config["qc_dir"] + "/{assay_type}"),
+            qc_dir=directory(config["qc_dir"] + "/phase_and_concat/{assay_type}"),
             unique_snp_ids=config["allele_dir"] + "/{assay_type}/unique_snp_ids.npy",
             cell_snp_Aallele=config["allele_dir"] + "/{assay_type}/cell_snp_Aallele.npz",
             cell_snp_Ballele=config["allele_dir"] + "/{assay_type}/cell_snp_Ballele.npz",
