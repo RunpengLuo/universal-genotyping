@@ -180,7 +180,7 @@ def read_genes_gtf_file(gtf_file: str, id_col="gene_ids"):
         )
     )
     # convert to 0-based BED format
-    genes["START"] = genes["START"] - 1
+    genes["START"] = genes["START1"] - 1
 
     return genes
 
