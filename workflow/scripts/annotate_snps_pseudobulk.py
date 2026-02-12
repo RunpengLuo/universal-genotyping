@@ -202,7 +202,7 @@ final_snps_chs = final_snps.groupby("#CHROM", sort=False)
 chrom_sizes = get_chr_sizes(sm.input["genome_size"])
 for chrname, out_snp_vcf in zip(chroms, sm.output["snp_vcfs"]):
     chrom = f"chr{chrname}"
-    chrom_length = chrom_sizes[chrname]
+    chrom_length = chrom_sizes[chrom]
     with open(out_snp_vcf[:-3], "w") as fd:
         fd.writelines(
             [
