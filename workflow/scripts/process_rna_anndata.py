@@ -98,11 +98,11 @@ logging.info(f"#concat barcodes={adata.n_obs}, #union features={adata.n_vars}")
 # filter genes not found in reference GTF file
 # invalid case: user should use same GTF file for space-ranger and genotyping.
 gene_id_colname = str(sm.params["gene_id_colname"])
-genes = read_genes_gtf_file(sm.input["gtf_file"], id_col=gene_id_colname)
-logging.info(f"loaded #{len(genes)} unique genes from GTF.")
+genes_gtf = read_genes_gtf_file(sm.input["gtf_file"], id_col=gene_id_colname)[[gene_id_colname, "#CHR", "START", "END"]]
+logging.info(f"loaded #{len(genes_gtf)} unique genes from GTF.")
 
 var_coords = adata.var.merge(
-    genes, how="left", on=gene_id_colname, validate="m:1", sort=False
+    genes_gtf, how="left", on=gene_id_colname, validate="m:1", sort=False
 )
 var_coords.index = adata.var.index
 
@@ -146,8 +146,9 @@ ind_sufficient_expressed_genes = np.asarray(
 ).ravel()
 adata = adata[:, ind_sufficient_expressed_genes]
 count_ratio = float(adata.X.sum()) / sum_count_before_filtering
+# FIXME 
 logging.info(
-    f"Retaining {100.0 * np.mean(ind_sufficient_expressed_genes)}% of genes with sufficient expression across spots ({100.0 * count_ratio:.2f}% of total UMIs) @ {min_frac_barcodes} fraction of barcodes."
+    f"Retaining {100.0 * np.mean(ind_sufficient_expressed_genes):.3f}% of genes with sufficient expression across spots ({100.0 * count_ratio:.2f}% of total UMIs) @ {min_frac_barcodes} fraction of barcodes."
 )
 
 ## 3. filter genes by region file, e.g., centromeric and HLA regions.
