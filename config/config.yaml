@@ -98,6 +98,7 @@ gene_blacklist_file: null
 params_postprocess:
   # process_rna_adata parameters
   gene_id_colname: gene_ids
+  # [0, 1]
   min_frac_barcodes: 5e-3
 
   # process_atac_fragments parameters
