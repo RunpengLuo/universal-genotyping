@@ -125,7 +125,6 @@ for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
 
 if any(is_multiome for is_multiome in rep2isMultiome.values()) and len(rep_ids) > 1:
     print("genotyping >1 replicates involving multiome data, warning")
-assay_type_rep_ids = list(get_data.keys())
 
 ##################################################
 # parse phase_snps inputs
