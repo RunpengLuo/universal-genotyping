@@ -15,7 +15,7 @@ if config["phaser"] == "shapeit":
             shapeit=config["shapeit"],
             bcftools=config["bcftools"],
         log:
-            config["log_dir"] + "/phase_snps.chr{chrname}.log",
+            config["log_dir"] + "/phase_snps_shapeit/phase_snps.chr{chrname}.log",
         shell:
             r"""
             {params.shapeit} \
@@ -47,7 +47,7 @@ if config["phaser"] == "eagle":
             bcftools=config["bcftools"],
             out_prefix=config["phase_dir"] + "/chr{chrname}",
         log:
-            config["log_dir"] + "/phase_snps.chr{chrname}.log",
+            config["log_dir"] + "/phase_snps_eagle/phase_snps.chr{chrname}.log",
         shell:
             r"""
             {params.eagle} \
@@ -80,7 +80,7 @@ if config["phaser"] == "longphase":
             bcftools=config["bcftools"],
         threads: config["threads"]["phase"]
         log:
-            config["log_dir"] + "/phase_snps.chr{chrname}.log",
+            config["log_dir"] + "/phase_snps_longphase/phase_snps.chr{chrname}.log",
         shell:
             r"""
             {params.longphase} phase \

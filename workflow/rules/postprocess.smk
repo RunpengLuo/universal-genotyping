@@ -67,7 +67,7 @@ if workflow_mode == "bulk_genotyping":
             read_quality=config["params_mosdepth"]["read_quality"],
             extra_params=config["params_mosdepth"].get("extra_params", ""),
         log:
-            config["log_dir"] + "/run_mosdepth_bulk.{assay_type}_{rep_id}.log",
+            config["log_dir"] + "/run_mosdepth_bulk/run_mosdepth_bulk.{assay_type}_{rep_id}.log",
         shell:
             r"""
             {params.mosdepth} \
