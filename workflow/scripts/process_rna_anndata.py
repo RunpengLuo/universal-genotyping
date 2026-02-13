@@ -152,9 +152,8 @@ nnz_per_gene = adata.X.getnnz(axis=0)
 ind_sufficient_expressed_genes = np.asarray(
     nnz_per_gene >= min_expressed_barcodes
 ).ravel()
-adata = adata[:, ind_sufficient_expressed_genes]
+adata = adata[:, ind_sufficient_expressed_genes].copy()
 count_ratio = float(adata.X.sum()) / sum_count_before_filtering
-# FIXME
 logging.info(
     f"Retaining {100.0 * np.mean(ind_sufficient_expressed_genes):.3f}% of genes with sufficient expression across spots ({100.0 * count_ratio:.2f}% of total UMIs) @ {min_frac_barcodes} fraction of barcodes."
 )
