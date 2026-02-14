@@ -147,7 +147,7 @@ def read_barcodes(bc_file: str):
 
 
 def read_celltypes(celltype_file: str):
-    celltypes = pd.read_table(celltype_file, sep="\t")[["BARCODE", "cell_type"]]
+    celltypes = pd.read_table(celltype_file, sep="\t")[["BARCODE", "cell_type"]].reset_index(drop=True)
     return celltypes
 
 
