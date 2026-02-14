@@ -53,8 +53,11 @@ for idx, rep_id in enumerate(rep_ids):
     if assay_type in ["scRNA"]:
         adata: sc.AnnData = sc.read_10x_h5(h5ad_file, gex_only=True, make_unique=True)
     elif assay_type in ["VISIUM", "VISIUM3prime"]:
-        # assert os.path.isdir(os.path.join(ranger_dir, "spatial/")), f"missing spatial/"
-        adata: sc.AnnData = sq.read.visium(ranger_dir, load_images=False)
+        # squidpy doesn't support load images from 3' data yet.
+        load_images = True if assay_type == "VISIUM" else False
+        if load_images:
+            assert os.path.isdir(os.path.join(ranger_dir, "spatial/")), f"missing spatial/ for {assay_type} data"
+        adata: sc.AnnData = sq.read.visium(ranger_dir, load_images=load_images)
         adata.var_names_make_unique()
     else:
         raise ValueError(f"Unknown assay_type={assay_type}")
