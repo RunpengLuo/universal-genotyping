@@ -147,23 +147,7 @@ def read_barcodes(bc_file: str):
 
 
 def read_celltypes(celltype_file: str):
-    # cell_id cell_types final_type
-    celltypes = pd.read_table(celltype_file)
-    celltypes = celltypes.rename(
-        columns={"cell_id": "BARCODE", "cell_types": "cell_type"}
-    )
-    celltypes["BARCODE"] = celltypes["BARCODE"].astype(str)
-
-    if "met_subcluster" in celltypes.columns.tolist():
-        print("use column met_subcluster as final_type")
-        celltypes["final_type"] = celltypes["met_subcluster"]
-
-    if "final_type" not in celltypes.columns.tolist():
-        assert "cell_type" in celltypes.columns.tolist(), (
-            "cell_type column does not exist"
-        )
-        print("use column cell_type as final_type")
-        celltypes["final_type"] = celltypes["cell_type"]
+    celltypes = pd.read_table(celltype_file, sep="\t")[["BARCODE", "cell_type"]]
     return celltypes
 
 
