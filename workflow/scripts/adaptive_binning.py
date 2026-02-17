@@ -91,9 +91,11 @@ if gmap_file is not None:
     )
     snps["switchprobs"] = switchprobs
     if "PS" not in snps.columns:
-        max_switchprob = float(sm.params["max_switchprob"])
-        logging.info(f"decide phaseset PS with max_switchprob={max_switchprob}")
-        snps["PS"] = (switchprobs > max_switchprob).cumsum()
+        # max_switchprob = float(sm.params["max_switchprob"])
+        # logging.info(f"decide phaseset PS with max_switchprob={max_switchprob}")
+        # snps["PS"] = (switchprobs > max_switchprob).cumsum()
+        logging.info("PS not in SNP columns, setting PS=1 for all SNPs")
+        snps["PS"] = 1
 else:
     assert "PS" in snps.columns, (
         "either PS be provided (long-read) or genetic map should be preovided"

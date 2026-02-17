@@ -122,6 +122,7 @@ params_postprocess:
   nu: 1
 
   ## split SNPs if switchprobs exceeds max_switchprob when PS is N/A.
+  ## NOTE: currently disabled -- when PS is absent, all SNPs are assigned PS=1 instead.
   max_switchprob: 0.1
 
   ## constant switchprobs inter-PS for long-read based phasing.
