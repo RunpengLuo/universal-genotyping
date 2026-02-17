@@ -17,6 +17,9 @@ allele_dir: "allele"
 qc_dir: "qc"
 log_dir: "logs"
 
+# {bulk_genotyping, single_cell_genotyping, copytyping_preprocess}
+workflow_mode: "bulk_genotyping"
+
 ##################################################
 # Input
 sample_file: /path/to/sample.tsv

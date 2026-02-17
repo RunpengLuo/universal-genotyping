@@ -8,6 +8,12 @@ from collections import OrderedDict
 import pandas as pd
 import numpy as np
 
+SPOT_ASSAYS = {"VISIUM"}
+CELL_ASSAYS = {"scRNA", "scATAC", "multiome"}
+GEX_ASSAYS = {"scRNA", "multiome", "VISIUM"}
+ATAC_ASSAYS = {"scATAC", "multiome"}
+SPATIAL_ASSAYS = {"VISIUM", "VISIUM3prime"}
+ALL_ASSAYS = ["scRNA", "scATAC", "multiome", "VISIUM"]
 
 def setup_logging(log):
     logging.basicConfig(

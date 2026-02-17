@@ -5,6 +5,14 @@ import pandas as pd
 from collections import OrderedDict
 
 ##################################################
+workflow_mode = config["workflow_mode"]
+assert workflow_mode in {
+    "bulk_genotyping",
+    "single_cell_genotyping",
+    "copytyping_preprocess",
+}
+
+
 # parse sample file
 sample_df = pd.read_table(config["sample_file"])
 required = ["SAMPLE", "REP_ID", "assay_type", "sample_type", "PATH_to_bam"]
@@ -25,7 +33,7 @@ assert all(st in ["normal", "tumor"] for st in uniq_sample_types)
 rep_ids = sample_df["REP_ID"].unique().tolist()
 assay_types = sample_df["assay_type"].unique().tolist()
 
-nonbulk_assays = ["scATAC", "scRNA", "VISIUM", "VISIUM3prime"]
+nonbulk_assays = {"scATAC", "scRNA", "VISIUM", "VISIUM3prime"}
 bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
 allowed_assay_types = list(bulk_assays) + list(nonbulk_assays)
 assert all(dt in allowed_assay_types for dt in assay_types)
@@ -49,39 +57,44 @@ assay_type2feature_type = {
 }
 sample_df["modality"] = sample_df["assay_type"].map(assay_type2modality)
 
-has_het_snps = config.get("het_snp_vcf") is not None
-has_cn_profile = config.get("seg_ucn") is not None
-if has_cn_profile:
-    assert has_het_snps, "CN profile is provided, but missing <het_snp_vcf>"
+if workflow_mode == "bulk_genotyping":
+    sample_df = sample_df.loc[sample_df["assay_type"].isin(bulk_assays), :].reset_index(
+        drop=True
+    )
+    assert len(sample_df) > 0, "no samples for bulk_genotyping mode"
+    assert sample_df["REP_ID"].nunique() == len(
+        sample_df
+    ), "bulk mode must have no duplicated replicate IDs"
+    assert sample_df["PATH_to_bam"].notna().all(), "PATH_to_bam has missing values"
+    run_genotype_snps = True
+elif workflow_mode == "single_cell_genotyping":
+    sample_df = sample_df.loc[
+        sample_df["assay_type"].isin(nonbulk_assays), :
+    ].reset_index(drop=True)
+    assert len(sample_df) > 0, "no samples for single_cell_genotyping mode"
+    assert (
+        sample_df["PATH_to_barcodes"].notna().all()
+    ), "PATH_to_barcodes has missing values"
+    assert (
+        sample_df["PATH_to_10x_ranger"].notna().all()
+    ), "PATH_to_10x_ranger has missing values"
+    # validate per-replicate records
+    for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
+        rep_assay_types = rep_df["assay_type"].unique().tolist()
+        assert len(rep_assay_types) <= 2, "at most 2 data types allowed per replicate"
+        if len(rep_assay_types) == 2:
+            assert ("scRNA" in rep_assay_types) and ("scATAC" in rep_assay_types)
+    run_genotype_snps = True
+elif workflow_mode == "copytyping_preprocess":
+    sample_df = sample_df.loc[
+        sample_df["assay_type"].isin(nonbulk_assays), :
+    ].reset_index(drop=True)
+    assert len(sample_df) > 0, "no nonbulk for single_cell_genotyping mode"
+    assert config.get("het_snp_vcf") is not None
+    assert config.get("seg_ucn") is not None
     run_genotype_snps = False
-    workflow_mode = "copytyping_preprocess"
 else:
-    run_genotype_snps = not has_het_snps
-    if any(assay_type in bulk_assays for assay_type in assay_types):
-        workflow_mode = "bulk_genotyping"
-        assert all(
-            assay_type in bulk_assays for assay_type in assay_types
-        ), "bulk mode must have only bulk samples"
-        assert len(assay_types) == 1, "mixing bulk assay types are not supported yet"
-        assert sample_df["REP_ID"].nunique() == len(
-            sample_df
-        ), "bulk mode must have no duplicated replicate IDs"
-    else:
-        workflow_mode = "single_cell_genotyping"
-        assert (
-            sample_df["PATH_to_barcodes"].notna().all()
-        ), "PATH_to_barcodes has missing values"
-        assert (
-            sample_df["PATH_to_10x_ranger"].notna().all()
-        ), "PATH_to_10x_ranger has missing values"
-        # validate per-replicate records
-        for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
-            rep_assay_types = rep_df["assay_type"].unique().tolist()
-            assert (
-                len(rep_assay_types) <= 2
-            ), "at most 2 data types allowed per replicate"
-            if len(rep_assay_types) == 2:
-                assert ("scRNA" in rep_assay_types) and ("scATAC" in rep_assay_types)
+    raise ValueError(f"unknown mode: {workflow_mode}")
 
 modalities = sample_df["modality"].unique().tolist()
 normal_bams = sample_df.loc[
@@ -98,7 +111,7 @@ assay2sample_types = OrderedDict()
 for assay_type, rows in sample_df.groupby("assay_type", sort=False):
     assay2rep_ids[assay_type] = rows["REP_ID"].tolist()
     assay2sample_types[assay_type] = rows["sample_type"].tolist()
-    
+
 for assay_type in allowed_assay_types:
     if assay_type not in assay2rep_ids:
         assay2rep_ids[assay_type] = []

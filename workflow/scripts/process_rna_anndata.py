@@ -15,6 +15,7 @@ import anndata
 import scanpy as sc
 import squidpy as sq
 
+from utils import *
 from io_utils import *
 from aggregation_utils import *
 
@@ -50,15 +51,15 @@ for idx, rep_id in enumerate(rep_ids):
     ranger_dir = ranger_dirs[idx]
     h5ad_file = os.path.join(ranger_dir, "filtered_feature_bc_matrix.h5")
     assert os.path.exists(h5ad_file), f"missing {h5ad_file}"
-    if assay_type in ["scRNA"]:
-        adata: sc.AnnData = sc.read_10x_h5(h5ad_file, gex_only=True, make_unique=True)
-    elif assay_type in ["VISIUM", "VISIUM3prime"]:
+    if assay_type in SPATIAL_ASSAYS:
         # squidpy doesn't support load images from 3' data yet.
         load_images = True if assay_type == "VISIUM" else False
         if load_images:
-            assert os.path.isdir(os.path.join(ranger_dir, "spatial/")), f"missing spatial/ for {assay_type} data"
-        adata: sc.AnnData = sq.read.visium(ranger_dir, load_images=load_images)
+            assert os.path.isdir(os.path.join(ranger_dir, "spatial/")), f"missing spatial/ for {assay_type}"
+        adata: sc.AnnData = sq.read.visium(ranger_dir, load_images=load_images, library_id=rep_id)
         adata.var_names_make_unique()
+    else:
+        adata: sc.AnnData = sc.read_10x_h5(h5ad_file, gex_only=True, make_unique=True)
     else:
         raise ValueError(f"Unknown assay_type={assay_type}")
 
@@ -89,6 +90,7 @@ if len(adatas) > 1:
         join="outer",  # union of var (genes)
         label="REP_ID",
         merge="same",
+        uns_merge="unique",
         fill_value=0,
     )
 else:
