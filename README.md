@@ -5,7 +5,6 @@ A Snakemake pipeline for unified SNP genotyping, phasing, and allele counting ac
 ## Table of Contents
 
 - [Quick-Start](#quick-start)
-- [Usage](#usage)
 - [Documentation](#documentation)
 
 ---
