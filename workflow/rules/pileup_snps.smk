@@ -20,7 +20,7 @@ rule pileup_snps_bulk_mode1b:
         minMAF=config["params_cellsnp_lite"]["minMAF_pileup"],
         minCOUNT=config["params_cellsnp_lite"]["minCOUNT_pileup"],
     log:
-        config["log_dir"] + "pileup_snps_bulk_mode1b/pileup_snps.{assay_type}_{rep_id}.log",
+        config["log_dir"] + "/pileup_snps_bulk_mode1b/pileup_snps.{assay_type}_{rep_id}.log",
     shell:
         r"""
         {params.cellsnp_lite} \
