@@ -42,16 +42,12 @@ snakemake --cores <num_cores> \
 
 ---
 
-## Usage
-
-See [docs/step-by-step.md](docs/step-by-step.md) for a step-by-step guide to running each of the three workflow modes. To configure the pipeline, edit `config/config.yaml` following the inline comments.
-
----
-
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
+| [config/config.yaml](config/config.yaml) | Workflow configuration file. |
+| [config/samples.tsv](config/samples.tsv) | Template of sample file. |
 | [docs/step-by-step.md](docs/step-by-step.md) | Step-by-step guide for running all three workflow modes. |
-| [docs/spec.md](docs/spec.md) | Specification for input and output |
+| [docs/spec.md](docs/spec.md) | Specification for input and output. |
 | [docs/resources.md](docs/resources.md) | SNP panels, phasing panels, GTF files, phasing tool downloads, and panel preparation scripts. |
