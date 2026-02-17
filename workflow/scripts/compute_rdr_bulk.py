@@ -88,14 +88,21 @@ if has_normal:
     library_correction = total_bases[0] / total_bases[1:]
     logging.info(f"RDR library normalization factor: {library_correction}")
     
-    normal_dp = dp_mtx_bb[:, 0].copy()
+    # view
+    normal_dp = dp_mtx_bb[:, 0]
+
     mask = np.isfinite(normal_dp) & (normal_dp > 0)
-    num_valid = np.sum(mask)
+    num_valid = int(mask.sum())
+
     if num_valid < nbb:
         logging.warning(f"#invalid normal sample bins due to infinite/zero depth={nbb - num_valid}/{nbb}")
-        logging.warning(f"impute depth for invalid normal sample bins via adjacent bins")
-        # TODO
-    rdr_mtx_bb = dp_mtx_bb[:, 1:] / normal_dp[:, None]
+        if num_valid == 0:
+            raise ValueError("All normal bins invalid; cannot impute.")
+        fill = float(np.nanmedian(normal_dp[mask]))
+        logging.warning(f"impute normal depth via global nanmedian over valid normal bins: {fill}")
+        normal_dp[~mask] = fill
+
+    rdr_mtx_bb = dp_mtx_bb[:, 1:] / dp_mtx_bb[:, 0][:, None]
     rdr_mtx_bb *= library_correction[None, :]
 else:
     # TODO panel of normal PON, metin branch?
