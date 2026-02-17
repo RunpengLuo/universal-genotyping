@@ -1,6 +1,8 @@
 import os
 import sys
 
+import pandas as pd
+
 """
 Take a barcode/label visium annotation file, convert to correct format.
 """
@@ -33,3 +35,5 @@ anns[target_label] = anns.apply(
 ).astype("str")
 
 print(anns.head())
+
+anns.to_csv(out_file, sep="\t", header=True, index=False)
