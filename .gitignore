@@ -4,3 +4,4 @@ third_party/
 tmp/
 .snakemake/
 .ruff_cache/
+CLAUDE.md

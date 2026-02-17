@@ -93,3 +93,87 @@ One subdirectory per `{assay_type}_{rep_id}` combination.
 | `X_count.npz` | Sparse matrix (cells × segments): total allele count per cell per CNV segment. |
 | `Y_count.npz` | Sparse matrix (cells × segments): A-allele count per cell per CNV segment. |
 | `D_count.npz` | Sparse matrix (cells × segments): read depth count per cell per CNV segment. |
+
+---
+
+## 5. Column Reference for TSV Files
+
+### `snps.tsv.gz`
+
+| Column | Description |
+|--------|-------------|
+| `#CHR` | Chromosome name. |
+| `POS` | 1-based SNP position (right end, i.e. `POS0 + 1`). |
+| `POS0` | 0-based SNP position. |
+| `START` | Start of the SNP's assigned region interval (from `region_bed`). |
+| `END` | End of the SNP's assigned region interval. |
+| `GT` | Genotype string (e.g. `0|1`, `1|0`, `1|1`). |
+| `PHASE` | Phased allele orientation: `1` if A-allele is ALT, `-1` if A-allele is REF. |
+| `region_id` | Integer ID of the genomic region (from `region_bed`) this SNP falls in. |
+| `feature_id` | Integer ID of the gene/tile feature this SNP is assigned to (from `gtf_file`). |
+
+### `multi_snp.tsv.gz`
+
+| Column | Description |
+|--------|-------------|
+| `#CHR` | Chromosome name. |
+| `START` | Genomic start of the bin (min over member SNP region starts). |
+| `END` | Genomic end of the bin (max over member SNP region ends). |
+| `START0` | 0-based position of the leftmost SNP in the bin. |
+| `END0` | 1-based position of the rightmost SNP in the bin. |
+| `switchprobs` | Haplotype-switch probability at the first SNP of this bin (inter-bin boundary). Present only when a genetic map or PS-based switch prob is available. |
+| `region_id` | Region ID shared by all SNPs in this bin. |
+| `#SNPS` | Number of SNPs aggregated into this bin. |
+| `BLOCKSIZE` | Genomic span of the bin in bp (`END - START`). |
+| `multi_id` | Integer bin index (0-based, global across all chromosomes). |
+
+### `bb.tsv.gz`
+
+Same structure as `multi_snp.tsv.gz` but with additional grouping columns and a different bin index:
+
+| Column | Description |
+|--------|-------------|
+| `#CHR` | Chromosome name. |
+| `START` | Genomic start of the bin. |
+| `END` | Genomic end of the bin. |
+| `START0` | 0-based position of the leftmost SNP. |
+| `END0` | 1-based position of the rightmost SNP. |
+| `switchprobs` | Inter-bin haplotype-switch probability at the bin boundary. |
+| `region_id` | Region ID shared by all SNPs in this bin. |
+| `PS` | Phase-set ID; SNPs in the same bin share the same haplotype phase. |
+| `binom_id` | Binomial-test boundary ID; breaks bins at significant AF shifts. Present only when `binom_test: true`. |
+| `#SNPS` | Number of SNPs in this bin. |
+| `BLOCKSIZE` | Genomic span in bp. |
+| `bb_id` | Integer bin index (0-based, global across all chromosomes). |
+
+### `sample_ids.tsv`
+
+| Column | Description |
+|--------|-------------|
+| `SAMPLE` | Full sample label (`{SAMPLE_NAME}_{REP_ID}`). |
+| `SAMPLE_NAME` | Patient-level sample name (same for all rows). |
+| `REP_ID` | Replicate identifier. |
+| `sample_type` | `normal` or `tumor`. |
+
+### `barcodes.tsv.gz`
+
+Single column, no header. Each row is one cell barcode (or bulk sample label) in the form `{BARCODE}_{REP_ID}`. Row order matches the columns of the allele count matrices.
+
+### `corr_factors.tsv.gz`
+
+Contains all columns from `bb.tsv.gz` plus:
+
+| Column | Description |
+|--------|-------------|
+| `GC` | GC-content fraction of the bin computed from the reference genome. |
+| `MAP` | Mean mappability score of the bin (`1.0` if no mappability file is provided). |
+
+### `cnv_segments.tsv`
+
+Inherits all columns from the input HATCHet `.ucn` file (typically `#CHR`, `START`, `END`, per-clone `cn_*` and `u_*` columns), plus:
+
+| Column | Description |
+|--------|-------------|
+| `seg_id` | Integer segment index (0-based). |
+| `CNP` | Semicolon-separated total copy numbers across all clones. |
+| `PROPS` | Semicolon-separated clone proportions (usage values) across all clones. |

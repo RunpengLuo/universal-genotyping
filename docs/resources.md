@@ -1,73 +1,48 @@
-### Resources
-#### SNP panel files
-1. https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf.gz
-    * used by Numbat, ~92MB
-2. https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e4.chr1toX.hg38.vcf.gz
-    * used by CalicoST, ~568MB
-3. dbSNPv157 (for WGS data)
-    * hg19: https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.25.gz
-    * hg38: https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz and https://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.40.gz.tbi
+# Resources
 
-#### Gene annotation files
-1. hg38: https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz
+External data files required to run the pipeline.
 
-#### phasing panel files
-1. 1000GP HG38 phasing panel: http://pklab.med.harvard.edu/teng/data/1000G_hg38.zip
-2. gnomAD HGDP + 1KG panel (n=4,099): download the reference files using gsutil: gs://gcp-public-data--gnomad/resources/hgdp_1kg/phased_haplotypes
-3. TOPMed imputation server (n=97,256)
+---
 
-https://github.com/10XGenomics/subset-bam/releases/download/v1.1.0/subset-bam_linux
+## SNP Panels
 
+Used for genotyping (`snp_panel` or `snp_targets` in config). VCF format, one file per genome or per chromosome.
 
-### Running options
-User can either run with mode 1 (bulk WGS/WES genotyping) or mode 2 (single-cell/visium genotyping). Refer to mode1 and mode2 DAG workflow for all involved rules.
-* For mode 1, sample file should only contain bulk samples.
-* For mode 2, sample file only only contain non-bulk samples.
-* In either mode, if reference het SNP file genotyped from same patient is provided, genotyping and phasign step are skipped, only pile-up and postprocessing will run.
+| Panel | hg19 | hg38 | Notes |
+|-------|------|------|-------|
+| 1kGP phase3 AF≥5e-2 | [download](https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e2.chr1toX.hg19.vcf.gz) | [download](https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf.gz) | ~92 MB; used by Numbat |
+| 1kGP phase3 AF≥5e-4 | — | [download](https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e4.chr1toX.hg38.vcf.gz) | ~568 MB; used by CalicoST |
+| 1kGP phase3 n=3,202 (high-coverage) | — | [FTP](https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/) · [README](https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/README_1kGP_phased_panel_110722.pdf) | Per-chromosome VCFs; also doubles as phasing panel. Use [`resources/scripts/process_1kGP_3202_panel.sh`](../resources/scripts/process_1kGP_3202_panel.sh) to download and prepare all outputs. |
 
-#### Sample file
-Sample file is tsv-format and has following columns to describe all samples from same patient:
-* (Required columns): SAMPLE, REP_ID, assay_type, PATH_to_bam
-* (Optional columns): PATH_to_barcodes, PATH_to_10x_ranger
+---
 
-Requirements on sample files:
-* All rows should have same `SAMPLE` field, replicates can be distinguished based on replicate ID `REP_ID`
-* Paired scMultiome can be described by two rows with same `REP_ID` and two `assay_type` values: `scRNA` and `scATAC`.
-* For mode 1, specify `bulkWGS` or `bulkWES` under `assay_type`, and use `REP_ID`=`normal` to label the matched-normal sample if available.
-* For mode 2, `assay_type` can be chosen from `scRNA`, `scATAC`, `VISIUM`, `VISIUM3prime`.
-* provide two separate sample files for mode 1 and mode 2, respectively. Don't interleave bulk and non-bulk samples in same sample file.
-* when both bulk and non-bulk samples from same patient are provided, user should first run mode 1 using bulk samples, set `het_snp_file=phase/phased_snps.vcf.gz` in config file, and run mode 2 on non-bulk samples.
+## Phasing Panels
 
-### Output
-* `snps/<chromosome>.vcf.gz*`: annotated bi-allelic Het/Hom-Alt SNPs.
-* `phase/phased_snps.vcf.gz*`: phased Het SNPs.
-* `allele/<assay_type>(_<rep_id>)?/sample_ids.tsv`: sample IDs.
-* `allele/<assay_type>(_<rep_id>)?/snp_info.tsv.gz`: Per-SNP positional and genotype information.
-* `allele/<assay_type>(_<rep_id>)?/snp_matrix.dp.npz`: SNP by samples read-depth matrix, generated if mode 1.
-* `allele/<assay_type>(_<rep_id>)?/snp_matrix.tot.npz`: SNP by samples/barcodes total-allele matrix.
-* `allele/<assay_type>(_<rep_id>)?/snp_matrix.ref.npz`: SNP by samples/barcodes ref-allele matrix.
-* `allele/<assay_type>(_<rep_id>)?/snp_matrix.alt.npz`: SNP by samples/barcodes alt-allele matrix.
-* `allele/<assay_type>(_<rep_id>)?/snp_matrix.A.npz`: SNP by samples/barcodes A-allele matrix, generated if phased.
-* `allele/<assay_type>(_<rep_id>)?/snp_matrix.B.npz`: SNP by samples/barcodes B-allele matrix, generated if phased.
+Used for population-based phasing (`phasing_panel` in config). BCF format, one file per chromosome.
 
-#### Optional output
-* `phase/genetic_map.tsv.gz`: parsed genetic map file, required by HATCHet3.
+| Panel | hg19 | hg38 | Notes |
+|-------|------|------|-------|
+| 1kGP phase3 (n=2,504) | [download](http://pklab.med.harvard.edu/teng/data/1000G_hg19.zip) | [download](http://pklab.med.harvard.edu/teng/data/1000G_hg38.zip) | Commonly used with Eagle/SHAPEIT |
+| 1kGP phase3 (n=3,202, with trios) | — | see SNP Panels above | Higher coverage; includes 698 trios. BCF outputs produced by [`resources/scripts/process_1kGP_3202_panel.sh`](../resources/scripts/process_1kGP_3202_panel.sh). |
+| gnomAD HGDP + 1KG (n=4,099) | — | `gs://gcp-public-data--gnomad/resources/hgdp_1kg/phased_haplotypes` (gsutil) | Diverse ancestry panel |
+| TOPMed (n=97,256) | — | via [imputation server](https://imputation.biodatacatalyst.nhlbi.nih.gov) | Largest panel; requires server access |
 
-#### Legacy output
-* `allele/<assay_type>(_<rep_id>)?/unique_snp_ids.npy`: per-SNP `<chromosome>_<position>` array.
-* `allele/<assay_type>(_<rep_id>)?/cell_snp_Aallele.npz`: SNP by samples/barcodes A-allele matrix, generated if phased.
-* `allele/<assay_type>(_<rep_id>)?/cell_snp_Ballele.npz`: SNP by samples/barcodes B-allele matrix, generated if phased.
+---
 
+## Gene Annotation (GTF)
 
+Used for feature assignment (`gtf_file` in config).
 
+| Source | Download |
+|--------|----------|
+| GENCODE v38 (hg38) | `wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz` |
+| 10x Genomics GRCh38-2024-A | `curl -O https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2024-A.tar.gz` → `genes/genes.gtf.gz` |
 
-### Tips
-#### rename dbSNP SNP panel chromosomes
-NCBI dbSNP uses refseq version, rename it to UCSC version.
-```sh
-bcftools view -r NC_000001.11,NC_000002.12,NC_000003.12,NC_000004.12,NC_000005.10,NC_000006.12,NC_000007.14,NC_000008.11,NC_000009.12,NC_000010.11,NC_000011.10,NC_000012.12,NC_000013.11,NC_000014.9,NC_000015.10,NC_000016.10,NC_000017.11,NC_000018.10,NC_000019.10,NC_000020.11,NC_000021.9,NC_000022.11,NC_000023.11,NC_000024.10,NC_012920.1 -Ou GCF_000001405.40.gz \
-    | bcftools annotate --rename-chrs /path/to/rename_chrs.refseq2ucsc.tsv -Ou \
-    | bcftools view -v snps -Oz -o dbsnp157.hg38.biallelic.snps.vcf.gz
+---
 
-bcftools index dbsnp157.hg38.biallelic.snps.vcf.gz
-```
+## Utilities
+
+| Tool | Download |
+|------|----------|
+| subset-bam (10x) | https://github.com/10XGenomics/subset-bam/releases/download/v1.1.0/subset-bam_linux |
+

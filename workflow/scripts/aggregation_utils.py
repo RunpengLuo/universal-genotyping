@@ -80,9 +80,11 @@ def adaptive_binning(
     tumor_sidx=0,
 ):
     """
-    Adaptive binning over pre-defined chromosome regions,
-    each bin has MSR and MSPB constraint, beside last bin in the region.
-    in-place add <colname> column to snps to indicate bin ids.
+    Adaptive binning over pre-defined chromosome regions.
+    Each bin satisfies both MSR (min total reads) and MSPB (min SNPs per block).
+    The last block in each group is kept as its own bin if it meets both criteria,
+    otherwise it is merged into the previous bin.
+    In-place adds <colname> column to snps to indicate bin ids.
     """
     bin_id = 0
     snps[colname] = 0
@@ -114,12 +116,19 @@ def adaptive_binning(
                 acc_read_count += tot_mtx[idx, tumor_sidx:].copy()
                 acc_num_snp += 1
 
-        # fill last block if any
-        bin_ids[prev_start:] = max(bin_id - 1, bin_id0)
+        # fill last block: keep as its own bin if it meets both criteria,
+        # otherwise merge backward into the previous bin.
+        if (
+            np.all(acc_read_count >= min_snp_reads)
+            and acc_num_snp >= min_snp_per_block
+            and prev_start > 0
+        ):
+            bin_ids[prev_start:] = bin_id
+            bin_id += 1
+        else:
+            bin_ids[prev_start:] = max(bin_id - 1, bin_id0)
         snps.loc[grp_idxs, colname] = bin_ids
 
-        # if only a partial block is found, block_idx is not incremented in the loop
-        # and partial block is assigned to previous block.
         bin_id = max(bin_id, bin_id0 + 1)
 
     pos_dict = {
@@ -129,15 +138,16 @@ def adaptive_binning(
         # effective first/last SNP positions.
         "START0": ("POS0", "min"),
         "END0": ("POS", "max"),
-        # inter-block switchprobs
-        "switchprobs": ("switchprobs", "first"),
     }
+    # only include switchprobs if present (not guaranteed when called externally)
+    if "switchprobs" in snps.columns:
+        pos_dict["switchprobs"] = ("switchprobs", "first")
     for grp_col in grp_cols:
         pos_dict[grp_col] = (grp_col, "first")
 
     snp_grps = snps.groupby(by=colname, sort=False, as_index=True)
     snp_bins = snp_grps.agg(**pos_dict)
-    snp_bins.loc[:, "#SNPS"] = snp_grps.size().reset_index(drop=True)
+    snp_bins.loc[:, "#SNPS"] = snp_grps.size()  # align by bin_id index, not position
     snp_bins.loc[:, "BLOCKSIZE"] = snp_bins["END"] - snp_bins["START"]
     snp_bins[colname] = snp_bins.index
 

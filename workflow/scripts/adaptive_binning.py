@@ -179,7 +179,7 @@ if is_bulk_assay:
         0,
         int(sm.params["nsnp_multi"]),
         tot_mtx,
-        grp_cols,
+        ["region_id"],
         colname="multi_id",
         tumor_sidx=tumor_sidx,
     )
@@ -189,7 +189,7 @@ else:
         0,
         int(sm.params["nsnp_multi"]),
         tot_vec[:, None],
-        grp_cols,
+        ["region_id"],
         colname="multi_id",
     )
 multi_ids = snps["multi_id"].to_numpy()
