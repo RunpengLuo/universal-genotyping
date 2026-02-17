@@ -73,7 +73,7 @@ for i, rep_id in enumerate(rep_ids):
         genome_size,
         plot_file,
         unit="bb",
-        val_type="RDR",
+        val_type="RD",
         max_ylim=rdr_ylim,
     )
 
