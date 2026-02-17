@@ -64,6 +64,19 @@ logging.info(f"compute RDRs, has_normal={has_normal}, gc_correct={gc_correct}")
 assert has_normal, "no normal sample, TODO"
 tumor_sidx = {False: 0, True: 1}[has_normal]
 
+# plot per-sample read-depth
+for i, rep_id in enumerate(rep_ids):
+    plot_file = os.path.join(qc_dir, f"depth_bb_before_correction.{rep_id}.pdf")
+    plot_1d_sample(
+        bbs,
+        dp_mtx_bb[:, i],
+        genome_size,
+        plot_file,
+        unit="bb",
+        val_type="RDR",
+        max_ylim=rdr_ylim,
+    )
+
 if has_normal:
     bases_mtx_bb = dp_mtx_bb * bbs["BLOCKSIZE"].to_numpy()[:, None]
     total_bases = np.sum(bases_mtx_bb, axis=0)
