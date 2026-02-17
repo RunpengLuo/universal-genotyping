@@ -260,10 +260,10 @@ rule adaptive_binning:
         genome_size=lambda wc: config["genome_size"],
         gtf_file=lambda wc: config["gtf_file"],
     output:
-        meta_file=config["allele_dir"] + "/{assay_type}/meta_snp.tsv.gz",
-        tot_mtx_meta=config["allele_dir"] + "/{assay_type}/meta_snp.Tallele.npz",
-        a_mtx_meta=config["allele_dir"] + "/{assay_type}/meta_snp.Aallele.npz",
-        b_mtx_meta=config["allele_dir"] + "/{assay_type}/meta_snp.Ballele.npz",
+        multi_snp_file=config["allele_dir"] + "/{assay_type}/multi_snp.tsv.gz",
+        tot_mtx_multi=config["allele_dir"] + "/{assay_type}/multi_snp.Tallele.npz",
+        a_mtx_multi=config["allele_dir"] + "/{assay_type}/multi_snp.Aallele.npz",
+        b_mtx_multi=config["allele_dir"] + "/{assay_type}/multi_snp.Ballele.npz",
         bb_file=config["allele_dir"] + "/{assay_type}/bb.tsv.gz",
         tot_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.Tallele.npz",
         a_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.Aallele.npz",
@@ -280,7 +280,7 @@ rule adaptive_binning:
         binom_test=config["params_postprocess"]["binom_test"],
         binom_alpha=config["params_postprocess"]["binom_alpha"],
         binom_margin=config["params_postprocess"]["binom_margin"],
-        nsnp_meta=config["params_postprocess"]["nsnp_meta"],
+        nsnp_multi=config["params_postprocess"]["nsnp_multi"],
         min_snp_reads=config["params_postprocess"]["min_snp_reads"],
         min_snp_per_block=config["params_postprocess"]["min_snp_per_block"],
     threads: 1

@@ -136,7 +136,7 @@ params_postprocess:
   binom_alpha: 5e-3
   binom_margin: 0.05
 
-  nsnp_meta: 2
+  nsnp_multi: 2
 
   min_snp_reads: 200
   min_snp_per_block: 10

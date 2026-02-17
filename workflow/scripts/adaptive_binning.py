@@ -170,51 +170,51 @@ if binom_test:
 # 3. use HMM to estimate bounderies? TODO
 # 4. restrict within gene binning by feature_id? TODO
 ##################################################
-# meta-snp segmentation
+# multi-snp segmentation
 if is_bulk_assay:
-    meta_snps = adaptive_binning(
+    multi_snps = adaptive_binning(
         snps,
         0,
-        int(sm.params["nsnp_meta"]),
+        int(sm.params["nsnp_multi"]),
         tot_mtx,
         grp_cols,
-        colname="meta_id",
+        colname="multi_id",
         tumor_sidx=tumor_sidx,
     )
 else:
-    meta_snps = adaptive_binning(
+    multi_snps = adaptive_binning(
         snps,
         0,
-        int(sm.params["nsnp_meta"]),
+        int(sm.params["nsnp_multi"]),
         tot_vec[:, None],
         grp_cols,
-        colname="meta_id",
+        colname="multi_id",
     )
-meta_ids = snps["meta_id"].to_numpy()
-a_mtx_meta = matrix_segmentation(a_mtx, meta_ids, len(meta_snps))
-b_mtx_meta = matrix_segmentation(b_mtx, meta_ids, len(meta_snps))
-tot_mtx_meta = matrix_segmentation(tot_mtx, meta_ids, len(meta_snps))
+multi_ids = snps["multi_id"].to_numpy()
+a_mtx_multi = matrix_segmentation(a_mtx, multi_ids, len(multi_snps))
+b_mtx_multi = matrix_segmentation(b_mtx, multi_ids, len(multi_snps))
+tot_mtx_multi = matrix_segmentation(tot_mtx, multi_ids, len(multi_snps))
 
 plot_allele_freqs(
-    meta_snps,
+    multi_snps,
     rep_ids,
-    tot_mtx_meta,
-    b_mtx_meta,
+    tot_mtx_multi,
+    b_mtx_multi,
     genome_size,
     qc_dir,
     apply_pseudobulk=not is_bulk_assay,
     allele="B",
-    unit="meta-snp",
+    unit="multi-snp",
 )
-meta_snps.to_csv(sm.output["meta_file"], sep="\t", header=True, index=False)
+multi_snps.to_csv(sm.output["multi_snp_file"], sep="\t", header=True, index=False)
 if is_bulk_assay:
-    np.savez_compressed(sm.output["tot_mtx_meta"], mat=tot_mtx_meta)
-    np.savez_compressed(sm.output["a_mtx_meta"], mat=a_mtx_meta)
-    np.savez_compressed(sm.output["b_mtx_meta"], mat=b_mtx_meta)
+    np.savez_compressed(sm.output["tot_mtx_multi"], mat=tot_mtx_multi)
+    np.savez_compressed(sm.output["a_mtx_multi"], mat=a_mtx_multi)
+    np.savez_compressed(sm.output["b_mtx_multi"], mat=b_mtx_multi)
 else:
-    save_npz(sm.output["tot_mtx_meta"], tot_mtx_meta)
-    save_npz(sm.output["a_mtx_meta"], a_mtx_meta)
-    save_npz(sm.output["b_mtx_meta"], b_mtx_meta)
+    save_npz(sm.output["tot_mtx_multi"], tot_mtx_multi)
+    save_npz(sm.output["a_mtx_multi"], a_mtx_multi)
+    save_npz(sm.output["b_mtx_multi"], b_mtx_multi)
 
 ##################################################
 # MSR&MSPB block segmentation
