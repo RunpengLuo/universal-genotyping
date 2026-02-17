@@ -1,4 +1,23 @@
-# Output Files
+# Input / Output Reference
+
+## Sample File Format
+
+The sample file is a TSV listing all data from the same patient. A template is provided at `config/samples.tsv`.
+
+| Column | Required | Explanation |
+|--------|----------|-------------|
+| `SAMPLE` | Yes | Patient ID. All rows must have the same value. |
+| `REP_ID` | Yes | Replicate ID. Must be unique per row, except for multiome pairs (scRNA + scATAC share a `REP_ID`). |
+| `assay_type` | Yes | One of: `bulkWGS`, `bulkWES`, `scATAC`, `scRNA`, `VISIUM`, `VISIUM3prime`. |
+| `sample_type` | Yes | `normal` or `tumor`. |
+| `PATH_to_bam` | Yes | Path to `.bam` file. |
+| `PATH_to_barcodes` | Non-bulk | Path to 10x `barcodes.tsv.gz`. Found under `outs/filtered_feature_bc_matrix/`. |
+| `PATH_to_10x_ranger` | Non-bulk | Path to 10x Cell Ranger / Space Ranger `outs/` directory. Must contain `filtered_feature_bc_matrix*` and `{atac_}*fragments.tsv.gz` (scATAC). |
+| `PATH_to_ref_annotations` | Optional | Reference annotation TSV with columns `BARCODE` and `<ref_label>`. |
+
+---
+
+## Output Files
 
 Files are organized by workflow stage. Paths use the directory prefixes defined in `config.yaml` (`snp_dir`, `phase_dir`, `pileup_dir`, `allele_dir`, `qc_dir`). `{assay_type}` is one of `bulkDNA`, `bulkWGS`, `bulkWES`, `scATAC`, `scRNA`, `VISIUM`, or `VISIUM3prime`; `{rep_id}` is the replicate identifier from the sample sheet.
 

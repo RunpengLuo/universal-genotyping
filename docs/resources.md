@@ -44,5 +44,17 @@ Used for feature assignment (`gtf_file` in config).
 
 | Tool | Download |
 |------|----------|
-| subset-bam (10x) | https://github.com/10XGenomics/subset-bam/releases/download/v1.1.0/subset-bam_linux |
+| subset-bam (10x) | [download](https://github.com/10XGenomics/subset-bam/releases/download/v1.1.0/subset-bam_linux) |
+
+---
+
+## Phasing Tools
+
+One phasing tool is required for `bulk_genotyping` and `single_cell_genotyping` modes. Python/conda dependencies are in `environment.yaml`.
+
+| Tool | Source |
+|------|--------|
+| Eagle2 | [download](https://storage.googleapis.com/broad-alkesgroup-public/Eagle/downloads/Eagle_v2.4.1.tar.gz) |
+| SHAPEIT5 | [GitHub](https://github.com/odelaneau/shapeit5) |
+| LongPhase | [GitHub](https://github.com/twolinin/longphase) |
 
