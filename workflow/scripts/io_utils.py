@@ -146,9 +146,9 @@ def read_barcodes(bc_file: str):
     return barcodes
 
 
-def read_celltypes(celltype_file: str, ref_label):
-    celltypes = pd.read_table(celltype_file, sep="\t")[["BARCODE", ref_label]].reset_index(drop=True)
-    return celltypes
+def read_ref_annotation(ref_annotation_file: str, ref_label):
+    ref_annotations = pd.read_table(ref_annotation_file, sep="\t")[["BARCODE", ref_label]].reset_index(drop=True)
+    return ref_annotations
 
 
 def read_genes_gtf_file(gtf_file: str, id_col="gene_ids"):

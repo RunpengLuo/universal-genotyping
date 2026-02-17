@@ -149,7 +149,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
                 "min_frac_barcodes"
             ],
             gene_id_colname=lambda wc: config["params_postprocess"]["gene_id_colname"],
-            rep2celltypes=lambda wc: rep2celltypes,
+            rep2ref_annotation=lambda wc: rep2ref_annotation,
             ref_label=lambda wc: config["ref_label"],
         wildcard_constraints:
             assay_type="(scRNA|VISIUM|VISIUM3prime)",
@@ -183,7 +183,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
             sample_types=lambda wc: assay2sample_types[wc.assay_type],
             tile_width=lambda wc: config["params_postprocess"]["tile_width"],
-            rep2celltypes=lambda wc: rep2celltypes,
+            rep2ref_annotation=lambda wc: rep2ref_annotation,
             ref_label=lambda wc: config["ref_label"],
         wildcard_constraints:
             assay_type="scATAC",

@@ -28,7 +28,7 @@ Input:
 5. genome regions whitelist
 
 Output:
-single h5ad matrix covers all replicates with position and (optional) celltype columns
+single h5ad matrix covers all replicates with position and (optional) ref_annotation columns
 """
 setup_logging(sm.log[0])
 
@@ -36,7 +36,7 @@ barcode_files = sm.input["barcodes"]
 ranger_dirs = sm.input["ranger_dirs"]
 assay_type = sm.params["assay_type"]
 rep_ids = sm.params["rep_ids"]
-rep2celltypes = dict(sm.params["rep2celltypes"])
+rep2ref_annotation = dict(sm.params["rep2ref_annotation"])
 chrom_sizes = get_chr_sizes(sm.input["genome_size"])
 tile_width = int(sm.params["tile_width"])
 ref_label = sm.params["ref_label"]
@@ -68,12 +68,12 @@ for idx, rep_id in enumerate(rep_ids):
         n_jobs=int(sm.threads),
     )
     adata.obs_names = adata.obs_names.astype(str)
-    if rep_id in rep2celltypes:
-        celltypes = read_celltypes(rep2celltypes[rep_id], ref_label)
-        num_annotated_barcodes = len(set(adata.obs_names) & set(celltypes["BARCODE"]))
-        logging.info(f"#barcodes with celltype annotation: {num_annotated_barcodes}")
+    if rep_id in rep2ref_annotation:
+        ref_annotations = read_ref_annotation(rep2ref_annotation[rep_id], ref_label)
+        num_annotated_barcodes = len(set(adata.obs_names) & set(ref_annotations["BARCODE"]))
+        logging.info(f"#barcodes with ref_annotation annotation: {num_annotated_barcodes}")
         adata.obs[ref_label] = (
-            celltypes.set_index("BARCODE")
+            ref_annotations.set_index("BARCODE")
             .reindex(adata.obs_names)[ref_label]
             .fillna("Unknown")
             .values.astype(str)
