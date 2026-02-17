@@ -105,7 +105,7 @@ if has_normal:
     rdr_mtx_bb = dp_mtx_bb[:, 1:] / dp_mtx_bb[:, 0][:, None]
     rdr_mtx_bb *= library_correction[None, :]
 else:
-    # TODO panel of normal PON, metin branch?
+    # TODO panel of normal PON, metin longread branch.
     raise ValueError("no normal sample, TODO")
 
 rdr_ylim = np.round(rdr_mtx_bb.max()).astype(int) + 1

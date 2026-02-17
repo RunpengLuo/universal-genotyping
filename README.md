@@ -1,7 +1,18 @@
 ## Unified Genotyping Pipeline
-```
+This Snakemake pipeline takes a sample file listing data from same patient across different assays (bulkWGS (sr and lr), bulkWES, scRNA/ATAC-seq, VISIUM, VISIUM HD 3prime), a configuration file, and performs bulk genotyping, single-cell genotyping, or copy-typing preprocessing on request. It can do genotyping, phasing, adaptive binning, GC-corrected RDR computation, etc.,
+
+### Quick-Start
+```sh
 mamba env create -f ./environment.yaml -p /path/to/envs/genotyping_env
 conda activate /path/to/envs/genotyping_env
+
+# dry-run to check input files are formatted properly
+snakemake --cores 1 \
+    --dry-run \
+    -s /path/to/workflow/Snakefile \
+    --configfile config/config.yaml \
+    --directory <output> \
+    --config sample_file=/path/to/sample_file.tsv
 
 # run the pipeline
 snakemake --cores <num_cores> \
@@ -10,7 +21,7 @@ snakemake --cores <num_cores> \
     --directory <output> \
     --config sample_file=/path/to/sample_file.tsv
 
-# generate snakemake performance report
+# generate report
 snakemake --cores <num_cores> \
     -s /path/to/workflow/Snakefile \
     --configfile config/config.yaml \
@@ -19,11 +30,15 @@ snakemake --cores <num_cores> \
     --report report.html
 ```
 
-### Overview
-The universal genotyping pipeline supports genotyping, phasing, adaptive binning, RDR computation, etc., in either bulk (WGS/WES/lr-WGS) or single-cell (scRNA/ATAC-seq, Visium, Visium HD 3') sequencing data. it runs in two modes. For bulk mode, it produces necessary input files including BAF and RDR count matrices for running HATCHet. For single cell mode, it produces SNP/meta-SNP/bin-level allele count matrices for running CalicoST. Refer to `docs/bulk_mode.md` and `docs/single_cell_mode.md` for detailed configurations.
-
 ### Dependencies
-Refer to `environment.yaml` for the complete list of required libraries. Additional phasing softwares:
+Refer to `environment.yaml` for the complete list of dependecies libraries. Additional phasing softwares can be installed via mamba or GitHub epends on need:
 1. Eagle2 `https://storage.googleapis.com/broad-alkesgroup-public/Eagle/downloads/Eagle_v2.4.1.tar.gz`
 2. Shapeit5 `https://github.com/odelaneau/shapeit5.git`, `https://github.com/odelaneau/shapeit5/releases`
 3. LongPhase `https://github.com/twolinin/longphase`
+
+### Configuration
+To configure this workflow, modify `config/config.yaml` according to your needs, following the explanations provided in the file. An template sample file is provided as `config/samples.tsv`.
+
+#### Parameters
+TODO
+

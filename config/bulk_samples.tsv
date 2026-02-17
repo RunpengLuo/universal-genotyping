@@ -1,3 +1,0 @@
-SAMPLE	REP_ID	assay_type	sample_type	PATH_to_bam
-HT001	N1	bulkWGS	normal	s1.bam
-HT001	T1	bulkWGS	tumor	s2.bam
