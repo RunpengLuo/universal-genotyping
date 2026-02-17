@@ -66,6 +66,7 @@ tumor_sidx = {False: 0, True: 1}[has_normal]
 
 # plot per-sample read-depth
 rd_ylim = np.round(dp_mtx_bb.max()).astype(int) + 1
+logging.info(f"RD y-lim={rd_ylim}")
 for i, rep_id in enumerate(rep_ids):
     plot_file = os.path.join(qc_dir, f"depth_bb_before_correction.{rep_id}.pdf")
     plot_1d_sample(
@@ -90,7 +91,7 @@ else:
     raise ValueError("no normal sample, TODO")
 
 rdr_ylim = np.round(rdr_mtx_bb.max()).astype(int) + 1
-
+logging.info(f"RDR y-lim={rdr_ylim}")
 # plot per-sample RDRs (before corrections)
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
     plot_file = os.path.join(qc_dir, f"rdr_bb_before_correction.{rep_id}.pdf")
