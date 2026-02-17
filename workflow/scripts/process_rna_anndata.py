@@ -38,6 +38,7 @@ ranger_dirs = sm.input["ranger_dirs"]
 assay_type = sm.params["assay_type"]
 rep_ids = sm.params["rep_ids"]
 rep2celltypes = dict(sm.params["rep2celltypes"])
+ref_label = sm.params["ref_label"]
 logging.info(f"prepare rna anndata, assay_type={assay_type}, rep_ids={rep_ids}")
 
 ##################################################
@@ -65,17 +66,17 @@ for idx, rep_id in enumerate(rep_ids):
 
     adata.obs_names = adata.obs_names.astype(str)
     if rep_id in rep2celltypes:
-        celltypes = read_celltypes(rep2celltypes[rep_id])
+        celltypes = read_celltypes(rep2celltypes[rep_id], ref_label)
         num_annotated_barcodes = len(set(adata.obs_names) & set(celltypes["BARCODE"]))
         logging.info(f"#barcodes with celltype annotation: {num_annotated_barcodes}")
-        adata.obs["cell_type"] = (
+        adata.obs[ref_label] = (
             celltypes.set_index("BARCODE")
-            .reindex(adata.obs_names)["cell_type"]
+            .reindex(adata.obs_names)[ref_label]
             .fillna("Unknown")
             .values.astype(str)
         )
     else:
-        adata.obs["cell_type"] = "Unknown"
+        adata.obs[ref_label] = "Unknown"
 
     # filter by barcodes (must match current adata.obs_names)
     adata = adata[adata.obs_names.isin(barcodes), :].copy()

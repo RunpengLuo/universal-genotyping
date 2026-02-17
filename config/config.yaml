@@ -45,6 +45,9 @@ region_bed: null
 # gene annotation GTF file
 gtf_file: null
 
+# reference celltype/pathology annotation colname
+ref_label: "cell_type"
+
 ##################################################
 # Population Panel
 # e.g., 1000GP_hg38
