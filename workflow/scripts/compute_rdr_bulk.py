@@ -65,6 +65,7 @@ assert has_normal, "no normal sample, TODO"
 tumor_sidx = {False: 0, True: 1}[has_normal]
 
 # plot per-sample read-depth
+rd_ylim = np.round(dp_mtx_bb.max()).astype(int) + 1
 for i, rep_id in enumerate(rep_ids):
     plot_file = os.path.join(qc_dir, f"depth_bb_before_correction.{rep_id}.pdf")
     plot_1d_sample(
@@ -74,7 +75,7 @@ for i, rep_id in enumerate(rep_ids):
         plot_file,
         unit="bb",
         val_type="RD",
-        max_ylim=rdr_ylim,
+        max_ylim=rd_ylim,
     )
 
 if has_normal:
