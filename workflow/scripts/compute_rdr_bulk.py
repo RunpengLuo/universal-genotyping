@@ -42,8 +42,10 @@ logging.info("concat mosdepth per-sample depth data")
 sample_df = pd.read_table(sample_file, sep="\t")
 rep_ids = sample_df["REP_ID"].astype(str).tolist()
 sample_types = sample_df["sample_type"].tolist()
-nsamples = len(sample_df)
 bbs = pd.read_table(bb_file, sep="\t")
+nsamples = len(sample_df)
+ntumor_samples = (sample_df["sample_type"] == "tumor").sum()
+nbb = len(bbs)
 for rep_id in rep_ids:
     mos_file = os.path.join(mosdepth_dir, f"{rep_id}.regions.bed.gz")
     mos_df = pd.read_table(
@@ -65,9 +67,10 @@ assert has_normal, "no normal sample, TODO"
 tumor_sidx = {False: 0, True: 1}[has_normal]
 
 # plot per-sample read-depth
-rd_ylim = np.round(dp_mtx_bb.max()).astype(int) + 1
-logging.info(f"RD y-lim={rd_ylim}")
+rd_quantile = [0.01, 0.99]
 for i, rep_id in enumerate(rep_ids):
+    _, rd_ylim = np.nanquantile(dp_mtx_bb[:, i], rd_quantile)
+    logging.info(f"{rep_id} RD y-lim={rd_ylim}")
     plot_file = os.path.join(qc_dir, f"depth_bb_before_correction.{rep_id}.pdf")
     plot_1d_sample(
         bbs,
@@ -76,7 +79,7 @@ for i, rep_id in enumerate(rep_ids):
         plot_file,
         unit="bb",
         val_type="RD",
-        max_ylim=rd_ylim,
+        max_ylim=rd_ylim
     )
 
 if has_normal:
@@ -84,10 +87,18 @@ if has_normal:
     total_bases = np.sum(bases_mtx_bb, axis=0)
     library_correction = total_bases[0] / total_bases[1:]
     logging.info(f"RDR library normalization factor: {library_correction}")
-
-    rdr_mtx_bb = dp_mtx_bb[:, 1:] / dp_mtx_bb[:, 0][:, None]
+    
+    normal_dp = dp_mtx_bb[:, 0].copy()
+    mask = np.isfinite(normal_dp) & (normal_dp > 0)
+    num_valid = np.sum(mask)
+    if num_valid < nbb:
+        logging.warning(f"#invalid normal sample bins due to infinite/zero depth={nbb - num_valid}/{nbb}")
+        logging.warning(f"impute depth for invalid normal sample bins via adjacent bins")
+        # TODO
+    rdr_mtx_bb = dp_mtx_bb[:, 1:] / normal_dp[:, None]
     rdr_mtx_bb *= library_correction[None, :]
 else:
+    # TODO panel of normal PON, metin branch?
     raise ValueError("no normal sample, TODO")
 
 rdr_ylim = np.round(rdr_mtx_bb.max()).astype(int) + 1
