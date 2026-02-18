@@ -61,8 +61,6 @@ for idx, rep_id in enumerate(rep_ids):
         adata.var_names_make_unique()
     else:
         adata: sc.AnnData = sc.read_10x_h5(h5ad_file, gex_only=True, make_unique=True)
-    else:
-        raise ValueError(f"Unknown assay_type={assay_type}")
 
     adata.obs_names = adata.obs_names.astype(str)
     if rep_id in rep2ref_annotation:
