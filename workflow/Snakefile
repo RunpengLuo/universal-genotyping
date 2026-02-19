@@ -2,7 +2,6 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-from collections import OrderedDict
 
 ##################################################
 workflow_mode = config["workflow_mode"]
@@ -102,12 +101,12 @@ normal_bams = sample_df.loc[
 ].to_list()
 tumor_bams = sample_df.loc[sample_df["sample_type"] == "tumor", "PATH_to_bam"].to_list()
 
-modality2bams = OrderedDict()
+modality2bams = {}
 for modality, rows in sample_df.groupby("modality", sort=False):
     modality2bams[modality] = rows["PATH_to_bam"].tolist()
 
-assay2rep_ids = OrderedDict()
-assay2sample_types = OrderedDict()
+assay2rep_ids = {}
+assay2sample_types = {}
 for assay_type, rows in sample_df.groupby("assay_type", sort=False):
     assay2rep_ids[assay_type] = rows["REP_ID"].tolist()
     assay2sample_types[assay_type] = rows["sample_type"].tolist()
@@ -117,10 +116,10 @@ for assay_type in allowed_assay_types:
         assay2rep_ids[assay_type] = []
         assay2sample_types[assay_type] = []
 
-get_data = OrderedDict()
-rep2modalities = OrderedDict()
-rep2ref_annotation = OrderedDict()
-rep2isMultiome = OrderedDict()
+get_data = {}
+rep2modalities = {}
+rep2ref_annotation = {}
+rep2isMultiome = {}
 for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
     rep2modalities[rep_id] = rep_df["modality"].tolist()
     ref_annotation_file = rep_df["PATH_to_ref_annotations"].tolist()[0]

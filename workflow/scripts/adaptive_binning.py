@@ -169,8 +169,6 @@ if binom_test:
             snps["binom_id"] = np.cumsum(switches)
             grp_cols.append("binom_id")
 
-# 3. use HMM to estimate bounderies? TODO
-# 4. restrict within gene binning by feature_id? TODO
 ##################################################
 # multi-snp segmentation
 if is_bulk_assay:

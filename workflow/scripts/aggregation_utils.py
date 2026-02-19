@@ -147,6 +147,8 @@ def adaptive_binning(
 
     snp_grps = snps.groupby(by=colname, sort=False, as_index=True)
     snp_bins = snp_grps.agg(**pos_dict)
+    if "feature_id" in snps.columns:
+        snp_bins["feature_id"] = snp_grps["feature_id"].agg(lambda x: ";".join(dict.fromkeys(x.dropna().astype(str))))
     snp_bins.loc[:, "#SNPS"] = snp_grps.size()  # align by bin_id index, not position
     snp_bins.loc[:, "BLOCKSIZE"] = snp_bins["END"] - snp_bins["START"]
     snp_bins[colname] = snp_bins.index
