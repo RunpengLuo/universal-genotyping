@@ -41,6 +41,18 @@ logging.info(
 
 
 def get_genotype(row):
+    """Return the VCF GT string for a SNP row based on genotype boolean columns.
+
+    Parameters
+    ----------
+    row : pd.Series
+        Row with ``is_het``, ``is_hom_alt``, ``is_hom_ref`` boolean fields.
+
+    Returns
+    -------
+    str
+        One of ``"0/1"``, ``"1/1"``, ``"0/0"``, or ``"./."``.
+    """
     if row["is_het"]:
         return "0/1"
     if row["is_hom_alt"]:

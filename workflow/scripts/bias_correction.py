@@ -15,6 +15,27 @@ import matplotlib.pyplot as plt
 def compute_gc_content(
     bin_info: pd.DataFrame, ref_file: str, mapp_file=None, genome_size=None
 ):
+    """Compute per-bin GC fraction and optionally mean mappability.
+
+    Uses pybedtools ``nucleotide_content`` on the reference FASTA. If a
+    mappability BED track is provided, per-bin mean mappability is also computed.
+
+    Parameters
+    ----------
+    bin_info : pd.DataFrame
+        DataFrame with ``#CHR``, ``START``, ``END`` columns defining genomic bins.
+    ref_file : str
+        Path to the reference genome FASTA.
+    mapp_file : str or None
+        Path to a BED-format mappability track (optional).
+    genome_size : str or None
+        Path to chromosome sizes file (required when *mapp_file* is given).
+
+    Returns
+    -------
+    pd.DataFrame
+        *bin_info* augmented with ``GC`` and ``MAP`` columns.
+    """
     logging.info("compute GC content")
     gc_df = bin_info.merge(
         BedTool.from_dataframe(bin_info[["#CHR", "START", "END"]])
@@ -56,6 +77,34 @@ def bias_correction_rdr(
     eps_quantile=0.01,
     gc_quantile=[0.01, 0.99],
 ):
+    """Correct read-depth ratios (RDR) for GC-content (and optionally mappability) bias.
+
+    Fits a median quantile regression of RDR on GC (quadratic) per tumor sample,
+    divides raw RDR by the fitted expected RDR, and normalizes by the mean
+    corrected RDR. Saves diagnostic scatter and hexbin plots.
+
+    Parameters
+    ----------
+    raw_rdr_mat : np.ndarray
+        Raw RDR matrix (bins x samples).
+    gc_df : pd.DataFrame
+        DataFrame with ``GC`` and ``MAP`` columns per bin.
+    rep_ids : list[str]
+        Replicate identifiers (tumor samples only).
+    has_mapp : bool
+        If True, include mappability as a covariate.
+    out_dir : str or None
+        Directory for diagnostic plots.
+    eps_quantile : float
+        Lower quantile of expected RDR used as floor to avoid division by zero.
+    gc_quantile : list[float]
+        Lower and upper GC quantiles defining the fitting range.
+
+    Returns
+    -------
+    np.ndarray
+        GC-corrected RDR matrix (bins x samples).
+    """
     logging.info("correct for GC biases on RDR")
     gc = gc_df["GC"].to_numpy()
     mapv = gc_df["MAP"].to_numpy()
@@ -133,6 +182,23 @@ def bias_correction_rdr(
 
 
 def plot_gc_bias(gc, raw_rdr, corr_rdr, rep_id=None, out_dir=None):
+    """Produce a side-by-side hexbin plot comparing uncorrected vs. GC-corrected RDR.
+
+    Each panel is annotated with the median absolute deviation (MAD).
+
+    Parameters
+    ----------
+    gc : np.ndarray
+        Per-bin GC content.
+    raw_rdr : np.ndarray
+        Uncorrected RDR values.
+    corr_rdr : np.ndarray
+        GC-corrected RDR values.
+    rep_id : str or None
+        Replicate identifier (used in the output filename).
+    out_dir : str or None
+        Directory for the output PNG.
+    """
     def mad(x):
         return np.median(np.abs(x - np.median(x)))
 

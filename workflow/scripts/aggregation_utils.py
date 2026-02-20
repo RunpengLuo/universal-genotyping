@@ -23,6 +23,28 @@ def assign_pos_to_range(
     pos_col="POS0",
     nodup=True,
 ):
+    """Assign each query position to the reference interval it falls within using pyranges.
+
+    Parameters
+    ----------
+    qry : pd.DataFrame
+        Query DataFrame with ``#CHR`` and *pos_col* columns.
+    ref : pd.DataFrame
+        Reference intervals with ``#CHR``, ``START``, ``END``, and *ref_id*.
+    ref_id : str
+        Column name for the reference interval identifier.
+    pos_col : str
+        Column in *qry* containing 0-based positions.
+    nodup : bool
+        If True, each query is assigned to at most one reference interval;
+        if False, returns all overlapping (query, ref) pairs.
+
+    Returns
+    -------
+    pd.DataFrame
+        *qry* with *ref_id* column added (if ``nodup=True``), or a hits
+        DataFrame (if ``nodup=False``).
+    """
     qry_pr = pr.PyRanges(
         chromosomes=qry["#CHR"], starts=qry[pos_col], ends=qry[pos_col] + 1
     )

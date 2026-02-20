@@ -12,6 +12,18 @@ from utils import *
 
 
 def get_chr_sizes(sz_file: str):
+    """Read a two-column chromosome-sizes file and return an OrderedDict mapping name to length.
+
+    Parameters
+    ----------
+    sz_file : str
+        Path to a tab-separated file with columns (chromosome, size).
+
+    Returns
+    -------
+    OrderedDict[str, int]
+        Chromosome name to integer length.
+    """
     chr_sizes = OrderedDict()
     with open(sz_file, "r") as rfd:
         for line in rfd.readlines():
@@ -108,6 +120,20 @@ def read_VCF(
 
 
 def read_region_file(region_bed_file: str, addchr=True):
+    """Read the first three columns of a BED file into a DataFrame.
+
+    Parameters
+    ----------
+    region_bed_file : str
+        Path to a BED file.
+    addchr : bool
+        If True, prefix chromosome names with ``chr`` when missing.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with ``#CHR``, ``START``, ``END`` (and pyranges-compatible aliases).
+    """
     regions = pd.read_table(
         region_bed_file,
         sep="\t",
@@ -125,6 +151,19 @@ def read_region_file(region_bed_file: str, addchr=True):
 
 
 def read_ucn_file(seg_ucn_file: str):
+    """Read a HATCHet-style UCN segment file and derive CNP and PROPS columns.
+
+    Parameters
+    ----------
+    seg_ucn_file : str
+        Path to a tab-separated UCN file with per-clone copy-number columns.
+
+    Returns
+    -------
+    tuple[pd.DataFrame, list[str]]
+        Sorted segment DataFrame with ``CNP`` and ``PROPS`` columns, and
+        the list of clone names.
+    """
     segs_df = pd.read_table(seg_ucn_file, sep="\t")
     segs_df = sort_df_chr(segs_df, pos="START")
 
@@ -140,6 +179,18 @@ def read_ucn_file(seg_ucn_file: str):
 
 
 def read_barcodes(bc_file: str):
+    """Read a barcode file (one barcode per line) and return as a list of strings.
+
+    Parameters
+    ----------
+    bc_file : str
+        Path to a text file with one barcode per line.
+
+    Returns
+    -------
+    list[str]
+        Barcodes.
+    """
     barcodes = (
         pd.read_table(bc_file, sep="\t", header=None, dtype=str).iloc[:, 0].tolist()
     )
@@ -147,11 +198,42 @@ def read_barcodes(bc_file: str):
 
 
 def read_ref_annotation(ref_annotation_file: str, ref_label):
+    """Read a TSV annotation file and return only the BARCODE and the specified label column.
+
+    Parameters
+    ----------
+    ref_annotation_file : str
+        Path to a tab-separated annotation file.
+    ref_label : str
+        Name of the label column to extract alongside ``BARCODE``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Two-column DataFrame with ``BARCODE`` and *ref_label*.
+    """
     ref_annotations = pd.read_table(ref_annotation_file, sep="\t")[["BARCODE", ref_label]].reset_index(drop=True)
     return ref_annotations
 
 
 def read_genes_gtf_file(gtf_file: str, id_col="gene_ids"):
+    """Parse a GTF file and return gene-level records with genomic coordinates.
+
+    Extracts gene features, deduplicates by ``gene_id``, and converts to
+    0-based BED-like coordinates.
+
+    Parameters
+    ----------
+    gtf_file : str
+        Path to a GTF annotation file.
+    id_col : str
+        Column name for the gene identifier in the output.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with ``#CHR``, ``START`` (0-based), ``END``, and *id_col*.
+    """
     gr = pr.read_gtf(gtf_file, rename_attr=True)
     genes = (
         gr.df.query("Feature == 'gene'")[["Chromosome", "Start", "End", "gene_id"]]
@@ -172,6 +254,20 @@ def read_genes_gtf_file(gtf_file: str, id_col="gene_ids"):
 
 
 def read_genes_bed_file(bed_file: str, id_col="gene_id"):
+    """Read a BED file and return deduplicated gene-level records.
+
+    Parameters
+    ----------
+    bed_file : str
+        Path to a BED file with gene names in the Name column.
+    id_col : str
+        Column name for the gene identifier in the output.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with ``#CHR``, ``START``, ``END``, and *id_col*.
+    """
     gr = pr.read_bed(bed_file, as_df=True)
     genes = (
         gr[["Chromosome", "Start", "End", "Name"]]

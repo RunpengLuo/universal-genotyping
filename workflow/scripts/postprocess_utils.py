@@ -89,6 +89,22 @@ def canon_mat_one_replicate(
 
 
 def merge_mats(tot_list: list, ad_list: list):
+    """Horizontally stack per-replicate total and alt-count matrices.
+
+    Derives the REF matrix as ``TOT - ALT``.
+
+    Parameters
+    ----------
+    tot_list : list of csr_matrix
+        Per-replicate total depth matrices (SNPs x cells).
+    ad_list : list of csr_matrix
+        Per-replicate alt-allele count matrices (SNPs x cells).
+
+    Returns
+    -------
+    tuple[csr_matrix, csr_matrix, csr_matrix]
+        ``(tot_mtx, ref_mtx, alt_mtx)`` concatenated across replicates.
+    """
     if len(tot_list) == 1:
         return tot_list[0], tot_list[0] - ad_list[0], ad_list[0]
     tot_mtx = hstack(tot_list, format="csr")
@@ -98,12 +114,42 @@ def merge_mats(tot_list: list, ad_list: list):
 
 
 def hstack_mtx_list(mtx_list: list):
+    """Horizontally stack a list of sparse matrices into a single CSR matrix.
+
+    Parameters
+    ----------
+    mtx_list : list of csr_matrix
+        Matrices with the same number of rows.
+
+    Returns
+    -------
+    csr_matrix
+        Concatenated matrix.
+    """
     if len(mtx_list) == 1:
         return mtx_list[0]
     return hstack(mtx_list, format="csr")
 
 
 def apply_phase_to_mat(tot_mtx, ref_mtx, alt_mtx, phases):
+    """Apply per-SNP phase labels to produce phased A/B allele count matrices.
+
+    Parameters
+    ----------
+    tot_mtx : sparse or ndarray
+        Total depth matrix (SNPs x cells/samples).
+    ref_mtx : sparse or ndarray
+        Reference allele count matrix.
+    alt_mtx : sparse or ndarray
+        Alternate allele count matrix.
+    phases : np.ndarray
+        Per-SNP phase labels (0 or 1).
+
+    Returns
+    -------
+    tuple
+        ``(a_mtx, b_mtx)`` — phased allele count matrices.
+    """
     p = phases[:, None]
     if issparse(ref_mtx):
         b_mtx = ref_mtx.multiply(p) + alt_mtx.multiply(1 - p)
@@ -116,6 +162,22 @@ def apply_phase_to_mat(tot_mtx, ref_mtx, alt_mtx, phases):
 
 
 def compute_af_per_sample(tot_mtx, b_mtx, i: int):
+    """Compute per-SNP allele frequency for a single sample column.
+
+    Parameters
+    ----------
+    tot_mtx : sparse or ndarray
+        Total depth matrix (SNPs x samples).
+    b_mtx : sparse or ndarray
+        B-allele count matrix.
+    i : int
+        Sample column index.
+
+    Returns
+    -------
+    np.ndarray
+        Allele frequency per SNP; ``NaN`` where depth is zero.
+    """
     tot_col = tot_mtx[:, i]
     b_col = b_mtx[:, i]
 
@@ -129,6 +191,20 @@ def compute_af_per_sample(tot_mtx, b_mtx, i: int):
 
 
 def compute_af_pseudobulk(tot_mtx, b_mtx):
+    """Compute per-SNP allele frequency across all cells (pseudobulk sum).
+
+    Parameters
+    ----------
+    tot_mtx : sparse or ndarray
+        Total depth matrix (SNPs x cells).
+    b_mtx : sparse or ndarray
+        B-allele count matrix.
+
+    Returns
+    -------
+    np.ndarray
+        Pseudobulk allele frequency per SNP; ``NaN`` where total depth is zero.
+    """
     if issparse(tot_mtx):
         den = np.asarray(tot_mtx.sum(axis=1)).ravel()
     else:
@@ -175,6 +251,22 @@ def get_mask_by_region(snps: pd.DataFrame, regions: pd.DataFrame) -> np.ndarray:
 
 
 def get_mask_by_depth(snps: pd.DataFrame, tot_mtx: csr_matrix, min_dp=1):
+    """Return a boolean mask keeping SNPs where every sample meets the minimum depth.
+
+    Parameters
+    ----------
+    snps : pd.DataFrame
+        SNP info DataFrame (used only for logging).
+    tot_mtx : csr_matrix
+        Total depth matrix (SNPs x samples).
+    min_dp : int
+        Minimum depth threshold per sample.
+
+    Returns
+    -------
+    np.ndarray
+        Boolean mask of length ``len(snps)``.
+    """
     mask = np.all(tot_mtx >= min_dp, axis=1)
     logging.info(
         f"filter by depth, min_dp={min_dp}, #passed SNPs={np.sum(mask)}/{len(snps)}"
@@ -183,6 +275,22 @@ def get_mask_by_depth(snps: pd.DataFrame, tot_mtx: csr_matrix, min_dp=1):
 
 
 def get_mask_by_depth_pseudobulk(snps: pd.DataFrame, tot_mtx: csr_matrix, min_dp=1):
+    """Return a boolean mask keeping SNPs whose pseudobulk (row-summed) depth meets the threshold.
+
+    Parameters
+    ----------
+    snps : pd.DataFrame
+        SNP info DataFrame (used only for logging).
+    tot_mtx : csr_matrix
+        Total depth matrix (SNPs x cells).
+    min_dp : int
+        Minimum pseudobulk depth threshold.
+
+    Returns
+    -------
+    np.ndarray
+        Boolean mask of length ``len(snps)``.
+    """
     mask = np.asarray(tot_mtx.sum(axis=1)).ravel() >= min_dp
     logging.info(
         f"filter by depth, min_dp={min_dp}, #passed SNPs={np.sum(mask)}/{len(snps)}"
@@ -219,6 +327,26 @@ def get_mask_by_het_balanced(
 def subset_baf(
     baf_df: pd.DataFrame, ch: str, start: int, end: int, is_last_block=False
 ):
+    """Slice a BAF DataFrame to a chromosomal interval ``[start, end)``.
+
+    For the last block, the interval is closed on the right: ``[start, end]``.
+
+    Parameters
+    ----------
+    baf_df : pd.DataFrame
+        DataFrame with ``#CHR`` and ``POS`` columns (or ``POS`` as index).
+    ch : str or None
+        Chromosome to filter on; if None, no chromosome filter is applied.
+    start, end : int
+        Genomic position boundaries.
+    is_last_block : bool
+        If True, use a closed right boundary.
+
+    Returns
+    -------
+    pd.DataFrame
+        Filtered subset.
+    """
     if ch != None:
         baf_ch = baf_df[baf_df["#CHR"] == ch]
     else:
@@ -295,6 +423,32 @@ def plot_allele_freqs(
     unit="SNP",
     suffix="",
 ):
+    """Generate genome-wide allele-frequency scatter plots.
+
+    Produces either one plot per sample or a single pseudobulk plot, saved as
+    multi-page PDFs (one page per chromosome).
+
+    Parameters
+    ----------
+    pos_df : pd.DataFrame
+        SNP/bin position DataFrame with ``#CHR`` and ``POS`` (or ``START``/``END``).
+    rep_ids : list[str]
+        Replicate identifiers.
+    tot_mtx, b_mtx : sparse or ndarray
+        Total depth and B-allele count matrices.
+    genome_size : str
+        Path to chromosome sizes file.
+    plot_dir : str
+        Output directory for PDF plots.
+    apply_pseudobulk : bool
+        If True, plot a single pseudobulk AF; otherwise plot per-sample.
+    allele : str
+        Allele label for filenames (e.g., ``"ref"``, ``"B"``).
+    unit : str
+        Feature unit label (e.g., ``"SNP"``, ``"bin"``).
+    suffix : str
+        Optional filename suffix.
+    """
     logging.info(
         f"QC analysis - plot {allele}-{unit} allele frequency, {unit}={allele}, apply_pseudobulk={apply_pseudobulk}"
     )

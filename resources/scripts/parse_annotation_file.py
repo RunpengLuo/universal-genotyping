@@ -10,6 +10,22 @@ Take a barcode/label visium annotation file, convert to correct format.
 _, ann_file, out_file = sys.argv
 
 def simplify_label(v):
+    """Simplify a Visium annotation label string.
+
+    Labels starting with ``"T"`` without an underscore become ``"tumor"``.
+    Labels starting with ``"T"`` with an underscore keep the part after the
+    first underscore. All other labels are returned unchanged.
+
+    Parameters
+    ----------
+    v : str
+        Raw annotation label.
+
+    Returns
+    -------
+    str
+        Simplified label.
+    """
     if v[0] == "T":
         if "_" not in v:
             return "tumor"
@@ -29,7 +45,7 @@ print(anns.head())
 anns = anns.rename(columns={barcode_col: "BARCODE"})
 
 # NA labels are non-tumor
-anns[raw_label].fillna("normal", inplace=True)
+anns[raw_label] = anns[raw_label].fillna("normal")
 anns[target_label] = anns.apply(
     func=lambda r: simplify_label(r[raw_label]), axis=1
 ).astype("str")
