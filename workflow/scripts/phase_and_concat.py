@@ -18,6 +18,28 @@ from postprocess_utils import *
 from aggregation_utils import *
 from switchprobs import *
 
+def annotate_feature_type(snps, gtf_file):
+    """Annotate SNPs with feature_type (exon/intron/intergenic) using a GTF file.
+
+    Returns the gene_mask (bool Series) indicating which SNPs fall within a gene.
+    """
+    genes_gtf = read_genes_gtf_file(gtf_file, id_col="gene_id")[["gene_id", "#CHR", "START", "END"]]
+    genes_gtf["gene_idx"] = np.arange(len(genes_gtf))
+    snps = assign_pos_to_range(snps, genes_gtf, ref_id="gene_idx", pos_col="POS0")
+    gene_mask = snps["gene_idx"].notna()
+
+    exons_gtf = read_exons_gtf_file(gtf_file)
+    exons_gtf["exon_idx"] = np.arange(len(exons_gtf))
+    snps = assign_pos_to_range(snps, exons_gtf, ref_id="exon_idx", pos_col="POS0")
+
+    snps["feature_type"] = "intergenic"
+    snps.loc[gene_mask, "feature_type"] = "intron"
+    snps.loc[snps["exon_idx"].notna(), "feature_type"] = "exon"
+
+    snps.drop(columns=["exon_idx"], inplace=True, errors="ignore")
+    return snps, genes_gtf, gene_mask
+
+
 ##################################################
 """
 Phase and concat allele-level count matrices.
@@ -124,7 +146,20 @@ if is_bulk_assay:
         )
         pass
     snps = snps.loc[snp_mask, :].reset_index(drop=True)
-    snps["feature_id"] = "Unknown"
+
+    # Annotate bulk SNPs with gene_id (feature_id) and feature_type using GTF
+    snps, genes_gtf, gene_mask = annotate_feature_type(snps, gtf_file)
+
+    # Map gene_idx -> gene_id; intergenic SNPs get "intergenic"
+    snps["feature_id"] = "intergenic"
+    if gene_mask.any():
+        snps.loc[gene_mask, "gene_idx"] = snps.loc[gene_mask, "gene_idx"].astype(int)
+        snps.loc[gene_mask, "feature_id"] = genes_gtf.set_index("gene_idx").loc[
+            snps.loc[gene_mask, "gene_idx"], "gene_id"
+        ].values
+
+    snps.drop(columns=["gene_idx"], inplace=True, errors="ignore")
+
     snps = assign_snp_bounderies(snps, regions, colname="region_id")
 else:
     logging.info(f"annotate SNPs with feature_id")
@@ -153,6 +188,10 @@ else:
     # fake START/END field, TODO refine by gene interval?
     snps["START"] = snps["POS0"]
     snps["END"] = snps["POS"]
+
+    # Annotate single-cell SNPs with feature_type using GTF (same as bulk)
+    snps, _, _ = annotate_feature_type(snps, gtf_file)
+    snps.drop(columns=["gene_idx"], inplace=True, errors="ignore")
 
 num_snps_after = np.sum(snp_mask)
 logging.info(f"#SNPs={num_snps_after}/{num_snps_before} after SNP filtering")
@@ -198,7 +237,7 @@ plot_allele_freqs(
 ##################################################
 logging.info(f"saving output files")
 snps[
-    ["#CHR", "POS", "POS0", "START", "END", "GT", "PHASE", "region_id", "feature_id"]
+    ["#CHR", "POS", "POS0", "START", "END", "GT", "PHASE", "region_id", "feature_id", "feature_type"]
 ].to_csv(sm.output["snp_info"], sep="\t", header=True, index=False)
 if is_bulk_assay:
     np.savez_compressed(sm.output["tot_mtx_snp"], mat=tot_mtx)

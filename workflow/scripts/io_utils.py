@@ -253,6 +253,36 @@ def read_genes_gtf_file(gtf_file: str, id_col="gene_ids"):
     return genes
 
 
+def read_exons_gtf_file(gtf_file: str):
+    """Parse a GTF file and return exon-level records with genomic coordinates.
+
+    Extracts exon features and converts to 0-based BED-like coordinates.
+
+    Parameters
+    ----------
+    gtf_file : str
+        Path to a GTF annotation file.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with ``#CHR``, ``START`` (0-based), ``END``, and ``gene_id``.
+    """
+    gr = pr.read_gtf(gtf_file, rename_attr=True)
+    exons = (
+        gr.df.query("Feature == 'exon'")[["Chromosome", "Start", "End", "gene_id"]]
+        .rename(
+            columns={
+                "Chromosome": "#CHR",
+                "Start": "START1",
+                "End": "END",
+            }
+        )
+    )
+    exons["START"] = exons["START1"] - 1
+    return exons[["#CHR", "START", "END", "gene_id"]]
+
+
 def read_genes_bed_file(bed_file: str, id_col="gene_id"):
     """Read a BED file and return deduplicated gene-level records.
 

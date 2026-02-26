@@ -16,6 +16,24 @@ from io_utils import *
 from postprocess_utils import *
 
 
+def _pyranges_assign_chrom(qry, qry_mask, ref_chrom, ref_id, pos_col):
+    """PyRanges fallback for assigning positions to overlapping intervals on one chromosome."""
+    qry_sub = qry.loc[qry_mask]
+    qry_pr = pr.PyRanges(
+        chromosomes=qry_sub["#CHR"], starts=qry_sub[pos_col], ends=qry_sub[pos_col] + 1
+    )
+    qry_pr = qry_pr.insert(pd.Series(data=qry_sub.index.to_numpy(), name="qry_index"))
+    ref_pr = pr.PyRanges(
+        chromosomes=ref_chrom["#CHR"],
+        starts=ref_chrom["START"],
+        ends=ref_chrom["END"],
+    )
+    ref_pr = ref_pr.insert(ref_chrom[ref_id])
+    joined = qry_pr.join(ref_pr)
+    if len(joined) > 0:
+        qry.loc[joined.df["qry_index"], ref_id] = joined.df[ref_id].to_numpy()
+
+
 def assign_pos_to_range(
     qry: pd.DataFrame,
     ref: pd.DataFrame,
@@ -23,7 +41,10 @@ def assign_pos_to_range(
     pos_col="POS0",
     nodup=True,
 ):
-    """Assign each query position to the reference interval it falls within using pyranges.
+    """Assign each query position to the reference interval it falls within.
+
+    Uses ``np.searchsorted`` for non-overlapping intervals (fast path) and
+    falls back to PyRanges for chromosomes with overlapping intervals.
 
     Parameters
     ----------
@@ -45,23 +66,17 @@ def assign_pos_to_range(
         *qry* with *ref_id* column added (if ``nodup=True``), or a hits
         DataFrame (if ``nodup=False``).
     """
-    qry_pr = pr.PyRanges(
-        chromosomes=qry["#CHR"], starts=qry[pos_col], ends=qry[pos_col] + 1
-    )
-    qry_pr = qry_pr.insert(pd.Series(data=qry.index.to_numpy(), name="qry_index"))
-    ref_pr = pr.PyRanges(
-        chromosomes=ref["#CHR"],
-        starts=ref["START"],
-        ends=ref["END"],
-    )
-    ref_pr = ref_pr.insert(ref[ref_id])
-
-    if nodup:  # qry assigned to at most one ref.
-        joined = qry_pr.join(ref_pr)
-        qry[ref_id] = pd.NA
-        qry.loc[joined.df["qry_index"], ref_id] = joined.df[ref_id].to_numpy()
-        return qry
-    else:
+    if not nodup:
+        qry_pr = pr.PyRanges(
+            chromosomes=qry["#CHR"], starts=qry[pos_col], ends=qry[pos_col] + 1
+        )
+        qry_pr = qry_pr.insert(pd.Series(data=qry.index.to_numpy(), name="qry_index"))
+        ref_pr = pr.PyRanges(
+            chromosomes=ref["#CHR"],
+            starts=ref["START"],
+            ends=ref["END"],
+        )
+        ref_pr = ref_pr.insert(ref[ref_id])
         hits = (
             qry_pr.join(ref_pr)
             .df[["Chromosome", "Start", "qry_index", ref_id]]
@@ -69,6 +84,35 @@ def assign_pos_to_range(
         )
         hits["POS"] = hits["POS0"] + 1
         return hits
+
+    # nodup=True: assign each query position to at most one interval
+    qry[ref_id] = pd.NA
+    for chrom in ref["#CHR"].unique():
+        qry_mask = (qry["#CHR"] == chrom).to_numpy()
+        if not qry_mask.any():
+            continue
+
+        ref_chrom = ref.loc[ref["#CHR"] == chrom].sort_values("START")
+        starts = ref_chrom["START"].to_numpy()
+        ends = ref_chrom["END"].to_numpy()
+        ids = ref_chrom[ref_id].to_numpy()
+        positions = qry.loc[qry_mask, pos_col].to_numpy()
+
+        has_overlap = len(starts) > 1 and np.any(starts[1:] < ends[:-1])
+
+        if not has_overlap:
+            # Fast path: searchsorted for non-overlapping intervals
+            # 0-based half-open: START <= pos < END
+            idx = np.searchsorted(starts, positions, side="right") - 1
+            safe_idx = idx.clip(min=0)
+            valid = (idx >= 0) & (positions < ends[safe_idx])
+            qry_indices = qry.index[qry_mask]
+            qry.loc[qry_indices[valid], ref_id] = ids[idx[valid]]
+        else:
+            # Fallback: PyRanges join for overlapping intervals on this chromosome
+            _pyranges_assign_chrom(qry, qry_mask, ref_chrom, ref_id, pos_col)
+
+    return qry
 
 
 def snp_to_region(
@@ -171,6 +215,8 @@ def adaptive_binning(
     snp_bins = snp_grps.agg(**pos_dict)
     if "feature_id" in snps.columns:
         snp_bins["feature_id"] = snp_grps["feature_id"].agg(lambda x: ";".join(dict.fromkeys(x.dropna().astype(str))))
+    if "feature_type" in snps.columns:
+        snp_bins["feature_type"] = snp_grps["feature_type"].agg(lambda x: ";".join(dict.fromkeys(x.dropna().astype(str))))
     snp_bins.loc[:, "#SNPS"] = snp_grps.size()  # align by bin_id index, not position
     snp_bins.loc[:, "BLOCKSIZE"] = snp_bins["END"] - snp_bins["START"]
     snp_bins[colname] = snp_bins.index
