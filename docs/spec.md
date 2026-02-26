@@ -129,7 +129,8 @@ One subdirectory per `{assay_type}_{rep_id}` combination.
 | `GT` | Genotype string (e.g. `0|1`, `1|0`, `1|1`). |
 | `PHASE` | Phased allele orientation: `1` if A-allele is ALT, `-1` if A-allele is REF. |
 | `region_id` | Integer ID of the genomic region (from `region_bed`) this SNP falls in. |
-| `feature_id` | Integer ID of the gene/tile feature this SNP is assigned to (from `gtf_file`). |
+| `feature_id` | Gene ID from GTF (bulk) or feature name from the assay count matrix (single-cell). `"intergenic"` for bulk SNPs not overlapping any gene. |
+| `feature_type` | Genomic context of the SNP: `exon`, `intron`, or `intergenic`, determined by overlap with gene and exon annotations from the GTF. |
 
 ### `multi_snp.tsv.gz`
 
@@ -144,6 +145,8 @@ One subdirectory per `{assay_type}_{rep_id}` combination.
 | `region_id` | Region ID shared by all SNPs in this bin. |
 | `#SNPS` | Number of SNPs aggregated into this bin. |
 | `BLOCKSIZE` | Genomic span of the bin in bp (`END - START`). |
+| `feature_id` | Semicolon-joined unique feature IDs of the SNPs aggregated into this block. |
+| `feature_type` | Semicolon-joined unique feature types of the SNPs aggregated into this block. |
 | `multi_id` | Integer bin index (0-based, global across all chromosomes). |
 
 ### `bb.tsv.gz`
@@ -163,6 +166,8 @@ Same structure as `multi_snp.tsv.gz` but with additional grouping columns and a 
 | `binom_id` | Binomial-test boundary ID; breaks bins at significant AF shifts. Present only when `binom_test: true`. |
 | `#SNPS` | Number of SNPs in this bin. |
 | `BLOCKSIZE` | Genomic span in bp. |
+| `feature_id` | Semicolon-joined unique feature IDs of the SNPs aggregated into this block. |
+| `feature_type` | Semicolon-joined unique feature types of the SNPs aggregated into this block. |
 | `bb_id` | Integer bin index (0-based, global across all chromosomes). |
 
 ### `sample_ids.tsv`
