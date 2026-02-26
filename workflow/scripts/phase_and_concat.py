@@ -58,6 +58,7 @@ os.makedirs(qc_dir, exist_ok=True)
 region_bed = sm.input["region_bed"]
 genome_size = sm.input["genome_size"]
 gtf_file = maybe_path(sm.input["gtf_file"])
+repeat_blacklist_file = maybe_path(sm.input["repeat_blacklist_file"])
 
 sample_name = sm.params["sample_name"]
 assay_type = sm.params["assay_type"]
@@ -128,17 +129,27 @@ if is_bulk_assay:
 num_snps_before = len(snps)
 
 snp_mask = np.ones(len(snps), dtype=bool)
-# define continguous autosome segments
 regions = read_region_file(region_bed)
-snp_mask = snp_mask & get_mask_by_region(snps, regions)
+region_mask = get_mask_by_region(snps, regions)
+logging.info(f"#SNPs masked by regions={np.sum(region_mask)}/{len(snps)}")
+snp_mask = snp_mask & region_mask
+
+if repeat_blacklist_file is not None:
+    repeat_regions = read_region_file(repeat_blacklist_file)
+    repeat_mask = get_mask_by_region(snps, repeat_regions)
+    logging.info(f"#SNPs in repeat/segdup regions={np.sum(repeat_mask)}/{len(snps)}")
+    snp_mask = snp_mask & ~repeat_mask
+
 if is_bulk_assay:
     snp_mask = snp_mask & get_mask_by_depth(
         snps, tot_mtx, min_dp=max(int(sm.params["min_depth"]), 1)
     )
     if has_normal:
-        snp_mask = snp_mask & get_mask_by_het_balanced(
+        normal_mask = get_mask_by_het_balanced(
             snps, ref_mtx, alt_mtx, float(sm.params["gamma"]), normal_idx=0
         )
+        logging.info(f"#SNPs masked by normal AF={np.sum(normal_mask)}/{len(snps)}")
+        snp_mask = snp_mask & normal_mask
 
     if assay_type == "bulkWES":
         logging.info(

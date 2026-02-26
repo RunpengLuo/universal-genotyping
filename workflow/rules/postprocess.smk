@@ -27,6 +27,11 @@ if workflow_mode == "bulk_genotyping":
             region_bed=lambda wc: config["region_bed"],
             genome_size=lambda wc: config["genome_size"],
             gtf_file=lambda wc: config["gtf_file"],
+            repeat_blacklist_file=lambda wc: branch(
+                config.get("repeat_blacklist_file") is None,
+                then=[],
+                otherwise=config["repeat_blacklist_file"],
+            ),
         output:
             all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
             snp_info=config["allele_dir"] + "/{assay_type}/snps.tsv.gz",
@@ -220,6 +225,11 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             region_bed=lambda wc: config["region_bed"],
             genome_size=lambda wc: config["genome_size"],
             gtf_file=lambda wc: config["gtf_file"],
+            repeat_blacklist_file=lambda wc: branch(
+                config.get("repeat_blacklist_file") is None,
+                then=[],
+                otherwise=config["repeat_blacklist_file"],
+            ),
         output:
             all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
             snp_info=config["allele_dir"] + "/{assay_type}/snps.tsv.gz",
