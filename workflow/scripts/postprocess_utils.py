@@ -245,8 +245,6 @@ def get_mask_by_region(snps: pd.DataFrame, regions: pd.DataFrame) -> np.ndarray:
         .eq("both")
         .to_numpy(dtype=bool)
     )
-
-    logging.info(f"filter by regions, #passed SNPs={int(mask.sum())}/{len(snps)}")
     return mask
 
 
