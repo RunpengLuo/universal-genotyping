@@ -21,8 +21,9 @@ assert not missing, f"missing columns: {missing}"
 for c in optional:
     if c not in sample_df.columns:
         sample_df[c] = pd.NA
-SAMPLE_ID = sample_df["SAMPLE"].iloc[0]
-assert (sample_df["SAMPLE"] == SAMPLE_ID).all(), "identical SAMPLE required"
+SAMPLE_ID = config["sample_id"]
+sample_df = sample_df.loc[sample_df["SAMPLE"] == SAMPLE_ID].reset_index(drop=True)
+assert len(sample_df) > 0, f"no rows matching sample_id={SAMPLE_ID} in sample file"
 assert sample_df["REP_ID"].notna().all(), "REP_ID required for all replicates"
 assert sample_df["PATH_to_bam"].notna().all(), "PATH_to_bam has missing values"
 

@@ -7,8 +7,10 @@ snakemake --cores <N> \
     -s /path/to/workflow/Snakefile \
     --configfile config/config.yaml \
     --directory <output_dir> \
-    --config sample_file=/path/to/samples.tsv
+    --config sample_file=/path/to/samples.tsv sample_id=<PATIENT_ID>
 ```
+
+`sample_id` selects which patient to process from the sample sheet (must match a value in the `SAMPLE` column). This allows a single multi-patient sample sheet to be shared across runs.
 
 ---
 

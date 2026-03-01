@@ -6,7 +6,7 @@ The sample file is a TSV listing all data from the same patient. A template is p
 
 | Column | Required | Explanation |
 |--------|----------|-------------|
-| `SAMPLE` | Yes | Patient ID. All rows must have the same value. |
+| `SAMPLE` | Yes | Patient ID. The sample sheet may contain multiple patients; set `sample_id` in the config (or via `--config sample_id=...`) to select which patient to process. Only rows where `SAMPLE` matches `sample_id` are used. |
 | `REP_ID` | Yes | Replicate ID. Must be unique per row, except for multiome pairs (scRNA + scATAC share a `REP_ID`). |
 | `assay_type` | Yes | One of: `bulkWGS`, `bulkWES`, `scATAC`, `scRNA`, `VISIUM`, `VISIUM3prime`. |
 | `sample_type` | Yes | `normal` or `tumor`. |
