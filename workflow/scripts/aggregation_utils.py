@@ -155,7 +155,7 @@ def adaptive_binning(
     bin_id = 0
     snps[colname] = 0
     snp_grps = snps.groupby(by=grp_cols, sort=False)
-    logging.info(f"adaptive binning, colname={colname}")
+    logging.info(f"adaptive binning, colname={colname}, min_snp_reads={min_snp_reads}, min_snp_per_block={min_snp_per_block}")
     logging.info(f"#SNP groups={len(snp_grps)}, grouper: {grp_cols}")
     for _, grp_snps in snp_grps:
         grp_idxs = grp_snps.index.to_numpy()
