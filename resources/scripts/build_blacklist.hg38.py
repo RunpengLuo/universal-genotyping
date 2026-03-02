@@ -26,6 +26,11 @@ import numpy as np
 import pandas as pd
 import pyranges as pr
 
+NCBI_REFERENCE_URL = (
+    "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/"
+    "GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/"
+    "GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz"
+)
 UCSC_BASE = "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database"
 TABLES = ["genomicSuperDups.txt.gz", "simpleRepeat.txt.gz"]
 STANDARD_CHROMS = {f"chr{c}" for c in list(range(1, 23)) + ["X", "Y"]}
@@ -69,11 +74,24 @@ def read_bed_columns(path):
     return df
 
 
-def check_dependencies(build_index):
+def download_reference(dest_dir):
+    """Download the NCBI GRCh38 analysis set FASTA, decompress, and index."""
+    gz_path = download_file(NCBI_REFERENCE_URL, dest_dir)
+    fa_path = gz_path.removesuffix(".gz")
+    print("  Decompressing ...")
+    subprocess.run(["gunzip", gz_path], check=True)
+    print("  Indexing with samtools faidx ...")
+    subprocess.run(["samtools", "faidx", fa_path], check=True)
+    return fa_path
+
+
+def check_dependencies(build_index, download_reference):
     """Verify required executables are on PATH."""
     required = ["generateMap.pl", "mapCounter", "bowtie"]
     if build_index:
         required.append("bowtie-build")
+    if download_reference:
+        required.append("samtools")
     missing = [cmd for cmd in required if shutil.which(cmd) is None]
     if missing:
         sys.exit(
@@ -175,16 +193,28 @@ def main():
             "Dependencies:\n"
             "  generateMap.pl, mapCounter, bowtie  (hmmcopy_utils + bowtie)\n"
             "  bowtie-build  (only with --build_index)\n\n"
-            "Example:\n"
+            "Examples:\n"
+            "  # With a local reference FASTA\n"
             "  python build_blacklist.hg38.py \\\n"
             "    --reference /path/to/hg38.fa \\\n"
             "    --out_file /path/to/blacklist.hg38.bed.gz \\\n"
-            "    --build_index --threads 8"
+            "    --build_index --threads 8\n\n"
+            "  # Auto-download NCBI GRCh38 (downloaded to temp dir, removed on exit)\n"
+            "  python build_blacklist.hg38.py \\\n"
+            "    --download_reference \\\n"
+            "    --out_file /path/to/blacklist.hg38.bed.gz \\\n"
+            "    --threads 8"
         ),
     )
-    parser.add_argument(
-        "--reference", required=True,
+    ref_group = parser.add_mutually_exclusive_group(required=True)
+    ref_group.add_argument(
+        "--reference",
         help="Path to reference FASTA (must be indexed: .fai).",
+    )
+    ref_group.add_argument(
+        "--download_reference", action="store_true", default=False,
+        help="Download NCBI GRCh38 analysis set (no ALT, UCSC chr-names) to work dir. "
+        "Removed on exit unless --work_dir is specified.",
     )
     parser.add_argument(
         "--out_file", required=True,
@@ -216,14 +246,12 @@ def main():
     )
     args = parser.parse_args()
 
-    # Validate reference
-    if not os.path.isfile(args.reference):
+    # Validate reference (if provided)
+    if args.reference and not os.path.isfile(args.reference):
         sys.exit(f"Error: reference file not found: {args.reference}")
 
-    reference = os.path.abspath(args.reference)
-
-    # Check dependencies
-    check_dependencies(args.build_index)
+    # Check dependencies (download implies build_index)
+    check_dependencies(args.build_index or args.download_reference, args.download_reference)
 
     # Set up work directory
     user_work_dir = args.work_dir is not None
@@ -232,6 +260,13 @@ def main():
         os.makedirs(work_dir, exist_ok=True)
     else:
         work_dir = tempfile.mkdtemp(prefix="blacklist_")
+
+    # Resolve reference
+    if args.download_reference:
+        args.build_index = True  # downloaded FASTA has no pre-built index
+        reference = download_reference(work_dir)
+    else:
+        reference = os.path.abspath(args.reference)
 
     print("=== build_blacklist.hg38.py ===")
     print(f"  Reference:     {reference}")
