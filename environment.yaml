@@ -16,7 +16,7 @@ dependencies:
   - tabix
   - pip
   - pyranges
-  - pyBigWig
+
   - matplotlib-base
   - statsmodels
   - pybedtools

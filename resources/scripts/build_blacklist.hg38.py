@@ -7,17 +7,12 @@ import sys
 import tempfile
 import urllib.request
 
-import numpy as np
 import pandas as pd
-import pyBigWig
 import pyranges as pr
 
 UCSC_BASE = "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database"
 TABLES = ["genomicSuperDups.txt.gz", "simpleRepeat.txt.gz"]
-MAPPABILITY_URL = (
-    "https://hgdownload.soe.ucsc.edu/gbdb/hg38/hoffmanMappability/"
-    "k100.Umap.MultiTrackMappability.bw"
-)
+MAPPABILITY_URL = "https://bismap.hoffmanlab.org/raw/hg38/k100.umap.bedgraph.gz"
 STANDARD_CHROMS = {f"chr{c}" for c in list(range(1, 23)) + ["X", "Y"]}
 
 
@@ -59,54 +54,44 @@ def read_bed_columns(path):
     return df
 
 
-def get_low_mappability_regions(bw_path, min_map_score, chroms):
-    """Extract regions with mappability score < min_map_score from a bigWig file.
+def get_low_mappability_regions(bedgraph_path, min_map_score, chroms):
+    """Extract regions with mappability score < min_map_score from a bedGraph file.
 
-    Regions not covered by the bigWig (score=0) are also included.
+    Regions not covered by the bedGraph (score=0) are also included.
     """
-    bw = pyBigWig.open(bw_path)
-    rows = []
-    sorted_chroms = sorted(chroms)
-    for i, chrom in enumerate(sorted_chroms):
-        print(f"  Processing {chrom} ({i+1}/{len(sorted_chroms)})");
-        chrom_len = bw.chroms().get(chrom)
-        if chrom_len is None:
-            continue
-        intervals = bw.intervals(chrom)
-        if intervals is None:
-            rows.append((chrom, 0, chrom_len))
-            continue
-        arr = np.array(intervals)
-        starts = arr[:, 0].astype(np.int64)
-        ends = arr[:, 1].astype(np.int64)
-        scores = arr[:, 2]
-
-        # low-score intervals
-        low = scores < min_map_score
-        if low.any():
-            chrom_col = np.full(low.sum(), chrom)
-            rows.append(np.column_stack([chrom_col, starts[low], ends[low]]))
-
-        # gaps between consecutive intervals (unmappable, score=0)
-        gap_starts = ends[:-1]
-        gap_ends = starts[1:]
-        gap_mask = gap_ends > gap_starts
-        if gap_mask.any():
-            chrom_col = np.full(gap_mask.sum(), chrom)
-            rows.append(np.column_stack([chrom_col, gap_starts[gap_mask], gap_ends[gap_mask]]))
-
-        # leading/trailing gaps
-        if starts[0] > 0:
-            rows.append(np.array([[chrom, 0, starts[0]]]))
-        if ends[-1] < chrom_len:
-            rows.append(np.array([[chrom, ends[-1], chrom_len]]))
-    bw.close()
-    if not rows:
-        return pd.DataFrame(columns=["Chromosome", "Start", "End"])
-    combined = np.vstack(rows)
-    return pd.DataFrame(combined, columns=["Chromosome", "Start", "End"]).astype(
-        {"Start": np.int64, "End": np.int64}
+    print("Filtering low-mappability regions ...")
+    df = pd.read_csv(
+        bedgraph_path,
+        sep="\t",
+        header=None,
+        names=["Chromosome", "Start", "End", "Score"],
+        dtype={"Chromosome": str, "Start": int, "End": int, "Score": float},
     )
+
+    # keep only standard chromosomes
+    df = df[df["Chromosome"].isin(chroms)].reset_index(drop=True)
+
+    # intervals with score below threshold
+    low = df.loc[df["Score"] < min_map_score, ["Chromosome", "Start", "End"]]
+
+    # gaps between consecutive intervals per chromosome (unmapped, score=0)
+    gaps = []
+    for chrom, grp in df.groupby("Chromosome", sort=False):
+        starts = grp["Start"].to_numpy()
+        ends = grp["End"].to_numpy()
+        gap_mask = starts[1:] > ends[:-1]
+        if gap_mask.any():
+            idx = gap_mask.nonzero()[0]
+            gaps.append(pd.DataFrame({
+                "Chromosome": chrom,
+                "Start": ends[idx],
+                "End": starts[idx + 1],
+            }))
+
+    parts = [low]
+    if gaps:
+        parts.append(pd.concat(gaps, ignore_index=True))
+    return pd.concat(parts, ignore_index=True)
 
 
 def main():
@@ -136,10 +121,10 @@ def main():
             print(f"  {table}: {len(bed)} intervals")
             beds.append(bed)
 
-        # UCSC mappability bigWig
-        bw_path = download_file(MAPPABILITY_URL, tmpdir)
-        tmp_files.append(bw_path)
-        low_map = get_low_mappability_regions(bw_path, args.min_map_score, STANDARD_CHROMS)
+        # Hoffman Lab mappability bedGraph
+        bg_path = download_file(MAPPABILITY_URL, tmpdir)
+        tmp_files.append(bg_path)
+        low_map = get_low_mappability_regions(bg_path, args.min_map_score, STANDARD_CHROMS)
         print(f"Low-mappability regions (score < {args.min_map_score}): {len(low_map)} intervals")
         beds.append(low_map)
     finally:
