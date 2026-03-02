@@ -65,8 +65,14 @@ def get_low_mappability_regions(bedgraph_path, min_map_score, chroms):
         sep="\t",
         header=None,
         names=["Chromosome", "Start", "End", "Score"],
-        dtype={"Chromosome": str, "Start": int, "End": int, "Score": float},
+        dtype={"Chromosome": str},
+        comment="#",
     )
+    # drop non-data rows (e.g. "track type=bedGraph ..." header)
+    df = df[df["Chromosome"].str.startswith("chr", na=False)].reset_index(drop=True)
+    df["Start"] = df["Start"].astype(int)
+    df["End"] = df["End"].astype(int)
+    df["Score"] = df["Score"].astype(float)
 
     # keep only standard chromosomes
     df = df[df["Chromosome"].isin(chroms)].reset_index(drop=True)
