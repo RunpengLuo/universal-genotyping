@@ -48,6 +48,43 @@ Used for feature assignment (`gtf_file` in config).
 
 ---
 
+## Blacklist BED
+
+Used for filtering unreliable genomic regions (`blacklist_file` in config).
+
+### Building the blacklist
+
+The script [`resources/scripts/build_blacklist.hg38.py`](../resources/scripts/build_blacklist.hg38.py) generates a merged blacklist BED by:
+
+1. Running hmmcopy_utils (`generateMap.pl` + `mapCounter`) to compute per-base mappability from a reference FASTA
+2. Filtering bins with low average mappability
+3. Downloading UCSC repeat/segdup tables (genomicSuperDups, simpleRepeat)
+4. Merging all intervals with pyranges into a single gzipped BED
+
+**Dependencies:** [hmmcopy_utils](https://github.com/shahcompbio/hmmcopy_utils) (`generateMap.pl`, `mapCounter`) and [bowtie](https://bowtie-bio.sourceforge.net/index.shtml).
+
+**Quick start:**
+
+```bash
+python resources/scripts/build_blacklist.hg38.py \
+  --reference /path/to/hg38.fa \
+  --out_file /path/to/blacklist.hg38.bed.gz \
+  --build_index --threads 8
+
+# Keep intermediate files (mappability BigWig, etc.) for inspection
+python resources/scripts/build_blacklist.hg38.py \
+  --reference /path/to/hg38.fa \
+  --out_file /path/to/blacklist.hg38.bed.gz \
+  --build_index --threads 8 \
+  --work_dir /path/to/intermediates
+```
+
+**Choosing `--read_length`:** Use the default **150** for both standard short-read WGS/WES and PacBio HiFi workflows. `generateMap.pl` aligns synthetic k-mers with bowtie (a short-read aligner), so passing long-read lengths (10 kb+) is not supported. The blacklist also includes UCSC segdups and simple repeats regardless of read length.
+
+Run `python resources/scripts/build_blacklist.hg38.py --help` for full usage.
+
+---
+
 ## Phasing Tools
 
 One phasing tool is required for `bulk_genotyping` and `single_cell_genotyping` modes. Python/conda dependencies are in `environment.yaml`.
