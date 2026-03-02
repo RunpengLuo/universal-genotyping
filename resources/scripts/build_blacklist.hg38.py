@@ -3,6 +3,7 @@
 
 import argparse
 import os
+import sys
 import tempfile
 import urllib.request
 
@@ -19,13 +20,27 @@ MAPPABILITY_URL = (
 STANDARD_CHROMS = {f"chr{c}" for c in list(range(1, 23)) + ["X", "Y"]}
 
 
+def _reporthook(block_num, block_size, total_size):
+    """Print download progress."""
+    downloaded = block_num * block_size
+    if total_size > 0:
+        pct = min(downloaded / total_size * 100, 100)
+        mb = downloaded / 1e6
+        total_mb = total_size / 1e6
+        sys.stdout.write(f"\r  {mb:.1f}/{total_mb:.1f} MB ({pct:.0f}%)")
+    else:
+        sys.stdout.write(f"\r  {downloaded / 1e6:.1f} MB")
+    sys.stdout.flush()
+
+
 def download_file(url, dest_dir, filename=None):
     """Download a file to *dest_dir* and return the local path."""
     if filename is None:
         filename = os.path.basename(url)
     local_path = os.path.join(dest_dir, filename)
     print(f"Downloading {url} ...")
-    urllib.request.urlretrieve(url, local_path)
+    urllib.request.urlretrieve(url, local_path, reporthook=_reporthook)
+    print()  # newline after progress
     return local_path
 
 
@@ -50,7 +65,9 @@ def get_low_mappability_regions(bw_path, min_map_score, chroms):
     """
     bw = pyBigWig.open(bw_path)
     rows = []
-    for chrom in sorted(chroms):
+    sorted_chroms = sorted(chroms)
+    for i, chrom in enumerate(sorted_chroms):
+        print(f"  Processing {chrom} ({i+1}/{len(sorted_chroms)})");
         chrom_len = bw.chroms().get(chrom)
         if chrom_len is None:
             continue
@@ -96,7 +113,9 @@ def main():
         for table in TABLES:
             local = download_file(f"{UCSC_BASE}/{table}", tmpdir, table)
             tmp_files.append(local)
-            beds.append(read_bed_columns(local))
+            bed = read_bed_columns(local)
+            print(f"  {table}: {len(bed)} intervals")
+            beds.append(bed)
 
         # UCSC mappability bigWig
         bw_path = download_file(MAPPABILITY_URL, tmpdir)
