@@ -101,7 +101,7 @@ params_longphase:
 
 ##################################################
 gene_blacklist_file: null
-repeat_blacklist_file: null
+blacklist_bed: null
 
 params_postprocess:
   # process_rna_adata parameters
@@ -115,7 +115,11 @@ params_postprocess:
   # SNP filtering paramters
   ## filter SNP if any sample failed, (mode 1)
   min_depth: 1
-  ## per-SNP beta-posterior CI test on matched-normal sample
+  ## per-SNP beta-posterior CI test on matched-normal sample.
+  ## Uses a (1-gamma) credible interval from Beta(ref+1, alt+1) posterior;
+  ## SNP passes if 0.5 is within the interval.
+  ## Lower gamma → wider CI → more SNPs pass (more lenient).
+  ## Higher gamma → narrower CI → fewer SNPs pass (more strict).
   gamma: 0.05
 
   # switchprobs parameters

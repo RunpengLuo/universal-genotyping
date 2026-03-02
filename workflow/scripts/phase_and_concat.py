@@ -58,7 +58,7 @@ os.makedirs(qc_dir, exist_ok=True)
 region_bed = sm.input["region_bed"]
 genome_size = sm.input["genome_size"]
 gtf_file = maybe_path(sm.input["gtf_file"])
-repeat_blacklist_file = maybe_path(sm.input["repeat_blacklist_file"])
+blacklist_bed = maybe_path(sm.input["blacklist_bed"])
 
 sample_name = sm.params["sample_name"]
 assay_type = sm.params["assay_type"]
@@ -134,34 +134,14 @@ region_mask = get_mask_by_region(snps, regions)
 logging.info(f"#SNPs masked by regions={np.sum(region_mask)}/{len(snps)}")
 snp_mask = snp_mask & region_mask
 
-if repeat_blacklist_file is not None:
-    repeat_regions = read_region_file(repeat_blacklist_file)
+if blacklist_bed is not None:
+    repeat_regions = read_region_file(blacklist_bed)
     repeat_mask = get_mask_by_region(snps, repeat_regions)
     logging.info(f"#SNPs in repeat/segdup regions={np.sum(repeat_mask)}/{len(snps)}")
     snp_mask = snp_mask & ~repeat_mask
 
-snps_prefilter = snps  # save reference before snps gets sliced by filters
-
+snps, genes_gtf, gene_mask = annotate_feature_type(snps, gtf_file)
 if is_bulk_assay:
-    snp_mask = snp_mask & get_mask_by_depth(
-        snps, tot_mtx, min_dp=max(int(sm.params["min_depth"]), 1)
-    )
-    if has_normal:
-        normal_mask = get_mask_by_het_balanced(
-            snps, ref_mtx, alt_mtx, float(sm.params["gamma"]), normal_idx=0
-        )
-        snp_mask = snp_mask & normal_mask
-
-    if assay_type == "bulkWES":
-        logging.info(
-            "TODO, filter non-exonic SNPs, restrict SNPs interval by exonic region."
-        )
-        pass
-    snps = snps.loc[snp_mask, :].reset_index(drop=True)
-
-    # Annotate bulk SNPs with gene_id (feature_id) and feature_type using GTF
-    snps, genes_gtf, gene_mask = annotate_feature_type(snps, gtf_file)
-
     # Map gene_idx -> gene_id; intergenic SNPs get "intergenic"
     snps["feature_id"] = "intergenic"
     if gene_mask.any():
@@ -172,8 +152,24 @@ if is_bulk_assay:
 
     snps.drop(columns=["gene_idx"], inplace=True, errors="ignore")
 
-    snps = assign_snp_bounderies(snps, regions, colname="region_id")
+    snp_mask = snp_mask & get_mask_by_depth(
+        snps, tot_mtx, min_dp=max(int(sm.params["min_depth"]), 1)
+    )
+    if has_normal:
+        normal_mask = get_mask_by_het_balanced(
+            snps, ref_mtx, alt_mtx, float(sm.params["gamma"]), normal_idx=0
+        )
+        snp_mask = snp_mask & normal_mask
+
+    if assay_type == "bulkWES":
+        exon_mask = (snps["feature_type"] == "exon").to_numpy()
+        logging.info(
+            f"filter by non-exonic SNPs, #passed SNPs={np.sum(exon_mask)}/{len(snps)}"
+        )
+        snp_mask = snp_mask & exon_mask
 else:
+    snps.drop(columns=["gene_idx"], inplace=True, errors="ignore")
+
     logging.info(f"annotate SNPs with feature_id")
     adata: sc.AnnData = sc.read_h5ad(sm.input["h5ad_file"])
     feature_df = adata.var.reset_index(drop=False).rename(
@@ -186,7 +182,17 @@ else:
     logging.info(
         f"#SNPs overlap with {assay_type} features={np.sum(snp_mask) / len(snps):.3%}"
     )
-    snps = snps.loc[snp_mask, :].reset_index(drop=True)
+
+# Pre-filter QC: AF plot with mask overlay showing kept vs filtered SNPs
+plot_allele_freqs(
+    snps, rep_ids, tot_mtx, ref_mtx, genome_size, qc_dir,
+    apply_pseudobulk=not is_bulk_assay,
+    allele="ref", unit="snp", suffix=f"_{assay_type}_prefilter",
+    snp_mask=snp_mask,
+)
+
+snps = snps.loc[snp_mask, :].reset_index(drop=True)
+if not is_bulk_assay:
     snps["feature_idx"] = snps["feature_idx"].astype(feature_df["feature_idx"].dtype)
     snps = pd.merge(
         left=snps,
@@ -195,37 +201,20 @@ else:
         on="feature_idx",
         sort=False,
     ).reset_index(drop=True)
-
-    snps = assign_snp_bounderies(snps, regions, colname="region_id")
     # fake START/END field, TODO refine by gene interval?
     snps["START"] = snps["POS0"]
     snps["END"] = snps["POS"]
 
-    # Annotate single-cell SNPs with feature_type using GTF (same as bulk)
-    snps, _, _ = annotate_feature_type(snps, gtf_file)
-    snps.drop(columns=["gene_idx"], inplace=True, errors="ignore")
+snps = assign_snp_bounderies(snps, regions, colname="region_id")
 
 num_snps_after = np.sum(snp_mask)
 logging.info(f"#SNPs={num_snps_after}/{num_snps_before} after SNP filtering")
-
-# Pre-filter QC: AF plot with mask overlay showing kept vs filtered SNPs
-plot_allele_freqs(
-    snps_prefilter, rep_ids, tot_mtx, ref_mtx, genome_size, qc_dir,
-    apply_pseudobulk=not is_bulk_assay,
-    allele="ref", unit="snp", suffix=f"_{assay_type}_prefilter",
-    snp_mask=snp_mask,
-)
 
 tot_mtx = tot_mtx[snp_mask, :]
 ref_mtx = ref_mtx[snp_mask, :]
 alt_mtx = alt_mtx[snp_mask, :]
 a_mtx = a_mtx[snp_mask, :]
 b_mtx = b_mtx[snp_mask, :]
-
-# TODO
-# BAF HMM phase correction here?
-# record genotypes GT in snp_info for copy-typing recovery.
-# a/b mtx got updated.
 
 ##################################################
 # QC plots
