@@ -111,7 +111,7 @@ def run_bowtie_build(reference, index_base, threads):
     print("  Done.")
 
 
-def run_generate_map(reference, index_base, map_bw, read_length, threads):
+def run_generate_map(reference, index_base, map_bw, read_length):
     """Run generateMap.pl to produce a per-base mappability BigWig."""
     print(f"[Step 1] Running generateMap.pl (read_length={read_length}) ...")
     subprocess.run(
@@ -121,7 +121,6 @@ def run_generate_map(reference, index_base, map_bw, read_length, threads):
             reference,
             "-l", str(read_length),
             "-o", map_bw,
-            "-t", str(threads),
         ],
         check=True,
     )
@@ -299,7 +298,7 @@ def main():
                 )
 
         # Step 1: generateMap.pl → per-base BigWig
-        run_generate_map(reference, index_base, map_bw, args.read_length, args.threads)
+        run_generate_map(reference, index_base, map_bw, args.read_length)
 
         # Step 2: mapCounter → binned DataFrame
         binned = run_map_counter(map_bw, args.window, STANDARD_CHROMS)
