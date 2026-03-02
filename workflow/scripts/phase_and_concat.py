@@ -131,7 +131,7 @@ num_snps_before = len(snps)
 snp_mask = np.ones(len(snps), dtype=bool)
 regions = read_region_file(region_bed)
 region_mask = get_mask_by_region(snps, regions)
-logging.info(f"#SNPs masked by regions={np.sum(region_mask)}/{len(snps)}")
+logging.info(f"filter by non-region SNPs, #passed SNPs={np.sum(region_mask)}/{len(snps)}")
 snp_mask = snp_mask & region_mask
 
 if blacklist_bed is not None:
