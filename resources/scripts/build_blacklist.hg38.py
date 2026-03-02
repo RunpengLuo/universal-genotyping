@@ -7,6 +7,7 @@ import sys
 import tempfile
 import urllib.request
 
+import numpy as np
 import pandas as pd
 import pyBigWig
 import pyranges as pr
@@ -73,21 +74,39 @@ def get_low_mappability_regions(bw_path, min_map_score, chroms):
             continue
         intervals = bw.intervals(chrom)
         if intervals is None:
-            # entire chromosome has no mappability data — treat as unmappable
             rows.append((chrom, 0, chrom_len))
             continue
-        # gaps between intervals are score=0 (unmappable)
-        prev_end = 0
-        for start, end, score in intervals:
-            if start > prev_end:
-                rows.append((chrom, prev_end, start))
-            if score < min_map_score:
-                rows.append((chrom, start, end))
-            prev_end = end
-        if prev_end < chrom_len:
-            rows.append((chrom, prev_end, chrom_len))
+        arr = np.array(intervals)
+        starts = arr[:, 0].astype(np.int64)
+        ends = arr[:, 1].astype(np.int64)
+        scores = arr[:, 2]
+
+        # low-score intervals
+        low = scores < min_map_score
+        if low.any():
+            chrom_col = np.full(low.sum(), chrom)
+            rows.append(np.column_stack([chrom_col, starts[low], ends[low]]))
+
+        # gaps between consecutive intervals (unmappable, score=0)
+        gap_starts = ends[:-1]
+        gap_ends = starts[1:]
+        gap_mask = gap_ends > gap_starts
+        if gap_mask.any():
+            chrom_col = np.full(gap_mask.sum(), chrom)
+            rows.append(np.column_stack([chrom_col, gap_starts[gap_mask], gap_ends[gap_mask]]))
+
+        # leading/trailing gaps
+        if starts[0] > 0:
+            rows.append(np.array([[chrom, 0, starts[0]]]))
+        if ends[-1] < chrom_len:
+            rows.append(np.array([[chrom, ends[-1], chrom_len]]))
     bw.close()
-    return pd.DataFrame(rows, columns=["Chromosome", "Start", "End"])
+    if not rows:
+        return pd.DataFrame(columns=["Chromosome", "Start", "End"])
+    combined = np.vstack(rows)
+    return pd.DataFrame(combined, columns=["Chromosome", "Start", "End"]).astype(
+        {"Start": np.int64, "End": np.int64}
+    )
 
 
 def main():
