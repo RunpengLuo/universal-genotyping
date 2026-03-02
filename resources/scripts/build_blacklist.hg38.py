@@ -2,11 +2,13 @@
 """Download UCSC hg38 repeat annotations and low-mappability regions, merge into a single blacklist BED."""
 
 import argparse
+import gzip
 import os
 import sys
 import tempfile
 import urllib.request
 
+import numpy as np
 import pandas as pd
 import pyranges as pr
 
@@ -57,47 +59,31 @@ def read_bed_columns(path):
 def get_low_mappability_regions(bedgraph_path, min_map_score, chroms):
     """Extract regions with mappability score < min_map_score from a bedGraph file.
 
-    Regions not covered by the bedGraph (score=0) are also included.
+    The bismap bedGraph omits regions with score=1.0 (fully mappable),
+    so only explicitly listed intervals are checked against the threshold.
+    Streams line-by-line to avoid loading the entire file into memory.
     """
     print("Filtering low-mappability regions ...")
-    df = pd.read_csv(
-        bedgraph_path,
-        sep="\t",
-        header=None,
-        names=["Chromosome", "Start", "End", "Score"],
-        dtype={"Chromosome": str},
-        comment="#",
-    )
-    # drop non-data rows (e.g. "track type=bedGraph ..." header)
-    df = df[df["Chromosome"].str.startswith("chr", na=False)].reset_index(drop=True)
-    df["Start"] = df["Start"].astype(int)
-    df["End"] = df["End"].astype(int)
-    df["Score"] = df["Score"].astype(float)
+    rows = []
 
-    # keep only standard chromosomes
-    df = df[df["Chromosome"].isin(chroms)].reset_index(drop=True)
+    with gzip.open(bedgraph_path, "rt") as fh:
+        for line in fh:
+            if not line.startswith("chr"):
+                continue
+            chrom, start_s, end_s, score_s = line.split("\t", 3)
+            if chrom not in chroms:
+                continue
+            if float(score_s) < min_map_score:
+                rows.append((chrom, int(start_s), int(end_s)))
 
-    # intervals with score below threshold
-    low = df.loc[df["Score"] < min_map_score, ["Chromosome", "Start", "End"]]
-
-    # gaps between consecutive intervals per chromosome (unmapped, score=0)
-    gaps = []
-    for chrom, grp in df.groupby("Chromosome", sort=False):
-        starts = grp["Start"].to_numpy()
-        ends = grp["End"].to_numpy()
-        gap_mask = starts[1:] > ends[:-1]
-        if gap_mask.any():
-            idx = gap_mask.nonzero()[0]
-            gaps.append(pd.DataFrame({
-                "Chromosome": chrom,
-                "Start": ends[idx],
-                "End": starts[idx + 1],
-            }))
-
-    parts = [low]
-    if gaps:
-        parts.append(pd.concat(gaps, ignore_index=True))
-    return pd.concat(parts, ignore_index=True)
+    if not rows:
+        return pd.DataFrame(columns=["Chromosome", "Start", "End"])
+    arr = np.array(rows, dtype=object)
+    return pd.DataFrame({
+        "Chromosome": arr[:, 0],
+        "Start": arr[:, 1].astype(np.int64),
+        "End": arr[:, 2].astype(np.int64),
+    })
 
 
 def main():
