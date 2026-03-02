@@ -150,7 +150,6 @@ if is_bulk_assay:
         normal_mask = get_mask_by_het_balanced(
             snps, ref_mtx, alt_mtx, float(sm.params["gamma"]), normal_idx=0
         )
-        logging.info(f"#SNPs masked by normal AF={np.sum(normal_mask)}/{len(snps)}")
         snp_mask = snp_mask & normal_mask
 
     if assay_type == "bulkWES":
