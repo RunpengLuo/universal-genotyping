@@ -140,6 +140,8 @@ if repeat_blacklist_file is not None:
     logging.info(f"#SNPs in repeat/segdup regions={np.sum(repeat_mask)}/{len(snps)}")
     snp_mask = snp_mask & ~repeat_mask
 
+snps_prefilter = snps  # save reference before snps gets sliced by filters
+
 if is_bulk_assay:
     snp_mask = snp_mask & get_mask_by_depth(
         snps, tot_mtx, min_dp=max(int(sm.params["min_depth"]), 1)
@@ -206,6 +208,14 @@ else:
 
 num_snps_after = np.sum(snp_mask)
 logging.info(f"#SNPs={num_snps_after}/{num_snps_before} after SNP filtering")
+
+# Pre-filter QC: AF plot with mask overlay showing kept vs filtered SNPs
+plot_allele_freqs(
+    snps_prefilter, rep_ids, tot_mtx, ref_mtx, genome_size, qc_dir,
+    apply_pseudobulk=not is_bulk_assay,
+    allele="ref", unit="snp", suffix=f"_{assay_type}_prefilter",
+    snp_mask=snp_mask,
+)
 
 tot_mtx = tot_mtx[snp_mask, :]
 ref_mtx = ref_mtx[snp_mask, :]

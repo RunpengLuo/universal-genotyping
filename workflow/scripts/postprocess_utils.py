@@ -420,6 +420,7 @@ def plot_allele_freqs(
     allele="ref",
     unit="SNP",
     suffix="",
+    snp_mask=None,
 ):
     """Generate genome-wide allele-frequency scatter plots.
 
@@ -453,7 +454,7 @@ def plot_allele_freqs(
     if apply_pseudobulk:
         af = compute_af_pseudobulk(tot_mtx, b_mtx)
         plot_file = os.path.join(plot_dir, f"af_{allele}_{unit}.pseudobulk{suffix}.pdf")
-        plot_1d_sample(pos_df, af, genome_size, plot_file, unit=unit, val_type="AF")
+        plot_1d_sample(pos_df, af, genome_size, plot_file, unit=unit, val_type="AF", mask=snp_mask)
     else:
         _tot_mtx = tot_mtx.tocsc() if issparse(tot_mtx) else tot_mtx
         _b_mtx = b_mtx.tocsc() if issparse(b_mtx) else b_mtx
@@ -462,7 +463,7 @@ def plot_allele_freqs(
                 plot_dir, f"af_{allele}_{unit}.{rep_id}{suffix}.pdf"
             )
             af = compute_af_per_sample(_tot_mtx, _b_mtx, i)
-            plot_1d_sample(pos_df, af, genome_size, plot_file, unit=unit, val_type="AF")
+            plot_1d_sample(pos_df, af, genome_size, plot_file, unit=unit, val_type="AF", mask=snp_mask)
     return
 
 
@@ -479,6 +480,7 @@ def plot_1d_sample(
     figsize=(40, 3),
     min_ylim=0.0,
     max_ylim=1.0,
+    mask: np.ndarray | None = None,
 ):
     """
     plot any features like AF, RDR, etc., in 1d chromosome scatter plot.
@@ -511,13 +513,23 @@ def plot_1d_sample(
         x = pos[lo:hi]
         y = val[lo:hi]
         m = np.isfinite(y)
+        mask_chr = mask[lo:hi] if mask is not None else None
 
         n_plot = int(m.sum())
         if n_plot == 0:
             logging.warning(f"{chrom}: all {val_type} values are non-finite")
             continue
         fig, ax = plt.subplots(1, 1, figsize=figsize)
-        ax.scatter(x[m], y[m], s=s, alpha=alpha, rasterized=True)
+        if mask_chr is not None:
+            kept = m & mask_chr
+            filt = m & ~mask_chr
+            if filt.any():
+                ax.scatter(x[filt], y[filt], s=s, alpha=0.8, color="red", rasterized=True, label=f"filtered ({filt.sum()})")
+            if kept.any():
+                ax.scatter(x[kept], y[kept], s=s, alpha=0.8, color="blue", rasterized=True, label=f"kept ({kept.sum()})")
+            ax.legend(loc="upper right", fontsize=8, markerscale=2)
+        else:
+            ax.scatter(x[m], y[m], s=s, alpha=alpha, rasterized=True)
         if val_type in ["AF", "BAF"]:
             ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
             ax.set_ylim(-0.05, 1.05)

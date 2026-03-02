@@ -3,6 +3,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+import numba
 
 from scipy.io import mmread
 from scipy.sparse import csr_matrix, hstack, issparse
@@ -14,6 +15,72 @@ import scanpy as sc
 
 from io_utils import *
 from postprocess_utils import *
+
+
+@numba.njit
+def _bin_snps_numba(read_counts, min_snp_reads, min_snp_per_block):
+    """Greedy adaptive binning over a contiguous read-count array.
+
+    Parameters
+    ----------
+    read_counts : (N, M) contiguous float64
+        Per-SNP read counts for tumor samples.
+    min_snp_reads : int
+        Minimum total reads per sample for a bin to be complete.
+    min_snp_per_block : int
+        Minimum number of SNPs per bin.
+
+    Returns
+    -------
+    bin_ids : (N,) int64
+        Relative bin ID for each SNP within this group.
+    n_bins : int
+        Number of bins created (before last-block adjustment).
+    """
+    N, M = read_counts.shape
+    bin_ids = np.zeros(N, dtype=np.int64)
+    if N == 0:
+        return bin_ids, 0
+
+    bin_id = 0
+    prev_start = 0
+    acc = read_counts[0].copy()
+    acc_n = 1
+
+    for i in range(1, N):
+        # check if accumulator meets both thresholds
+        meets_reads = True
+        if min_snp_reads > 0:
+            for j in range(M):
+                if acc[j] < min_snp_reads:
+                    meets_reads = False
+                    break
+        if meets_reads and acc_n >= min_snp_per_block:
+            bin_ids[prev_start:i] = bin_id
+            bin_id += 1
+            prev_start = i
+            acc = read_counts[i].copy()
+            acc_n = 1
+        else:
+            for j in range(M):
+                acc[j] += read_counts[i, j]
+            acc_n += 1
+
+    # last block: keep as own bin if it meets both criteria and isn't the only block
+    last_meets_reads = True
+    if min_snp_reads > 0:
+        for j in range(M):
+            if acc[j] < min_snp_reads:
+                last_meets_reads = False
+                break
+    if last_meets_reads and acc_n >= min_snp_per_block and prev_start > 0:
+        bin_ids[prev_start:] = bin_id
+        bin_id += 1
+    else:
+        merge_id = bin_id - 1 if bin_id > 0 else 0
+        bin_ids[prev_start:] = merge_id
+
+    return bin_ids, bin_id
 
 
 def _pyranges_assign_chrom(qry, qry_mask, ref_chrom, ref_id, pos_col):
@@ -159,43 +226,21 @@ def adaptive_binning(
     logging.info(f"#SNP groups={len(snp_grps)}, grouper: {grp_cols}")
     for _, grp_snps in snp_grps:
         grp_idxs = grp_snps.index.to_numpy()
-        nsnp_grp = len(grp_idxs)
-        bin_ids = np.zeros(nsnp_grp, dtype=np.int64)
-        bin_id0 = bin_id
-        prev_start = 0
-        acc_read_count = tot_mtx[grp_idxs[0], tumor_sidx:].copy()
-        acc_num_snp = 1
-        for i in range(1, nsnp_grp):
-            idx = grp_idxs[i]
-            if (
-                np.all(acc_read_count >= min_snp_reads)
-                and acc_num_snp >= min_snp_per_block
-            ):
-                bin_ids[prev_start:i] = bin_id
-                bin_id += 1
-                prev_start = i
 
-                acc_read_count = tot_mtx[idx, tumor_sidx:].copy()
-                acc_num_snp = 1
-            else:
-                # extend feature block
-                acc_read_count += tot_mtx[idx, tumor_sidx:].copy()
-                acc_num_snp += 1
-
-        # fill last block: keep as its own bin if it meets both criteria,
-        # otherwise merge backward into the previous bin.
-        if (
-            np.all(acc_read_count >= min_snp_reads)
-            and acc_num_snp >= min_snp_per_block
-            and prev_start > 0
-        ):
-            bin_ids[prev_start:] = bin_id
-            bin_id += 1
+        # Extract the group's read-count submatrix as a contiguous dense copy
+        grp_mtx = tot_mtx[grp_idxs]
+        if issparse(grp_mtx):
+            grp_reads = np.ascontiguousarray(grp_mtx[:, tumor_sidx:].toarray(), dtype=np.float64)
         else:
-            bin_ids[prev_start:] = max(bin_id - 1, bin_id0)
-        snps.loc[grp_idxs, colname] = bin_ids
+            grp_reads = np.ascontiguousarray(grp_mtx[:, tumor_sidx:], dtype=np.float64).copy()
 
-        bin_id = max(bin_id, bin_id0 + 1)
+        # Call the Numba kernel for greedy binning
+        local_bin_ids, n_bins = _bin_snps_numba(grp_reads, min_snp_reads, min_snp_per_block)
+
+        # Offset local bin IDs to global bin IDs
+        local_bin_ids += bin_id
+        snps.loc[grp_idxs, colname] = local_bin_ids
+        bin_id += max(n_bins, 1)
 
     pos_dict = {
         "#CHR": ("#CHR", "first"),
@@ -213,10 +258,11 @@ def adaptive_binning(
 
     snp_grps = snps.groupby(by=colname, sort=False, as_index=True)
     snp_bins = snp_grps.agg(**pos_dict)
-    if "feature_id" in snps.columns:
-        snp_bins["feature_id"] = snp_grps["feature_id"].agg(lambda x: ";".join(dict.fromkeys(x.dropna().astype(str))))
-    if "feature_type" in snps.columns:
-        snp_bins["feature_type"] = snp_grps["feature_type"].agg(lambda x: ";".join(dict.fromkeys(x.dropna().astype(str))))
+    for feat_col in ("feature_id", "feature_type"):
+        if feat_col in snps.columns:
+            snp_bins[feat_col] = snp_grps[feat_col].agg(
+                lambda x: ";".join(dict.fromkeys(str(v) for v in x if pd.notna(v)))
+            )
     snp_bins.loc[:, "#SNPS"] = snp_grps.size()  # align by bin_id index, not position
     snp_bins.loc[:, "BLOCKSIZE"] = snp_bins["END"] - snp_bins["START"]
     snp_bins[colname] = snp_bins.index
