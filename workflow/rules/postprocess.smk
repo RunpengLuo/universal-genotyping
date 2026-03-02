@@ -49,6 +49,7 @@ if workflow_mode == "bulk_genotyping":
             sample_types=lambda wc: assay2sample_types[wc.assay_type],
             min_depth=config["params_postprocess"]["min_depth"],
             gamma=config["params_postprocess"]["gamma"],
+            exon_only=config["params_postprocess"]["exon_only"],
         log:
             config["log_dir"] + "/phase_and_concat.{assay_type}.log",
         script:

@@ -121,6 +121,8 @@ params_postprocess:
   ## Lower gamma → wider CI → more SNPs pass (more lenient).
   ## Higher gamma → narrower CI → fewer SNPs pass (more strict).
   gamma: 0.05
+  ## filter to exonic SNPs only for bulkWES assay type
+  exon_only: true
 
   # switchprobs parameters
   ## estimate switchprobs by genetic map (population-based phasing)

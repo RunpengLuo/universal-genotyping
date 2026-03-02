@@ -160,13 +160,6 @@ if is_bulk_assay:
             snps, ref_mtx, alt_mtx, float(sm.params["gamma"]), normal_idx=0
         )
         snp_mask = snp_mask & normal_mask
-
-    if assay_type == "bulkWES":
-        exon_mask = (snps["feature_type"] == "exon").to_numpy()
-        logging.info(
-            f"filter by non-exonic SNPs, #passed SNPs={np.sum(exon_mask)}/{len(snps)}"
-        )
-        snp_mask = snp_mask & exon_mask
 else:
     snps.drop(columns=["gene_idx"], inplace=True, errors="ignore")
 
@@ -182,6 +175,13 @@ else:
     logging.info(
         f"#SNPs overlap with {assay_type} features={np.sum(snp_mask) / len(snps):.3%}"
     )
+
+if sm.params["exon_only"]:
+    exon_mask = (snps["feature_type"] == "exon").to_numpy()
+    logging.info(
+        f"filter by non-exonic SNPs, #passed SNPs={np.sum(exon_mask)}/{len(snps)}"
+    )
+    snp_mask = snp_mask & exon_mask
 
 # Pre-filter QC: AF plot with mask overlay showing kept vs filtered SNPs
 plot_allele_freqs(
