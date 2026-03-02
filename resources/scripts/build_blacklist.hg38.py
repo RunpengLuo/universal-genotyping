@@ -296,12 +296,17 @@ def main():
     combined = pd.concat(beds, ignore_index=True)
     merged = pr.PyRanges(combined).merge().sort()
 
+    merged_df = merged.as_df()
     os.makedirs(os.path.dirname(os.path.abspath(args.out_file)), exist_ok=True)
-    merged.as_df()[["Chromosome", "Start", "End"]].to_csv(
+    merged_df[["Chromosome", "Start", "End"]].to_csv(
         args.out_file, sep="\t", header=False, index=False,
         compression="gzip" if args.out_file.endswith(".gz") else None,
     )
-    print(f"[Step 5] Wrote {len(merged)} intervals to {args.out_file}")
+    total_masked_bp = (merged_df["End"] - merged_df["Start"]).sum()
+    print(
+        f"[Step 5] Wrote {len(merged_df)} intervals to {args.out_file} "
+        f"({total_masked_bp / 1e3:.1f} kbp masked)"
+    )
 
 
 if __name__ == "__main__":
