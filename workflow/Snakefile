@@ -209,14 +209,14 @@ if workflow_mode == "copytyping_preprocess":
 
 else:
     for assay_type in assay_types:
-        final_targets.append(config["allele_dir"] + f"/{assay_type}/sample_ids.tsv")
-        final_targets.append(config["allele_dir"] + f"/{assay_type}/bb.tsv.gz")
-        final_targets.append(config["allele_dir"] + f"/{assay_type}/bb.Tallele.npz")
-        final_targets.append(config["allele_dir"] + f"/{assay_type}/bb.Aallele.npz")
-        final_targets.append(config["allele_dir"] + f"/{assay_type}/bb.Ballele.npz")
+        final_targets.append(config["bb_dir"] + f"/{assay_type}/sample_ids.tsv")
+        final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.tsv.gz")
+        final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Tallele.npz")
+        final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Aallele.npz")
+        final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Ballele.npz")
         if assay_type in bulk_assays:
-            final_targets.append(config["allele_dir"] + f"/{assay_type}/bb.depth.npz")
-            final_targets.append(config["allele_dir"] + f"/{assay_type}/bb.rdr.npz")
+            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.depth.npz")
+            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.rdr.npz")
         else:
             final_targets.append(
                 config["allele_dir"] + f"/{assay_type}/barcodes.tsv.gz"

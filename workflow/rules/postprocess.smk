@@ -38,7 +38,7 @@ if workflow_mode == "bulk_genotyping":
             tot_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Tallele.npz",
             a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
             b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
-            sample_file=config["allele_dir"] + "/{assay_type}/sample_ids.tsv",
+            sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
             qc_dir=directory(config["qc_dir"] + "/{assay_type}/phase_and_concat/"),
         wildcard_constraints:
             assay_type="(bulkDNA|bulkWGS|bulkWES)",
@@ -58,9 +58,9 @@ if workflow_mode == "bulk_genotyping":
     rule run_mosdepth_bulk:
         input:
             bam=lambda wc: get_data[(wc.assay_type, wc.rep_id)][1],
-            bed_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/bb.bed.gz",
+            bed_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/bb.bed.gz",
         output:
-            mosdepth_file=config["allele_dir"]
+            mosdepth_file=config["bb_dir"]
             + "/{assay_type}/out_mosdepth/{rep_id}.regions.bed.gz",
         threads: config["threads"]["mosdepth"]
         wildcard_constraints:
@@ -69,7 +69,7 @@ if workflow_mode == "bulk_genotyping":
             sample_name=SAMPLE_ID,
             assay_type=lambda wc: wc.assay_type,
             mosdepth=config["mosdepth"],
-            out_prefix=config["allele_dir"] + "/{assay_type}/out_mosdepth/{rep_id}",
+            out_prefix=config["bb_dir"] + "/{assay_type}/out_mosdepth/{rep_id}",
             read_quality=config["params_mosdepth"]["read_quality"],
             extra_params=config["params_mosdepth"].get("extra_params", ""),
         log:
@@ -89,11 +89,11 @@ if workflow_mode == "bulk_genotyping":
         input:
             sample_file=lambda wc: config["allele_dir"]
             + f"/{wc.assay_type}/sample_ids.tsv",
-            bb_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/bb.tsv.gz",
+            bb_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/bb.tsv.gz",
             mosdepth_files=lambda wc: branch(
                 assay2rep_ids.get(wc.assay_type) is not None,
                 then=[
-                    config["allele_dir"]
+                    config["bb_dir"]
                     + f"/{wc.assay_type}/out_mosdepth/{rep_id}.regions.bed.gz"
                     for rep_id in assay2rep_ids[wc.assay_type]
                 ],
@@ -107,9 +107,9 @@ if workflow_mode == "bulk_genotyping":
                 otherwise=config["mappability_file"],
             ),
         output:
-            dp_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.depth.npz",
-            rdr_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.rdr.npz",
-            corr_factors=config["allele_dir"] + "/{assay_type}/corr_factors.tsv.gz",
+            dp_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.depth.npz",
+            rdr_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.rdr.npz",
+            corr_factors=config["bb_dir"] + "/{assay_type}/corr_factors.tsv.gz",
             qc_dir=directory(config["qc_dir"] + "/{assay_type}/compute_rdr_bulk/"),
         wildcard_constraints:
             assay_type="(bulkDNA|bulkWGS|bulkWES)",
@@ -146,7 +146,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             ),
             gtf_file=lambda wc: config["gtf_file"],
         output:
-            h5ad_file=config["allele_dir"] + "/{assay_type}/{assay_type}.h5ad",
+            h5ad_file=config["feature_dir"] + "/{assay_type}/{assay_type}.h5ad",
         params:
             assay_type=lambda wc: wc.assay_type,
             rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
@@ -183,7 +183,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             ),
             gtf_file=lambda wc: config["gtf_file"],
         output:
-            h5ad_file=config["allele_dir"] + "/{assay_type}/{assay_type}.h5ad",
+            h5ad_file=config["feature_dir"] + "/{assay_type}/{assay_type}.h5ad",
         params:
             assay_type=lambda wc: wc.assay_type,
             rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
@@ -221,7 +221,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
                 then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
                 otherwise=config["het_snp_vcf"],
             ),
-            h5ad_file=lambda wc: config["allele_dir"]
+            h5ad_file=lambda wc: config["feature_dir"]
             + "/{assay_type}/{assay_type}.h5ad",
             region_bed=lambda wc: config["region_bed"],
             genome_size=lambda wc: config["genome_size"],
@@ -237,7 +237,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             tot_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Tallele.npz",
             a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
             b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
-            sample_file=config["allele_dir"] + "/{assay_type}/sample_ids.tsv",
+            sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
             qc_dir=directory(config["qc_dir"] + "/{assay_type}/phase_and_concat/"),
             unique_snp_ids=config["allele_dir"] + "/{assay_type}/unique_snp_ids.npy",
             cell_snp_Aallele=config["allele_dir"] + "/{assay_type}/cell_snp_Aallele.npz",
@@ -265,7 +265,7 @@ rule adaptive_binning:
         + f"/{wc.assay_type}/snp.Tallele.npz",
         a_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Aallele.npz",
         b_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Ballele.npz",
-        sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
+        sample_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
         all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
         gmap_file=lambda wc: (
             config["phase_dir"] + "/genetic_map.tsv.gz" if require_genetic_map else []
@@ -274,15 +274,15 @@ rule adaptive_binning:
         genome_size=lambda wc: config["genome_size"],
         gtf_file=lambda wc: config["gtf_file"],
     output:
-        multi_snp_file=config["allele_dir"] + "/{assay_type}/multi_snp.tsv.gz",
-        tot_mtx_multi=config["allele_dir"] + "/{assay_type}/multi_snp.Tallele.npz",
-        a_mtx_multi=config["allele_dir"] + "/{assay_type}/multi_snp.Aallele.npz",
-        b_mtx_multi=config["allele_dir"] + "/{assay_type}/multi_snp.Ballele.npz",
-        bb_file=config["allele_dir"] + "/{assay_type}/bb.tsv.gz",
-        tot_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.Tallele.npz",
-        a_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.Aallele.npz",
-        b_mtx_bb=config["allele_dir"] + "/{assay_type}/bb.Ballele.npz",
-        bed_file=config["allele_dir"] + "/{assay_type}/bb.bed.gz",
+        multi_snp_file=config["bb_dir"] + "/{assay_type}/multi_snp.tsv.gz",
+        tot_mtx_multi=config["bb_dir"] + "/{assay_type}/multi_snp.Tallele.npz",
+        a_mtx_multi=config["bb_dir"] + "/{assay_type}/multi_snp.Aallele.npz",
+        b_mtx_multi=config["bb_dir"] + "/{assay_type}/multi_snp.Ballele.npz",
+        bb_file=config["bb_dir"] + "/{assay_type}/bb.tsv.gz",
+        tot_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Tallele.npz",
+        a_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Aallele.npz",
+        b_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Ballele.npz",
+        bed_file=config["bb_dir"] + "/{assay_type}/bb.bed.gz",
         qc_dir=directory(config["qc_dir"] + "/{assay_type}/adaptive_binning/"),
     params:
         sample_name=SAMPLE_ID,
@@ -311,9 +311,9 @@ rule cnv_segmentation:
         + f"/{wc.assay_type}/snp.Tallele.npz",
         a_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Aallele.npz",
         b_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Ballele.npz",
-        sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
+        sample_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
         all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
-        h5ad_file=config["allele_dir"] + "/{assay_type}/{assay_type}.h5ad",
+        h5ad_file=config["feature_dir"] + "/{assay_type}/{assay_type}.h5ad",
         region_bed=lambda wc: config["region_bed"],
         genome_size=lambda wc: config["genome_size"],
         gtf_file=lambda wc: config["gtf_file"],
