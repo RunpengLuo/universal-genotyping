@@ -173,7 +173,7 @@ else:
     snps = assign_pos_to_range(snps, feature_df, ref_id="feature_idx", pos_col="POS0")
     snp_mask = snp_mask & snps["feature_idx"].notna().to_numpy()
     logging.info(
-        f"#SNPs overlap with {assay_type} features={np.sum(snp_mask) / len(snps):.3%}"
+        f"#SNPs overlap with {assay_type} features={np.sum(snp_mask)}/{len(snps)} ({np.sum(snp_mask) / len(snps):.3%})"
     )
 
 if sm.params["exon_only"]:
