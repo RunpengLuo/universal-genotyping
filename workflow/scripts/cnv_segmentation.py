@@ -78,7 +78,7 @@ logging.info(f"#CNV segments={num_segs}, #CNV blocks={num_bbcs}")
 
 bbcs_phases_df = pd.read_table(sm.input["bbc_phases"], sep="\t")
 bbcs_df = pd.merge(
-    left=segs_df,
+    left=bbcs_df,
     right=bbcs_phases_df[["#CHR", "START", "END", "PHASE"]],
     on=["#CHR", "START", "END"],
     how="left",
