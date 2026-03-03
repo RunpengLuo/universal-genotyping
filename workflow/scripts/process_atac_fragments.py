@@ -128,6 +128,9 @@ adata = feature_to_blocks(adata, regions, assay_type)
 assert adata.var_names.is_unique, "var_names is not unique!"
 sort_index = adata.var.sort_values(by=["#CHR", "START"]).index
 adata = adata[:, sort_index].copy()
+# drop bulky snapatac2 fragments and metadata to reduce h5ad size
+adata.obsm.clear()
+adata.uns.clear()
 adata.write_h5ad(sm.output["h5ad_file"], compression="gzip")
 
 logging.info(f"final processed {assay_type} AnnData")
