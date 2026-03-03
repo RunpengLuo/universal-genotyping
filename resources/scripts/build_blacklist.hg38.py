@@ -142,7 +142,7 @@ def run_generate_map(reference, index_base, map_bw, read_length):
         print(f"[Step 1] [skip] Mappability BigWig already exists: {map_bw}")
         return
     print(f"[Step 1] Running generateMap.pl (read_length={read_length}) ...")
-    subprocess.run(
+    result = subprocess.run(
         [
             "generateMap.pl",
             "-b", index_base,
@@ -150,8 +150,18 @@ def run_generate_map(reference, index_base, map_bw, read_length):
             "-l", str(read_length),
             "-o", map_bw,
         ],
-        check=True,
+        capture_output=True,
+        text=True,
     )
+    if result.stderr:
+        print(result.stderr, file=sys.stderr, end="")
+    if result.returncode != 0:
+        sys.exit(f"generateMap.pl failed (exit code {result.returncode})")
+    if not os.path.isfile(map_bw):
+        sys.exit(
+            f"generateMap.pl exited successfully but output file is missing: {map_bw}\n"
+            "Check the stderr output above for bowtie errors."
+        )
     print(f"  Output: {map_bw}")
 
 
@@ -170,13 +180,12 @@ def run_map_counter(bw_path, window, chroms):
     chrom_str = ",".join(sorted(chroms, key=lambda c: (0, int(c[3:])) if c[3:].isdigit() else (1, c[3:])))
     cmd = ["mapCounter", "-w", str(window), "-c", chrom_str, bw_path]
     print(f"[Step 2] Running: {' '.join(cmd)}")
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"mapCounter failed (exit code {e.returncode}):", file=sys.stderr)
-        if e.stderr:
-            print(e.stderr, file=sys.stderr)
-        raise
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"mapCounter failed (exit code {result.returncode}):", file=sys.stderr)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr, end="")
+        sys.exit(1)
 
     rows = []
     chrom = None
