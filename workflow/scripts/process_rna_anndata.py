@@ -145,7 +145,7 @@ if gene_blacklist_file is not None:
     )
     adata = adata[:, ~ind_gene_blacklist]
 
-## 2. filter lowly expressed genes by counting #epressed barcodes
+## 2. filter lowly expressed genes by counting #expressed barcodes
 sum_count_before_filtering = float(adata.X.sum())
 min_frac_barcodes = float(sm.params["min_frac_barcodes"])
 min_expressed_barcodes = round(min_frac_barcodes * num_total_barcodes)
@@ -153,15 +153,16 @@ logging.info(
     f"min_frac_barcodes={min_frac_barcodes}, min_expressed_barcodes={min_expressed_barcodes}/{num_total_barcodes}"
 )
 
-nnz_per_gene = adata.X.getnnz(axis=0)
-ind_sufficient_expressed_genes = np.asarray(
-    nnz_per_gene >= min_expressed_barcodes
-).ravel()
-adata = adata[:, ind_sufficient_expressed_genes].copy()
-count_ratio = float(adata.X.sum()) / sum_count_before_filtering
-logging.info(
-    f"Retaining {100.0 * np.mean(ind_sufficient_expressed_genes):.3f}% of genes with sufficient expression across spots ({100.0 * count_ratio:.2f}% of total UMIs) @ {min_frac_barcodes} fraction of barcodes."
-)
+if assay_type in SPATIAL_ASSAYS:
+    nnz_per_gene = adata.X.getnnz(axis=0)
+    ind_sufficient_expressed_genes = np.asarray(
+        nnz_per_gene >= min_expressed_barcodes
+    ).ravel()
+    adata = adata[:, ind_sufficient_expressed_genes].copy()
+    count_ratio = float(adata.X.sum()) / sum_count_before_filtering
+    logging.info(
+        f"Retaining {100.0 * np.mean(ind_sufficient_expressed_genes):.3f}% of genes with sufficient expression across spots ({100.0 * count_ratio:.2f}% of total UMIs) @ {min_frac_barcodes} fraction of barcodes."
+    )
 
 ## 3. filter genes by region file, e.g., centromeric and HLA regions.
 ## each gene gets a feature_idx
