@@ -142,6 +142,7 @@ def run_generate_map(reference, index_base, map_bw, read_length):
         print(f"[Step 1] [skip] Mappability BigWig already exists: {map_bw}")
         return
     print(f"[Step 1] Running generateMap.pl (read_length={read_length}) ...")
+    out_dir = os.path.dirname(map_bw)
     result = subprocess.run(
         [
             "generateMap.pl",
@@ -150,7 +151,7 @@ def run_generate_map(reference, index_base, map_bw, read_length):
             "-l", str(read_length),
             "-o", map_bw,
         ],
-        capture_output=True,
+        stderr=subprocess.PIPE,
         text=True,
     )
     if result.stderr:
@@ -158,9 +159,13 @@ def run_generate_map(reference, index_base, map_bw, read_length):
     if result.returncode != 0:
         sys.exit(f"generateMap.pl failed (exit code {result.returncode})")
     if not os.path.isfile(map_bw):
+        # List files generateMap.pl actually created to aid debugging
+        created = [f for f in os.listdir(out_dir) if f.startswith("mappability")]
         sys.exit(
             f"generateMap.pl exited successfully but output file is missing: {map_bw}\n"
-            "Check the stderr output above for bowtie errors."
+            f"Files matching 'mappability*' in {out_dir}: {created or '(none)'}\n"
+            "The output path may need a different extension or generateMap.pl "
+            "may require wigToBigWig on PATH."
         )
     print(f"  Output: {map_bw}")
 
