@@ -87,7 +87,7 @@ if workflow_mode == "bulk_genotyping":
 
     rule compute_rdr_bulk:
         input:
-            sample_file=lambda wc: config["allele_dir"]
+            sample_file=lambda wc: config["bb_dir"]
             + f"/{wc.assay_type}/sample_ids.tsv",
             bb_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/bb.tsv.gz",
             mosdepth_files=lambda wc: branch(
@@ -115,7 +115,7 @@ if workflow_mode == "bulk_genotyping":
             assay_type="(bulkDNA|bulkWGS|bulkWES)",
         params:
             sample_name=SAMPLE_ID,
-            mosdepth_dir=lambda wc: config["allele_dir"]
+            mosdepth_dir=lambda wc: config["bb_dir"]
             + f"/{wc.assay_type}/out_mosdepth",
             gc_correct=config["params_compute_rdr"]["gc_correct"],
         log:
