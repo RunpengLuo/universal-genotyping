@@ -91,13 +91,15 @@ def download_reference(dest_dir):
         print(f"  [skip] Reference already exists: {fa_path}")
     else:
         download_file(NCBI_REFERENCE_URL, dest_dir)
-        print("  Decompressing ...")
-        subprocess.run(["gunzip", gz_path], check=True)
+        cmd = ["gunzip", gz_path]
+        print(f"  Decompressing: {' '.join(cmd)}")
+        subprocess.run(cmd, check=True)
     if os.path.isfile(fa_path + ".fai"):
         print(f"  [skip] Index already exists: {fa_path}.fai")
     else:
-        print("  Indexing with samtools faidx ...")
-        subprocess.run(["samtools", "faidx", fa_path], check=True)
+        cmd = ["samtools", "faidx", fa_path]
+        print(f"  Indexing: {' '.join(cmd)}")
+        subprocess.run(cmd, check=True)
     return fa_path
 
 
@@ -125,11 +127,9 @@ def run_bowtie_build(reference, index_base, threads):
     if os.path.isfile(f"{index_base}.1.ebwt") or os.path.isfile(f"{index_base}.1.ebwtl"):
         print(f"[Step 0] [skip] Bowtie index already exists at {index_base}")
         return
-    print(f"[Step 0] Building bowtie index at {index_base} ...")
-    subprocess.run(
-        ["bowtie-build", reference, index_base, "--threads", str(threads)],
-        check=True,
-    )
+    cmd = ["bowtie-build", reference, index_base, "--threads", str(threads)]
+    print(f"[Step 0] Building bowtie index: {' '.join(cmd)}")
+    subprocess.run(cmd, check=True)
     print("  Done.")
 
 
@@ -143,14 +143,15 @@ def run_generate_map(reference, index_base, map_bw, read_length):
         return
     print(f"[Step 1] Running generateMap.pl (read_length={read_length}) ...")
     out_dir = os.path.dirname(map_bw)
+    cmd = [
+        "generateMap.pl",
+        "-b", reference,
+        "-w", str(read_length),
+        "-o", map_bw,
+    ]
+    print(" ".join(cmd))
     result = subprocess.run(
-        [
-            "generateMap.pl",
-            "-b", index_base,
-            reference,
-            "-l", str(read_length),
-            "-o", map_bw,
-        ],
+        cmd,
         stderr=subprocess.PIPE,
         text=True,
     )
