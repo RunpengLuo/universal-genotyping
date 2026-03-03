@@ -27,15 +27,27 @@ assert len(sample_df) > 0, f"no rows matching sample_id={SAMPLE_ID} in sample fi
 assert sample_df["REP_ID"].notna().all(), "REP_ID required for all replicates"
 assert sample_df["PATH_to_bam"].notna().all(), "PATH_to_bam has missing values"
 
+nonbulk_assays = {"scATAC", "scRNA", "VISIUM", "VISIUM3prime"}
+bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
+allowed_assay_types = list(bulk_assays) + list(nonbulk_assays)
+
+# filter to configured assay types
+configured_assay_types = config["assay_types"]
+assert all(
+    at in allowed_assay_types for at in configured_assay_types
+), f"unknown assay_types in config: {configured_assay_types}"
+sample_df = sample_df.loc[sample_df["assay_type"].isin(configured_assay_types)].reset_index(
+    drop=True
+)
+assert len(sample_df) > 0, (
+    f"no rows with assay_type in {configured_assay_types} for sample_id={SAMPLE_ID}"
+)
+
 uniq_sample_types = sample_df["sample_type"].unique().tolist()
 assert all(st in ["normal", "tumor"] for st in uniq_sample_types)
 
 rep_ids = sample_df["REP_ID"].unique().tolist()
 assay_types = sample_df["assay_type"].unique().tolist()
-
-nonbulk_assays = {"scATAC", "scRNA", "VISIUM", "VISIUM3prime"}
-bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
-allowed_assay_types = list(bulk_assays) + list(nonbulk_assays)
 assert all(dt in allowed_assay_types for dt in assay_types)
 assay_type2modality = {
     "bulkDNA": "DNA",

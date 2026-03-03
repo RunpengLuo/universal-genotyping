@@ -19,6 +19,7 @@ log_dir: "logs"
 
 # {bulk_genotyping, single_cell_genotyping, copytyping_preprocess}
 workflow_mode: "bulk_genotyping"
+assay_types: ["bulkWGS"]
 
 ##################################################
 # Input
