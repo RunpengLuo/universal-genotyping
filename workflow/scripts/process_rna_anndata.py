@@ -60,7 +60,8 @@ for idx, rep_id in enumerate(rep_ids):
         adata: sc.AnnData = sq.read.visium(ranger_dir, load_images=load_images, library_id=rep_id)
         adata.var_names_make_unique()
     else:
-        adata: sc.AnnData = sc.read_10x_h5(h5ad_file, gex_only=True, make_unique=True)
+        adata: sc.AnnData = sc.read_10x_h5(h5ad_file, gex_only=True)
+        adata.var_names_make_unique()
 
     adata.obs_names = adata.obs_names.astype(str)
     if rep_id in rep2ref_annotation:
