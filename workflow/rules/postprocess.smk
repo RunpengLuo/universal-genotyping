@@ -266,7 +266,11 @@ rule adaptive_binning:
         a_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Aallele.npz",
         b_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Ballele.npz",
         sample_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
-        all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
+        all_barcodes=lambda wc: branch(
+            wc.assay_type in nonbulk_assays,
+            then=config["allele_dir"] + f"/{wc.assay_type}/barcodes.tsv.gz",
+            otherwise=[],
+        ),
         gmap_file=lambda wc: (
             config["phase_dir"] + "/genetic_map.tsv.gz" if require_genetic_map else []
         ),
@@ -321,10 +325,11 @@ rule cnv_segmentation:
         bbc_ucn=lambda wc: config["bbc_ucn"],
         bbc_phases=lambda wc: config["bbc_phases"],
     output:
-        cnv_segments=config["allele_dir"] + "/{assay_type}/cnv_segments.tsv",
-        x_count=config["allele_dir"] + "/{assay_type}/X_count.npz",
-        y_count=config["allele_dir"] + "/{assay_type}/Y_count.npz",
-        d_count=config["allele_dir"] + "/{assay_type}/D_count.npz",
+        cnv_segments=config["bb_dir"] + "/{assay_type}/cnv_segments.tsv",
+        x_count=config["bb_dir"] + "/{assay_type}/X_count.npz",
+        y_count=config["bb_dir"] + "/{assay_type}/Y_count.npz",
+        d_count=config["bb_dir"] + "/{assay_type}/D_count.npz",
+        barcodes_out=config["bb_dir"] + "/{assay_type}/barcodes.tsv.gz",
         qc_dir=directory(config["qc_dir"] + "/{assay_type}/cnv_segmentation/"),
     wildcard_constraints:
         assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",

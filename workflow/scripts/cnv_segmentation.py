@@ -1,4 +1,4 @@
-import os, sys, gzip, logging
+import os, sys, gzip, logging, shutil
 from snakemake.script import snakemake as sm
 
 t = int(getattr(sm, "threads", 1))
@@ -148,4 +148,5 @@ else:
     np.savez_compressed(sm.output["d_count"], mat=d_count)
 
 segs_df.to_csv(sm.output["cnv_segments"], header=True, sep="\t", index=False)
+shutil.copy2(all_barcodes, sm.output["barcodes_out"])
 logging.info(f"finished.")

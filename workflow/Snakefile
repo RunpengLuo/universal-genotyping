@@ -202,10 +202,10 @@ pre_qc = False  # TODO add more files
 final_targets = []
 if workflow_mode == "copytyping_preprocess":
     for assay_type in assay_types:
-        final_targets.append(config["allele_dir"] + f"/{assay_type}/cnv_segments.tsv")
-        final_targets.append(config["allele_dir"] + f"/{assay_type}/X_count.npz")
-        final_targets.append(config["allele_dir"] + f"/{assay_type}/Y_count.npz")
-        final_targets.append(config["allele_dir"] + f"/{assay_type}/D_count.npz")
+        final_targets.append(config["bb_dir"] + f"/{assay_type}/cnv_segments.tsv")
+        final_targets.append(config["bb_dir"] + f"/{assay_type}/X_count.npz")
+        final_targets.append(config["bb_dir"] + f"/{assay_type}/Y_count.npz")
+        final_targets.append(config["bb_dir"] + f"/{assay_type}/D_count.npz")
 
 else:
     for assay_type in assay_types:

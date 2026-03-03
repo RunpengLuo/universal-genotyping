@@ -1,4 +1,4 @@
-import os, sys, gzip, logging
+import os, sys, gzip, logging, shutil
 from snakemake.script import snakemake as sm
 
 from collections import OrderedDict
@@ -35,7 +35,7 @@ a_mtx_snp = sm.input["a_mtx_snp"]
 b_mtx_snp = sm.input["b_mtx_snp"]
 
 gmap_file = maybe_path(sm.input["gmap_file"])
-all_barcodes = sm.input["all_barcodes"]
+all_barcodes = maybe_path(sm.input["all_barcodes"])
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 
@@ -273,4 +273,7 @@ else:
     save_npz(sm.output["tot_mtx_bb"], tot_mtx_bb)
     save_npz(sm.output["a_mtx_bb"], a_mtx_bb)
     save_npz(sm.output["b_mtx_bb"], b_mtx_bb)
+if all_barcodes is not None:
+    barcodes_out = os.path.join(os.path.dirname(sm.output["bb_file"]), "barcodes.tsv.gz")
+    shutil.copy2(all_barcodes, barcodes_out)
 logging.info(f"finished.")
