@@ -325,12 +325,12 @@ def assign_largest_overlap(
     that has largest overlap length
     """
 
-    qry_gr = pr.PyRanges(
-        qry.rename(columns={"#CHR": "Chromosome", "START": "Start", "END": "End"})
-    )
-    ref_gr = pr.PyRanges(
-        ref.rename(columns={"#CHR": "Chromosome", "START": "Start", "END": "End"})
-    )
+    _rename = {k: v for k, v in {"#CHR": "Chromosome", "START": "Start", "END": "End"}.items()
+               if k in qry.columns and v not in qry.columns}
+    qry_gr = pr.PyRanges(qry.rename(columns=_rename))
+    _rename = {k: v for k, v in {"#CHR": "Chromosome", "START": "Start", "END": "End"}.items()
+               if k in ref.columns and v not in ref.columns}
+    ref_gr = pr.PyRanges(ref.rename(columns=_rename))
 
     joined = qry_gr.join(ref_gr, suffix="_REF").as_df()
     joined["overlap_len"] = (
