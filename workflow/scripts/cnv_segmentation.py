@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import save_npz, load_npz
 import anndata
-from scanpy import AnnData
+import scanpy as sc
 from utils import *
 from io_utils import *
 from aggregation_utils import *
@@ -76,9 +76,7 @@ bbcs_df, _ = read_ucn_file(sm.input["bbc_ucn"])
 num_bbcs = len(bbcs_df)
 logging.info(f"#CNV segments={num_segs}, #CNV blocks={num_bbcs}")
 
-bbcs_phases_df = pd.read_table(sm.input["bbc_phases"], sep="\t").rename(
-    columns={"PHASE": "PHASE-BBC"}
-)
+bbcs_phases_df = pd.read_table(sm.input["bbc_phases"], sep="\t")
 bbcs_df = pd.merge(
     left=segs_df,
     right=bbcs_phases_df[["#CHR", "START", "END", "PHASE"]],
@@ -86,6 +84,7 @@ bbcs_df = pd.merge(
     how="left",
 )
 assert bbcs_df["PHASE"].notna().all(), f"corrupted bbc* files, un-matched coordinates"
+bbcs_df.rename(columns={"PHASE": "PHASE-BBC"}, inplace=True)
 bbcs_df["bbc_id"] = bbcs_df.index
 
 ##################################################
@@ -126,7 +125,7 @@ assert y_count.shape[0] == num_segs
 
 ##################################################
 if not is_bulk_assay:
-    adata: AnnData = sc.read_h5ad(h5ad_file)
+    adata: sc.AnnData = sc.read_h5ad(h5ad_file)
     # consistent order with allele mats
     barcodes = np.asarray(read_barcodes(all_barcodes), dtype=str)
     missing = barcodes[~np.isin(barcodes, adata.obs_names)]
