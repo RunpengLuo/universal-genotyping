@@ -146,7 +146,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             ),
             gtf_file=lambda wc: config["gtf_file"],
         output:
-            h5ad_file=config["feature_dir"] + "/{assay_type}.h5ad",
+            h5ad_file=config["bb_dir"] + "/{assay_type}/{assay_type}.h5ad",
         params:
             assay_type=lambda wc: wc.assay_type,
             rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
@@ -183,7 +183,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             ),
             gtf_file=lambda wc: config["gtf_file"],
         output:
-            h5ad_file=config["feature_dir"] + "/{assay_type}.h5ad",
+            h5ad_file=config["bb_dir"] + "/{assay_type}/{assay_type}.h5ad",
         params:
             assay_type=lambda wc: wc.assay_type,
             rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
@@ -221,8 +221,8 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
                 then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
                 otherwise=config["het_snp_vcf"],
             ),
-            h5ad_file=lambda wc: config["feature_dir"]
-            + "/{assay_type}.h5ad",
+            h5ad_file=lambda wc: config["bb_dir"]
+            + "/{assay_type}/{assay_type}.h5ad",
             region_bed=lambda wc: config["region_bed"],
             genome_size=lambda wc: config["genome_size"],
             gtf_file=lambda wc: config["gtf_file"],
@@ -317,7 +317,7 @@ rule cnv_segmentation:
         b_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Ballele.npz",
         sample_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
         all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
-        h5ad_file=config["feature_dir"] + "/{assay_type}.h5ad",
+        h5ad_file=config["bb_dir"] + "/{assay_type}/{assay_type}.h5ad",
         region_bed=lambda wc: config["region_bed"],
         genome_size=lambda wc: config["genome_size"],
         gtf_file=lambda wc: config["gtf_file"],
