@@ -13,7 +13,9 @@ mosdepth: /path/to/mosdepth
 snp_dir: "snps"
 phase_dir: "phase"
 pileup_dir: "pileup"
+feature_dir: "feature"
 allele_dir: "allele"
+bb_dir: "bb"
 qc_dir: "qc"
 log_dir: "logs"
 
