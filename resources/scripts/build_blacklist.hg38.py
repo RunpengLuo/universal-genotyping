@@ -50,10 +50,16 @@ def _reporthook(block_num, block_size, total_size):
 
 
 def download_file(url, dest_dir, filename=None):
-    """Download a file to *dest_dir* and return the local path."""
+    """Download a file to *dest_dir* and return the local path.
+
+    Skips the download if the file already exists.
+    """
     if filename is None:
         filename = os.path.basename(url)
     local_path = os.path.join(dest_dir, filename)
+    if os.path.isfile(local_path):
+        print(f"  [skip] {local_path} already exists")
+        return local_path
     print(f"Downloading {url} ...")
     urllib.request.urlretrieve(url, local_path, reporthook=_reporthook)
     print()  # newline after progress
@@ -75,13 +81,23 @@ def read_bed_columns(path):
 
 
 def download_reference(dest_dir):
-    """Download the NCBI GRCh38 analysis set FASTA, decompress, and index."""
-    gz_path = download_file(NCBI_REFERENCE_URL, dest_dir)
+    """Download the NCBI GRCh38 analysis set FASTA, decompress, and index.
+
+    Skips steps whose outputs already exist.
+    """
+    gz_path = os.path.join(dest_dir, os.path.basename(NCBI_REFERENCE_URL))
     fa_path = gz_path.removesuffix(".gz")
-    print("  Decompressing ...")
-    subprocess.run(["gunzip", gz_path], check=True)
-    print("  Indexing with samtools faidx ...")
-    subprocess.run(["samtools", "faidx", fa_path], check=True)
+    if os.path.isfile(fa_path):
+        print(f"  [skip] Reference already exists: {fa_path}")
+    else:
+        download_file(NCBI_REFERENCE_URL, dest_dir)
+        print("  Decompressing ...")
+        subprocess.run(["gunzip", gz_path], check=True)
+    if os.path.isfile(fa_path + ".fai"):
+        print(f"  [skip] Index already exists: {fa_path}.fai")
+    else:
+        print("  Indexing with samtools faidx ...")
+        subprocess.run(["samtools", "faidx", fa_path], check=True)
     return fa_path
 
 
@@ -102,7 +118,13 @@ def check_dependencies(build_index, download_reference):
 
 
 def run_bowtie_build(reference, index_base, threads):
-    """Build a bowtie index from the reference FASTA."""
+    """Build a bowtie index from the reference FASTA.
+
+    Skips if the index files already exist.
+    """
+    if os.path.isfile(f"{index_base}.1.ebwt") or os.path.isfile(f"{index_base}.1.ebwtl"):
+        print(f"[Step 0] [skip] Bowtie index already exists at {index_base}")
+        return
     print(f"[Step 0] Building bowtie index at {index_base} ...")
     subprocess.run(
         ["bowtie-build", reference, index_base, "--threads", str(threads)],
@@ -112,7 +134,13 @@ def run_bowtie_build(reference, index_base, threads):
 
 
 def run_generate_map(reference, index_base, map_bw, read_length):
-    """Run generateMap.pl to produce a per-base mappability BigWig."""
+    """Run generateMap.pl to produce a per-base mappability BigWig.
+
+    Skips if the output BigWig already exists.
+    """
+    if os.path.isfile(map_bw):
+        print(f"[Step 1] [skip] Mappability BigWig already exists: {map_bw}")
+        return
     print(f"[Step 1] Running generateMap.pl (read_length={read_length}) ...")
     subprocess.run(
         [
@@ -142,7 +170,13 @@ def run_map_counter(bw_path, window, chroms):
     chrom_str = ",".join(sorted(chroms, key=lambda c: (0, int(c[3:])) if c[3:].isdigit() else (1, c[3:])))
     cmd = ["mapCounter", "-w", str(window), "-c", chrom_str, bw_path]
     print(f"[Step 2] Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"mapCounter failed (exit code {e.returncode}):", file=sys.stderr)
+        if e.stderr:
+            print(e.stderr, file=sys.stderr)
+        raise
 
     rows = []
     chrom = None
@@ -279,52 +313,54 @@ def main():
     print()
 
     beds = []
-    try:
-        index_base = os.path.join(work_dir, "ref_index")
-        map_bw = os.path.join(work_dir, "mappability.bw")
+    index_base = os.path.join(work_dir, "ref_index")
+    map_bw = os.path.join(work_dir, "mappability.bw")
+    binned_tsv = os.path.join(work_dir, "binned_mappability.tsv")
 
-        # Step 0 (optional): build bowtie index
-        if args.build_index:
-            run_bowtie_build(reference, index_base, args.threads)
-        else:
-            if not (
-                os.path.isfile(f"{index_base}.1.ebwt")
-                or os.path.isfile(f"{index_base}.1.ebwtl")
-            ):
-                print(
-                    f"Warning: no bowtie index found at {index_base}.*\n"
-                    "  Use --build_index to create one, or ensure generateMap.pl\n"
-                    "  can locate the index via its own defaults."
-                )
+    # Step 0 (optional): build bowtie index
+    if args.build_index:
+        run_bowtie_build(reference, index_base, args.threads)
+    else:
+        if not (
+            os.path.isfile(f"{index_base}.1.ebwt")
+            or os.path.isfile(f"{index_base}.1.ebwtl")
+        ):
+            print(
+                f"Warning: no bowtie index found at {index_base}.*\n"
+                "  Use --build_index to create one, or ensure generateMap.pl\n"
+                "  can locate the index via its own defaults."
+            )
 
-        # Step 1: generateMap.pl → per-base BigWig
-        run_generate_map(reference, index_base, map_bw, args.read_length)
+    # Step 1: generateMap.pl → per-base BigWig
+    run_generate_map(reference, index_base, map_bw, args.read_length)
 
-        # Step 2: mapCounter → binned DataFrame
+    # Step 2: mapCounter → binned DataFrame (cached to TSV)
+    if os.path.isfile(binned_tsv):
+        print(f"[Step 2] [skip] Loading cached binned mappability: {binned_tsv}")
+        binned = pd.read_csv(binned_tsv, sep="\t")
+    else:
         binned = run_map_counter(map_bw, args.window, STANDARD_CHROMS)
+        binned.to_csv(binned_tsv, sep="\t", index=False)
+        print(f"  Cached binned mappability to {binned_tsv}")
 
-        # Step 3: filter low-mappability bins
-        low_map = binned[binned["Score"] < args.min_map_score][["Chromosome", "Start", "End"]].copy()
-        total_bins = len(binned)
-        n_low = len(low_map)
-        pct = n_low / total_bins * 100 if total_bins > 0 else 0
-        print(
-            f"[Step 3] Low-mappability bins (score < {args.min_map_score}): "
-            f"{n_low}/{total_bins} ({pct:.1f}%)"
-        )
-        beds.append(low_map)
+    # Step 3: filter low-mappability bins
+    low_map = binned[binned["Score"] < args.min_map_score][["Chromosome", "Start", "End"]].copy()
+    total_bins = len(binned)
+    n_low = len(low_map)
+    pct = n_low / total_bins * 100 if total_bins > 0 else 0
+    print(
+        f"[Step 3] Low-mappability bins (score < {args.min_map_score}): "
+        f"{n_low}/{total_bins} ({pct:.1f}%)"
+    )
+    beds.append(low_map)
 
-        # Step 4: UCSC repeat/segdup tables
-        print("[Step 4] Downloading UCSC repeat tables ...")
-        for table in TABLES:
-            local = download_file(f"{UCSC_BASE}/{table}", work_dir, table)
-            bed = read_bed_columns(local)
-            print(f"  {table}: {len(bed)} intervals")
-            beds.append(bed)
-
-    finally:
-        if not user_work_dir:
-            shutil.rmtree(work_dir, ignore_errors=True)
+    # Step 4: UCSC repeat/segdup tables
+    print("[Step 4] Downloading UCSC repeat tables ...")
+    for table in TABLES:
+        local = download_file(f"{UCSC_BASE}/{table}", work_dir, table)
+        bed = read_bed_columns(local)
+        print(f"  {table}: {len(bed)} intervals")
+        beds.append(bed)
 
     # Step 5: merge and write
     combined = pd.concat(beds, ignore_index=True)
@@ -341,6 +377,10 @@ def main():
         f"[Step 5] Wrote {len(merged_df)} intervals to {args.out_file} "
         f"({total_masked_bp / 1e3:.1f} kbp masked)"
     )
+
+    # Clean up auto-created temp dir only on success
+    if not user_work_dir:
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":
