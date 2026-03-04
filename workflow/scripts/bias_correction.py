@@ -286,7 +286,7 @@ def load_rt_for_bins(bin_info: pd.DataFrame, rt_file: str) -> pd.DataFrame:
     logging.info(f"loading replication timing from {rt_file}")
     rt_raw = pd.read_csv(rt_file, sep="\t", index_col=0)
     logging.info(f"RT file loaded: {len(rt_raw)} SNPs, {rt_raw.shape[1]} columns")
-    rt_raw["Chr"] = rt_raw["Chr"].astype(str).str.replace("^chr", "", regex=True)
+    rt_raw["Chr"] = "chr" + rt_raw["Chr"].astype(str).str.replace("^chr", "", regex=True)
     cell_line_cols = [c for c in rt_raw.columns if c not in ("Chr", "Position")]
     logging.info(f"RT cell lines: {cell_line_cols}")
     rt_raw["Position"] = rt_raw["Position"].astype(np.int64)
