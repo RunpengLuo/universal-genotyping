@@ -78,8 +78,6 @@ for idx, rep_id in enumerate(rep_ids):
             .fillna("Unknown")
             .values.astype(str)
         )
-    else:
-        adata.obs[ref_label] = "Unknown"
 
     adata.obs_names = adata.obs_names.astype(str) + f"_{rep_id}"
     snap.pp.add_tile_matrix(
@@ -131,6 +129,21 @@ adata = adata[:, sort_index].copy()
 # drop bulky snapatac2 fragments and metadata to reduce h5ad size
 adata.obsm.clear()
 adata.uns.clear()
+
+##################################################
+# write cell_types.tsv.gz and conditionally keep ref_label in h5ad
+has_annotations = ref_label in adata.obs.columns
+if has_annotations:
+    ct_df = adata.obs[[ref_label]].copy()
+    ct_df.index.name = "BARCODE"
+    ct_df.to_csv(sm.output["cell_types"], sep="\t", compression="gzip")
+    logging.info(f"wrote {len(ct_df)} rows to cell_types.tsv.gz with column {ref_label}")
+else:
+    header_df = pd.DataFrame(columns=[ref_label])
+    header_df.index.name = "BARCODE"
+    header_df.to_csv(sm.output["cell_types"], sep="\t", compression="gzip")
+    logging.info("no ref_annotation provided; wrote header-only cell_types.tsv.gz")
+
 adata.write_h5ad(sm.output["h5ad_file"], compression="gzip")
 
 logging.info(f"final processed {assay_type} AnnData")

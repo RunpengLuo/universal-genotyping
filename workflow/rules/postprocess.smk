@@ -147,6 +147,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             gtf_file=lambda wc: config["gtf_file"],
         output:
             h5ad_file=config["bb_dir"] + "/{assay_type}/{assay_type}.h5ad",
+            cell_types=config["bb_dir"] + "/{assay_type}/cell_types.tsv.gz",
         params:
             assay_type=lambda wc: wc.assay_type,
             rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
@@ -184,6 +185,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             gtf_file=lambda wc: config["gtf_file"],
         output:
             h5ad_file=config["bb_dir"] + "/{assay_type}/{assay_type}.h5ad",
+            cell_types=config["bb_dir"] + "/{assay_type}/cell_types.tsv.gz",
         params:
             assay_type=lambda wc: wc.assay_type,
             rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
