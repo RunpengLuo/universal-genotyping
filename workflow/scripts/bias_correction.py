@@ -142,14 +142,12 @@ def bias_correction_rdr(
         corr_factor = np.mean(corr_rdrs)
         logging.info(f"GC correction factor={corr_factor}")
 
-        # raw RDRs
         logging.info("hist: raw RDR")
         counts, edges = np.histogram(raw_rdrs)
         logging.info("bin_left\tbin_right\tcount")
         for l, r, c in zip(edges[:-1], edges[1:], counts):
             logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
 
-        # expected RDRs
         logging.info("hist: expected RDR corr_fit")
         counts, edges = np.histogram(exp_rdrs)
         logging.info("bin_left\tbin_right\tcount")
@@ -208,7 +206,6 @@ def plot_correction_diagnostics(
     def mad(x):
         return np.median(np.abs(x - np.median(x)))
 
-    # --- 1. GC vs RDR scatter with fit ---
     fig, ax = plt.subplots(1, 1, figsize=(8, 6))
     ax.scatter(gc, raw_rdr, s=2, alpha=0.2, label="raw RDR")
     sort_idx = np.argsort(gc)
@@ -223,7 +220,6 @@ def plot_correction_diagnostics(
     plt.savefig(os.path.join(out_dir, f"{rep_id}.gc_corr_scatter.png"), dpi=300)
     plt.close(fig)
 
-    # --- 2. Before/after hexbin ---
     mad_raw = mad(raw_rdr)
     mad_corr = mad(corr_rdr)
     fig, axes = plt.subplots(1, 2, figsize=(6, 3), sharey=True)
@@ -247,7 +243,6 @@ def plot_correction_diagnostics(
     plt.savefig(os.path.join(out_dir, f"{rep_id}.gc_corr.png"), dpi=300)
     plt.close(fig)
 
-    # --- 3. RT scatter (optional) ---
     if rt_vals is not None:
         valid = np.isfinite(rt_vals)
         fig, axes = plt.subplots(1, 2, figsize=(10, 4))
@@ -284,12 +279,13 @@ def load_rt_for_bins(bin_info: pd.DataFrame, rt_file: str) -> pd.DataFrame:
         DataFrame with ``#CHR``, ``START``, ``END`` and one column per RT cell line.
     """
     logging.info(f"loading replication timing from {rt_file}")
-    rt_raw = pd.read_csv(rt_file, sep="\t", index_col=0)
+    rt_raw = pd.read_csv(rt_file, sep="\t", index_col=None, dtype={"Chr": str, "Position": np.int64})
+    rt_raw = rt_raw.drop(columns=[rt_raw.columns[0]])
     logging.info(f"RT file loaded: {len(rt_raw)} SNPs, {rt_raw.shape[1]} columns")
-    rt_raw["Chr"] = "chr" + rt_raw["Chr"].astype(str).str.replace("^chr", "", regex=True)
+    if not str.startswith(rt_raw["Chr"].iloc[0], "chr"):
+        rt_raw["Chr"] = "chr" + rt_raw["Chr"]
     cell_line_cols = [c for c in rt_raw.columns if c not in ("Chr", "Position")]
     logging.info(f"RT cell lines: {cell_line_cols}")
-    rt_raw["Position"] = rt_raw["Position"].astype(np.int64)
 
     bin_chr = bin_info["#CHR"].astype(str).values
     bin_start = bin_info["START"].astype(np.int64).values
@@ -300,7 +296,6 @@ def load_rt_for_bins(bin_info: pd.DataFrame, rt_file: str) -> pd.DataFrame:
     rt_sums = np.zeros((n_bins, n_cl), dtype=np.float64)
     rt_counts = np.zeros(n_bins, dtype=np.int64)
 
-    # Build per-chromosome bin index for searchsorted
     chr_to_bin_idx = {}
     for i, c in enumerate(bin_chr):
         chr_to_bin_idx.setdefault(c, []).append(i)
@@ -316,36 +311,40 @@ def load_rt_for_bins(bin_info: pd.DataFrame, rt_file: str) -> pd.DataFrame:
 
     logging.info(f"built bin index for {len(chr_to_bin_starts)} chromosomes, {n_bins} bins")
 
-    # Process RT SNPs per chromosome using searchsorted
     rt_values = rt_raw[cell_line_cols].values.astype(np.float64)
     total_mapped = 0
+    all_mapped_global = []
+    all_rt_vals = []
     for chrom, chrom_df in rt_raw.groupby("Chr", sort=False):
         if chrom not in chr_to_bin_starts:
-            logging.info(f"chr{chrom}: skipped (no bins)")
+            logging.info(f"{chrom}: skipped (no bins)")
             continue
         starts = chr_to_bin_starts[chrom]
         ends = chr_to_bin_ends[chrom]
         global_idx = chr_to_bin_indices[chrom]
 
         positions = chrom_df["Position"].values
-        # searchsorted: find bin where START <= position; bins are [START, END)
         bin_i = np.searchsorted(starts, positions, side="right") - 1
-        # Keep only SNPs that fall within a valid bin
         valid = (bin_i >= 0) & (bin_i < len(starts)) & (positions < ends[np.clip(bin_i, 0, len(starts) - 1)])
         n_mapped = int(valid.sum())
         total_mapped += n_mapped
-        logging.info(f"chr{chrom}: {len(chrom_df)} SNPs, {n_mapped} mapped to {len(starts)} bins")
+        logging.info(f"{chrom}: {len(chrom_df)} SNPs, {n_mapped} mapped to {len(starts)} bins")
         bin_i = bin_i[valid]
-        rt_vals = rt_values[chrom_df.index[valid]]
-
-        # Accumulate sums and counts per bin
-        mapped_global = global_idx[bin_i]
-        np.add.at(rt_counts, mapped_global, 1)
-        np.add.at(rt_sums, (mapped_global, slice(None)), rt_vals)
+        all_mapped_global.append(global_idx[bin_i])
+        all_rt_vals.append(rt_values[chrom_df.index[valid]])
 
     logging.info(f"total RT SNPs mapped to bins: {total_mapped}/{len(rt_raw)}")
 
-    # Compute means
+    # Vectorized aggregation with np.bincount (much faster than np.add.at)
+    if all_mapped_global:
+        all_mapped_global = np.concatenate(all_mapped_global)
+        all_rt_vals = np.concatenate(all_rt_vals)
+        rt_counts = np.bincount(all_mapped_global, minlength=n_bins).astype(np.int64)
+        for ci in range(n_cl):
+            rt_sums[:, ci] = np.bincount(
+                all_mapped_global, weights=all_rt_vals[:, ci], minlength=n_bins
+            )
+
     with np.errstate(invalid="ignore"):
         rt_means = rt_sums / rt_counts[:, np.newaxis]
     rt_means[rt_counts == 0] = np.nan
@@ -457,7 +456,6 @@ def bias_correction_rdr_spline(
         raw_rdrs = raw_rdr_mat[:, si]
         log_rdr = np.log(raw_rdrs + 1e-8)
 
-        # Select best RT cell line if RT data available
         rt_vals = None
         best_rt_name = None
         if rt_df is not None:
@@ -467,7 +465,6 @@ def bias_correction_rdr_spline(
             if best_rt_name is not None:
                 rt_vals = rt_df[best_rt_name].to_numpy()
 
-        # Build covariate DataFrame
         cov_df = pd.DataFrame({"log_rdr": log_rdr, "GC": gc})
         formula_parts = ["cr(GC, df=5)"]
         if has_mapp:
@@ -479,7 +476,6 @@ def bias_correction_rdr_spline(
 
         formula_rhs = " + ".join(formula_parts)
 
-        # Determine fit mask: within GC quantile range, finite values
         fit_mask = (
             (gc >= gc_lo) & (gc <= gc_hi) &
             np.isfinite(log_rdr)
@@ -491,17 +487,13 @@ def bias_correction_rdr_spline(
 
         logging.info(f"{rep_id}: fitting spline on {fit_mask.sum()}/{len(fit_mask)} bins")
 
-        # Build design matrix on fit subset
         fit_df = cov_df.loc[fit_mask].copy()
         y_fit = fit_df["log_rdr"].values
         X_fit = patsy.dmatrix(f"{formula_rhs} - 1", data=fit_df, return_type="dataframe")
 
-        # Fit OLS
         ols_model = sm_ols.OLS(y_fit, X_fit).fit()
         logging.info(f"{rep_id}: spline OLS R²={ols_model.rsquared:.4f}")
 
-        # Predict on ALL bins
-        # For bins with NaN covariates, fill temporarily for prediction, then mark as NaN
         pred_df = cov_df.copy()
         for col in pred_df.columns:
             if col == "log_rdr":
@@ -512,15 +504,12 @@ def bias_correction_rdr_spline(
         )
         predicted = ols_model.predict(X_all)
 
-        # Residuals
         residuals = log_rdr - predicted
         mean_log_rdr_fit = np.mean(log_rdr[fit_mask])
         corrected_log_rdr = residuals + mean_log_rdr_fit
 
-        # Back-transform
         corrected_rdr = np.exp(corrected_log_rdr)
 
-        # Handle NaN bins (those with NaN in original covariates): impute with median
         nan_mask = ~np.isfinite(log_rdr)
         if rt_vals is not None:
             nan_mask |= ~np.isfinite(rt_vals)
@@ -531,12 +520,10 @@ def bias_correction_rdr_spline(
                 f"{rep_id}: imputed {nan_mask.sum()} NaN bins with median={med_corr:.4f}"
             )
 
-        # Normalize by per-sample mean
         corr_factor = np.mean(corrected_rdr)
         logging.info(f"{rep_id}: spline correction factor={corr_factor:.4f}")
         corrected_mat[:, si] = corrected_rdr / corr_factor
 
-        # Diagnostic plots
         if out_dir is not None:
             fitted_rdr = np.exp(predicted)
             plot_correction_diagnostics(
