@@ -13,7 +13,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = str(t)
 import numpy as np
 import pandas as pd
 import scanpy as sc
-from scipy.sparse import save_npz, load_npz
+from scipy.sparse import save_npz, load_npz, csr_matrix
 
 from utils import *
 from io_utils import *
@@ -269,10 +269,19 @@ if is_bulk_assay:
     np.savez_compressed(sm.output["tot_mtx_bb"], mat=tot_mtx_bb)
     np.savez_compressed(sm.output["a_mtx_bb"], mat=a_mtx_bb)
     np.savez_compressed(sm.output["b_mtx_bb"], mat=b_mtx_bb)
+    # BAF matrix (bins × samples) for downstream diploid-bin identification
+    baf_mtx_bb = np.divide(
+        b_mtx_bb, tot_mtx_bb,
+        where=tot_mtx_bb > 0,
+        out=np.full_like(b_mtx_bb, np.nan, dtype=np.float32),
+    )
+    np.savez_compressed(sm.output["baf_mtx_bb"], mat=baf_mtx_bb)
 else:
     save_npz(sm.output["tot_mtx_bb"], tot_mtx_bb)
     save_npz(sm.output["a_mtx_bb"], a_mtx_bb)
     save_npz(sm.output["b_mtx_bb"], b_mtx_bb)
+    # placeholder BAF for non-bulk (compute_rdr_bulk is bulk-only)
+    save_npz(sm.output["baf_mtx_bb"], csr_matrix((0, 0), dtype=np.float32))
 if all_barcodes is not None:
     barcodes_out = os.path.join(os.path.dirname(sm.output["bb_file"]), "barcodes.tsv.gz")
     shutil.copy2(all_barcodes, barcodes_out)

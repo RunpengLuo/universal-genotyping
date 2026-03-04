@@ -99,6 +99,7 @@ if workflow_mode == "bulk_genotyping":
                 ],
                 otherwise=[],
             ),
+            baf_mtx_bb=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/bb.baf.npz",
             reference=config["reference"],
             genome_size=config["genome_size"],
             mappability_file=branch(
@@ -294,6 +295,7 @@ rule adaptive_binning:
         tot_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Tallele.npz",
         a_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Aallele.npz",
         b_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Ballele.npz",
+        baf_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.baf.npz",
         bed_file=config["bb_dir"] + "/{assay_type}/bb.bed.gz",
         qc_dir=directory(config["qc_dir"] + "/{assay_type}/adaptive_binning/"),
     params:

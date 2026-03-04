@@ -30,6 +30,8 @@ genome_size = sm.input["genome_size"]
 mappability_file = maybe_path(sm.input["mappability_file"])
 rt_file = maybe_path(sm.input["rt_file"])
 
+baf_mtx_bb = np.load(sm.input["baf_mtx_bb"])["mat"]
+
 sample_name = sm.params["sample_name"]
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)

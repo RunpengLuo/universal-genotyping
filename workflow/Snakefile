@@ -215,6 +215,7 @@ else:
         final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Aallele.npz")
         final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Ballele.npz")
         if assay_type in bulk_assays:
+            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.baf.npz")
             final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.depth.npz")
             final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.rdr.npz")
         else:
