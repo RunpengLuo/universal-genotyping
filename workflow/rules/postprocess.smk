@@ -102,9 +102,9 @@ if workflow_mode == "bulk_genotyping":
             reference=config["reference"],
             genome_size=config["genome_size"],
             mappability_file=branch(
-                config.get("mappability_file") is None,
+                config["params_compute_rdr"].get("mappability_file") is None,
                 then=[],
-                otherwise=config["mappability_file"],
+                otherwise=config["params_compute_rdr"]["mappability_file"],
             ),
             rt_file=branch(
                 config["params_compute_rdr"].get("rt_file") is None,

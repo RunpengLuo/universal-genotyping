@@ -154,7 +154,6 @@ params_postprocess:
 
 ##################################################
 # compute RDRs - bulk only
-mappability_file: null
 params_mosdepth:
   read_quality: 11
   extra_params: "--no-per-base --fast-mode"
@@ -162,6 +161,7 @@ params_mosdepth:
 params_compute_rdr:
   gc_correct: true
   correction_method: "quantile"   # "quantile" (default) | "spline" (ASCAT-style)
+  mappability_file: null           # path to mappability BED track, null = skip
   rt_file: null                    # path to ASCAT RT TSV (e.g. RT_G1000_WGS_hg38.txt), null = skip RT
 
 ##################################################
