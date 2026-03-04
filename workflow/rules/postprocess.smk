@@ -106,6 +106,11 @@ if workflow_mode == "bulk_genotyping":
                 then=[],
                 otherwise=config["mappability_file"],
             ),
+            rt_file=branch(
+                config["params_compute_rdr"].get("rt_file") is None,
+                then=[],
+                otherwise=config["params_compute_rdr"]["rt_file"],
+            ),
         output:
             dp_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.depth.npz",
             rdr_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.rdr.npz",
@@ -118,6 +123,7 @@ if workflow_mode == "bulk_genotyping":
             mosdepth_dir=lambda wc: config["bb_dir"]
             + f"/{wc.assay_type}/out_mosdepth",
             gc_correct=config["params_compute_rdr"]["gc_correct"],
+            correction_method=config["params_compute_rdr"].get("correction_method", "quantile"),
         log:
             config["log_dir"] + "/compute_rdr_bulk.{assay_type}.log",
         script:

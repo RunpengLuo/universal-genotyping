@@ -28,12 +28,14 @@ bb_file = sm.input["bb_file"]
 reference = sm.input["reference"]
 genome_size = sm.input["genome_size"]
 mappability_file = maybe_path(sm.input["mappability_file"])
+rt_file = maybe_path(sm.input["rt_file"])
 
 sample_name = sm.params["sample_name"]
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 mosdepth_dir = sm.params["mosdepth_dir"]
 gc_correct = bool(sm.params["gc_correct"])
+correction_method = str(sm.params["correction_method"])
 
 logging.info("run compute_rdr_bulk")
 
@@ -128,9 +130,21 @@ corr_factors = compute_gc_content(bbs, reference, mappability_file, genome_size)
 corr_factors.to_csv(sm.output["corr_factors"], sep="\t", header=True, index=False)
 if gc_correct:
     has_mapp = mappability_file is not None
-    rdr_mtx_bb = bias_correction_rdr(
-        rdr_mtx_bb, corr_factors, rep_ids[tumor_sidx:], has_mapp, qc_dir
-    )
+    rt_df = None
+    if rt_file is not None:
+        rt_df = load_rt_for_bins(bbs, rt_file)
+        logging.info(f"loaded RT for {rt_df.shape[1] - 3} cell lines, {rt_df.shape[0]} bins")
+
+    if correction_method == "spline":
+        rdr_mtx_bb = bias_correction_rdr_spline(
+            rdr_mtx_bb, corr_factors, rep_ids[tumor_sidx:],
+            has_mapp=has_mapp, rt_df=rt_df, out_dir=qc_dir,
+        )
+    else:  # "quantile" — current default
+        rdr_mtx_bb = bias_correction_rdr(
+            rdr_mtx_bb, corr_factors, rep_ids[tumor_sidx:],
+            has_mapp=has_mapp, out_dir=qc_dir,
+        )
     plot_file = os.path.join(qc_dir, f"gc_content_bb.pdf")
     plot_1d_sample(
         corr_factors,

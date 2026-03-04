@@ -5,3 +5,5 @@ tmp/
 .snakemake/
 .ruff_cache/
 CLAUDE.md
+third_party
+.claude/

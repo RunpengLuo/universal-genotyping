@@ -161,6 +161,8 @@ params_mosdepth:
 
 params_compute_rdr:
   gc_correct: true
+  correction_method: "quantile"   # "quantile" (default) | "spline" (ASCAT-style)
+  rt_file: null                    # path to ASCAT RT TSV (e.g. RT_G1000_WGS_hg38.txt), null = skip RT
 
 ##################################################
 threads:
