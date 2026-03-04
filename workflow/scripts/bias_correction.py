@@ -12,7 +12,6 @@ from scipy.stats import pearsonr
 import patsy
 
 from pybedtools import BedTool
-import pyranges as pr
 import matplotlib.pyplot as plt
 
 
@@ -269,8 +268,8 @@ def load_rt_for_bins(bin_info: pd.DataFrame, rt_file: str) -> pd.DataFrame:
     """Load ASCAT replication timing data and average over genomic bins.
 
     Reads a tab-separated ASCAT RT file (columns: Chr, Position, then one column
-    per cell line) and maps SNP-level RT values to bins via pyranges overlap join,
-    averaging RT within each bin.
+    per cell line) and assigns each RT SNP to a bin via ``np.searchsorted``,
+    then averages RT values within each bin.
 
     Parameters
     ----------
@@ -286,56 +285,84 @@ def load_rt_for_bins(bin_info: pd.DataFrame, rt_file: str) -> pd.DataFrame:
     """
     logging.info(f"loading replication timing from {rt_file}")
     rt_raw = pd.read_csv(rt_file, sep="\t", index_col=0)
-    # Columns: Chr, Position, <cell_line_1>, ..., <cell_line_N>
+    logging.info(f"RT file loaded: {len(rt_raw)} SNPs, {rt_raw.shape[1]} columns")
     rt_raw["Chr"] = rt_raw["Chr"].astype(str).str.replace("^chr", "", regex=True)
     cell_line_cols = [c for c in rt_raw.columns if c not in ("Chr", "Position")]
+    logging.info(f"RT cell lines: {cell_line_cols}")
+    rt_raw["Position"] = rt_raw["Position"].astype(np.int64)
 
-    # Build pyranges for RT SNPs (point intervals)
-    rt_pr = pr.PyRanges(pd.DataFrame({
-        "Chromosome": rt_raw["Chr"],
-        "Start": rt_raw["Position"].astype(int),
-        "End": rt_raw["Position"].astype(int) + 1,
-        **{c: rt_raw[c].values for c in cell_line_cols},
-    }))
+    bin_chr = bin_info["#CHR"].astype(str).values
+    bin_start = bin_info["START"].astype(np.int64).values
+    bin_end = bin_info["END"].astype(np.int64).values
 
-    # Build pyranges for bins
-    bin_pr = pr.PyRanges(pd.DataFrame({
-        "Chromosome": bin_info["#CHR"].astype(str),
-        "Start": bin_info["START"].astype(int),
-        "End": bin_info["END"].astype(int),
-    }))
+    n_bins = len(bin_info)
+    n_cl = len(cell_line_cols)
+    rt_sums = np.zeros((n_bins, n_cl), dtype=np.float64)
+    rt_counts = np.zeros(n_bins, dtype=np.int64)
 
-    # Overlap join and aggregate by bin
-    joined = bin_pr.join(rt_pr, how="left")
-    joined_df = joined.df if hasattr(joined, "df") else joined.as_df()
+    # Build per-chromosome bin index for searchsorted
+    chr_to_bin_idx = {}
+    for i, c in enumerate(bin_chr):
+        chr_to_bin_idx.setdefault(c, []).append(i)
 
-    # Group by bin coordinates, take mean of each cell line
-    agg = (
-        joined_df
-        .groupby(["Chromosome", "Start", "End"])[cell_line_cols]
-        .mean()
-        .reset_index()
-    )
+    chr_to_bin_starts = {}
+    chr_to_bin_ends = {}
+    chr_to_bin_indices = {}
+    for c, idx_list in chr_to_bin_idx.items():
+        idx_arr = np.array(idx_list, dtype=np.int64)
+        chr_to_bin_indices[c] = idx_arr
+        chr_to_bin_starts[c] = bin_start[idx_arr]
+        chr_to_bin_ends[c] = bin_end[idx_arr]
 
-    # Merge back to preserve bin order
-    result = (
-        bin_info[["#CHR", "START", "END"]]
-        .merge(
-            agg.rename(columns={"Chromosome": "#CHR", "Start": "START", "End": "END"}),
-            on=["#CHR", "START", "END"],
-            how="left",
-        )
-    )
+    logging.info(f"built bin index for {len(chr_to_bin_starts)} chromosomes, {n_bins} bins")
 
-    n_missing = result[cell_line_cols[0]].isna().sum()
-    n_total = len(result)
+    # Process RT SNPs per chromosome using searchsorted
+    rt_values = rt_raw[cell_line_cols].values.astype(np.float64)
+    total_mapped = 0
+    for chrom, chrom_df in rt_raw.groupby("Chr", sort=False):
+        if chrom not in chr_to_bin_starts:
+            logging.info(f"chr{chrom}: skipped (no bins)")
+            continue
+        starts = chr_to_bin_starts[chrom]
+        ends = chr_to_bin_ends[chrom]
+        global_idx = chr_to_bin_indices[chrom]
+
+        positions = chrom_df["Position"].values
+        # searchsorted: find bin where START <= position; bins are [START, END)
+        bin_i = np.searchsorted(starts, positions, side="right") - 1
+        # Keep only SNPs that fall within a valid bin
+        valid = (bin_i >= 0) & (bin_i < len(starts)) & (positions < ends[np.clip(bin_i, 0, len(starts) - 1)])
+        n_mapped = int(valid.sum())
+        total_mapped += n_mapped
+        logging.info(f"chr{chrom}: {len(chrom_df)} SNPs, {n_mapped} mapped to {len(starts)} bins")
+        bin_i = bin_i[valid]
+        rt_vals = rt_values[chrom_df.index[valid]]
+
+        # Accumulate sums and counts per bin
+        mapped_global = global_idx[bin_i]
+        np.add.at(rt_counts, mapped_global, 1)
+        np.add.at(rt_sums, (mapped_global, slice(None)), rt_vals)
+
+    logging.info(f"total RT SNPs mapped to bins: {total_mapped}/{len(rt_raw)}")
+
+    # Compute means
+    with np.errstate(invalid="ignore"):
+        rt_means = rt_sums / rt_counts[:, np.newaxis]
+    rt_means[rt_counts == 0] = np.nan
+
+    result = bin_info[["#CHR", "START", "END"]].copy()
+    for ci, col in enumerate(cell_line_cols):
+        result[col] = rt_means[:, ci]
+
+    n_missing = int(np.sum(rt_counts == 0))
+    n_total = n_bins
     frac_missing = n_missing / n_total
     if frac_missing > 0.05:
         logging.warning(
             f"RT: {n_missing}/{n_total} bins ({frac_missing:.1%}) have no overlapping "
             f"RT SNPs; these will be filled with NaN and excluded from fitting."
         )
-    logging.info(f"RT loaded for {len(cell_line_cols)} cell lines, {n_total} bins")
+    logging.info(f"RT loaded for {n_cl} cell lines, {n_total} bins")
     return result
 
 
