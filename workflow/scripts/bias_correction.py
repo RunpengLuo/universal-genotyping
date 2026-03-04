@@ -454,7 +454,7 @@ def bias_correction_rdr_spline(
     corrected_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
     for si, rep_id in enumerate(rep_ids):
         raw_rdrs = raw_rdr_mat[:, si]
-        log_rdr = np.log(raw_rdrs + 1e-8)
+        log_rdr = np.log2(raw_rdrs + 1e-8)
 
         rt_vals = None
         best_rt_name = None
@@ -508,7 +508,7 @@ def bias_correction_rdr_spline(
         mean_log_rdr_fit = np.mean(log_rdr[fit_mask])
         corrected_log_rdr = residuals + mean_log_rdr_fit
 
-        corrected_rdr = np.exp(corrected_log_rdr)
+        corrected_rdr = np.exp2(corrected_log_rdr)
 
         nan_mask = ~np.isfinite(log_rdr)
         if rt_vals is not None:
@@ -525,7 +525,7 @@ def bias_correction_rdr_spline(
         corrected_mat[:, si] = corrected_rdr / corr_factor
 
         if out_dir is not None:
-            fitted_rdr = np.exp(predicted)
+            fitted_rdr = np.exp2(predicted)
             plot_correction_diagnostics(
                 gc, raw_rdrs, corrected_mat[:, si],
                 fitted_rdr=fitted_rdr, rep_id=rep_id, out_dir=out_dir,
