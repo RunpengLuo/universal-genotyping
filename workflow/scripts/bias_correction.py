@@ -13,6 +13,7 @@ import patsy
 
 from pybedtools import BedTool
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
 
 def compute_gc_content(
@@ -116,6 +117,8 @@ def bias_correction_rdr(
     logging.info(f"GC-content range for fitting: [{gc_lo}, {gc_hi}]")
     fit_mask = (gc >= gc_lo) & (gc <= gc_hi)
 
+    pdf = PdfPages(os.path.join(out_dir, "correction_diagnostics.pdf")) if out_dir else None
+
     gccorr_rdr_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
     for si, rep_id in enumerate(rep_ids):
         raw_rdrs = raw_rdr_mat[:, si]
@@ -161,28 +164,26 @@ def bias_correction_rdr(
             logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
 
         gccorr_rdr_mat[:, si] = corr_rdrs / corr_factor
-        if out_dir is not None:
+        if pdf is not None:
             plot_correction_diagnostics(
                 gc, raw_rdrs, gccorr_rdr_mat[:, si],
-                fitted_rdr=exp_rdrs, rep_id=rep_id, out_dir=out_dir,
+                fitted_rdr=exp_rdrs, rep_id=rep_id, pdf=pdf,
             )
+
+    if pdf is not None:
+        pdf.close()
     return gccorr_rdr_mat
 
 
 def plot_correction_diagnostics(
-    gc, raw_rdr, corr_rdr, fitted_rdr, rep_id, out_dir,
+    gc, raw_rdr, corr_rdr, fitted_rdr, rep_id, pdf,
     rt_vals=None, rt_name=None,
 ):
-    """Produce all diagnostic plots for RDR bias correction.
+    """Produce a single-page diagnostic figure for RDR bias correction.
 
-    Generates three plot files:
-
-    1. ``{rep_id}.gc_corr_scatter.png`` — GC vs raw RDR scatter with fitted
-       expected RDR overlaid as a red line.
-    2. ``{rep_id}.gc_corr.png`` — side-by-side hexbin of uncorrected vs.
-       corrected RDR, each annotated with MAD.
-    3. ``{rep_id}.rt_scatter.png`` — (only when *rt_vals* is provided)
-       before/after RT correction scatter.
+    Adds one page to *pdf* with a 2x2 scatter grid (GC before/after on row 0,
+    RT before/after on row 1). If no RT data is provided, only the top row
+    (1x2) is drawn.
 
     Parameters
     ----------
@@ -193,70 +194,55 @@ def plot_correction_diagnostics(
     corr_rdr : np.ndarray
         Corrected RDR values.
     fitted_rdr : np.ndarray
-        Model-predicted expected RDR for every bin (used for the fit overlay).
+        Model-predicted expected RDR for every bin.
     rep_id : str
-        Replicate identifier (used in output filenames).
-    out_dir : str
-        Directory for the output PNGs.
+        Replicate identifier (used in page title).
+    pdf : PdfPages
+        Open PdfPages handle to write the figure into.
     rt_vals : np.ndarray or None
         Per-bin replication timing values (optional).
     rt_name : str or None
         Name of the selected RT cell line (used in axis labels).
     """
-    def mad(x):
-        return np.median(np.abs(x - np.median(x)))
+    mad = lambda x: np.median(np.abs(x - np.median(x)))
 
-    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-    ax.scatter(gc, raw_rdr, s=2, alpha=0.2, label="raw RDR")
-    sort_idx = np.argsort(gc)
-    ax.plot(
-        gc[sort_idx], fitted_rdr[sort_idx],
-        linewidth=2, color="red", label="fit",
-    )
-    ax.set_xlabel("GC")
-    ax.set_ylabel("RDR")
-    ax.legend()
-    plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, f"{rep_id}.gc_corr_scatter.png"), dpi=300)
-    plt.close(fig)
+    has_rt = rt_vals is not None
+    if has_rt:
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    else:
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+        axes = axes[np.newaxis, :]  # make 2D for uniform indexing
 
+    # Row 0: GC scatter
     mad_raw = mad(raw_rdr)
     mad_corr = mad(corr_rdr)
-    fig, axes = plt.subplots(1, 2, figsize=(6, 3), sharey=True)
-    axes[0].hexbin(
-        gc, raw_rdr,
-        gridsize=100, cmap="Blues", mincnt=1, linewidths=0,
-        reduce_C_function=np.median,
-    )
-    axes[0].set_xlabel("GC content")
-    axes[0].set_ylabel("RDR")
-    axes[0].set_title(f"Uncorrected RDR\nMAD={mad_raw:.3f}")
-    axes[1].hexbin(
-        gc, corr_rdr,
-        gridsize=100, cmap="Blues", mincnt=1, linewidths=0,
-        reduce_C_function=np.median,
-    )
-    axes[1].set_xlabel("GC content")
-    axes[1].set_ylabel("RDR")
-    axes[1].set_title(f"GC-corrected RDR\nMAD={mad_corr:.3f}")
-    plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, f"{rep_id}.gc_corr.png"), dpi=300)
-    plt.close(fig)
+    axes[0, 0].scatter(gc, raw_rdr, s=2, alpha=0.2, rasterized=True)
+    axes[0, 0].set_xlabel("GC")
+    axes[0, 0].set_ylabel("RDR")
+    axes[0, 0].set_title(f"Before GC correction\nMAD={mad_raw:.4f}")
+    axes[0, 1].scatter(gc, corr_rdr, s=2, alpha=0.2, rasterized=True)
+    axes[0, 1].set_xlabel("GC")
+    axes[0, 1].set_ylabel("RDR")
+    axes[0, 1].set_title(f"After GC correction\nMAD={mad_corr:.4f}")
 
-    if rt_vals is not None:
+    # Row 1: RT scatter (only if RT data available)
+    if has_rt:
         valid = np.isfinite(rt_vals)
-        fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-        axes[0].scatter(rt_vals[valid], raw_rdr[valid], s=2, alpha=0.2)
-        axes[0].set_xlabel(f"RT ({rt_name})")
-        axes[0].set_ylabel("RDR (uncorrected)")
-        axes[0].set_title("Before RT correction")
-        axes[1].scatter(rt_vals[valid], corr_rdr[valid], s=2, alpha=0.2)
-        axes[1].set_xlabel(f"RT ({rt_name})")
-        axes[1].set_ylabel("RDR (corrected)")
-        axes[1].set_title("After RT correction")
-        plt.tight_layout()
-        plt.savefig(os.path.join(out_dir, f"{rep_id}.rt_scatter.png"), dpi=300)
-        plt.close(fig)
+        mad_raw_rt = mad(raw_rdr[valid])
+        mad_corr_rt = mad(corr_rdr[valid])
+        axes[1, 0].scatter(rt_vals[valid], raw_rdr[valid], s=2, alpha=0.2, rasterized=True)
+        axes[1, 0].set_xlabel(f"RT ({rt_name})")
+        axes[1, 0].set_ylabel("RDR")
+        axes[1, 0].set_title(f"Before RT correction\nMAD={mad_raw_rt:.4f}")
+        axes[1, 1].scatter(rt_vals[valid], corr_rdr[valid], s=2, alpha=0.2, rasterized=True)
+        axes[1, 1].set_xlabel(f"RT ({rt_name})")
+        axes[1, 1].set_ylabel("RDR")
+        axes[1, 1].set_title(f"After RT correction\nMAD={mad_corr_rt:.4f}")
+
+    fig.suptitle(rep_id, fontsize=14)
+    plt.tight_layout()
+    pdf.savefig(fig, dpi=150)
+    plt.close(fig)
 
 
 def load_rt_for_bins(bin_info: pd.DataFrame, rt_file: str) -> pd.DataFrame:
@@ -451,6 +437,8 @@ def bias_correction_rdr_spline(
 
     autosomes_mask = np.array([c not in ("X", "Y", "chrX", "chrY") for c in chrs])
 
+    pdf = PdfPages(os.path.join(out_dir, "correction_diagnostics.pdf")) if out_dir else None
+
     corrected_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
     for si, rep_id in enumerate(rep_ids):
         raw_rdrs = raw_rdr_mat[:, si]
@@ -524,12 +512,14 @@ def bias_correction_rdr_spline(
         logging.info(f"{rep_id}: spline correction factor={corr_factor:.4f}")
         corrected_mat[:, si] = corrected_rdr / corr_factor
 
-        if out_dir is not None:
+        if pdf is not None:
             fitted_rdr = np.exp2(predicted)
             plot_correction_diagnostics(
                 gc, raw_rdrs, corrected_mat[:, si],
-                fitted_rdr=fitted_rdr, rep_id=rep_id, out_dir=out_dir,
+                fitted_rdr=fitted_rdr, rep_id=rep_id, pdf=pdf,
                 rt_vals=rt_vals, rt_name=best_rt_name,
             )
 
+    if pdf is not None:
+        pdf.close()
     return corrected_mat
