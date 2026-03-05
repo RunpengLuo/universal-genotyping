@@ -529,8 +529,6 @@ bias_bed[out_cols].to_csv(
 logging.info("aggregating window data into adaptive bins")
 bbs = pd.read_table(bb_file, sep="\t")
 n_bb = len(bbs)
-n_tumors = rdr_mat.shape[1]
-bb_rdr = np.full((n_bb, n_tumors), 1.0, dtype=np.float32)
 bb_dp = np.full((n_bb, nsamples), np.nan, dtype=np.float32)
 
 win_chr = bias_bed["#CHR"].to_numpy()
@@ -600,28 +598,32 @@ for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
         means = np.where(wt_sums > 0, sums / wt_sums, np.nan)
         bb_dp[bb_global_idx, s] = means
 
-    # Aggregate RDR (tumor samples only)
-    n_defaulted = 0
-    for t in range(n_tumors):
-        rdr_chr = rdr_mat[win_idx_chr, t]
-        vals = rdr_chr[ov_win]
-        finite = np.isfinite(vals)
-        bi_f = ov_bin[finite]
-        wt_f = ov_wt[finite]
-        v_f = vals[finite]
-        sums = np.bincount(bi_f, weights=v_f * wt_f, minlength=n_bb_chr)
-        wt_sums = np.bincount(bi_f, weights=wt_f, minlength=n_bb_chr)
-        means = np.where(wt_sums > 0, sums / wt_sums, 1.0)
-        bb_rdr[bb_global_idx, t] = means
-        if t == 0:
-            n_defaulted = int((wt_sums == 0).sum())
-    logging.info(
-        f"  {chrom}: {n_bb_chr} bins, {n_windows_assigned} windows assigned, "
-        f"{n_defaulted} bins defaulted to 1.0"
-    )
+    logging.info(f"  {chrom}: {n_bb_chr} bins, {n_windows_assigned} windows assigned")
 
-n_filled = int(np.isfinite(bb_rdr[:, 0]).sum())
-logging.info(f"bb RDR: {n_filled}/{n_bb} bins filled from window RDR")
+# Compute bb RDR from aggregated depth (ratio of sums, not average of ratios)
+logging.info("computing bb RDR from aggregated depth")
+if has_normal:
+    normal_bb_dp = bb_dp[:, 0]
+    valid_bb = np.isfinite(normal_bb_dp) & (normal_bb_dp > 0)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        bb_rdr = bb_dp[:, tumor_sidx:] / normal_bb_dp[:, None]
+        bb_rdr *= library_correction[None, :]
+    bb_rdr[~valid_bb, :] = 1.0
+    n_defaulted = int((~valid_bb).sum())
+    logging.info(f"  {n_defaulted}/{n_bb} bins defaulted to 1.0 (no valid normal depth)")
+else:
+    bb_rdr = np.full((n_bb, nsamples), 1.0, dtype=np.float32)
+    for i in range(nsamples):
+        col = bb_dp[:, i]
+        valid_i = np.isfinite(col) & (col > 0)
+        if valid_i.any():
+            med = np.median(col[valid_i])
+            logging.info(f"  bb median-centering {rep_ids[i]}: median={med:.4f}")
+            with np.errstate(invalid="ignore", divide="ignore"):
+                bb_rdr[valid_i, i] = col[valid_i] / med
+
+n_filled = int((bb_rdr[:, 0] != 1.0).sum())
+logging.info(f"bb RDR: {n_filled}/{n_bb} bins computed from depth")
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=bb_rdr)
 np.savez_compressed(sm.output["dp_mtx_bb"], mat=bb_dp)
 
