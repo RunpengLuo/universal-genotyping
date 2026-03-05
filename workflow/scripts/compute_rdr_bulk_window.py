@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, gaussian_kde
 
 from utils import *
 from io_utils import read_region_file
@@ -102,7 +102,7 @@ def correct_readcount(
 
     ideal_idx = np.where(ideal)[0]
     logging.info(
-        f"  GC stage: {ideal_idx.size} ideal bins out of {int(valid.sum())} valid"
+        f"  GC stage: {ideal_idx.size}/{int(valid.sum())} ideal bins ({ideal_idx.size / valid.sum() * 100:.1f}%)"
     )
 
     if ideal_idx.size > samplesize:
@@ -164,7 +164,7 @@ def correct_readcount(
 
     ideal_idx2 = np.where(ideal2)[0]
     logging.info(
-        f"  MAP stage: {ideal_idx2.size} ideal bins out of {int(valid2.sum())} valid"
+        f"  MAP stage: {ideal_idx2.size}/{int(valid2.sum())} ideal bins ({ideal_idx2.size / valid2.sum() * 100:.1f}%)"
     )
 
     if ideal_idx2.size > samplesize:
@@ -244,23 +244,35 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
             ax = axes[0, si]
             reads = dp_mat[:, si]
             valid = (reads > 0) & np.isfinite(gc)
-            ax.scatter(
-                gc[valid],
-                reads[valid],
-                s=1,
-                alpha=0.05,
-                rasterized=True,
-                color="steelblue",
-            )
-            mad = np.median(np.abs(reads[valid] - np.median(reads[valid])))
-            r, _ = pearsonr(gc[valid], reads[valid])
+            x, y = gc[valid], reads[valid]
+            ylim = np.nanquantile(y, 0.99)
+
+            # subsample for KDE fitting (speed), then evaluate on grid
+            n_pts = len(x)
+            rng = np.random.default_rng(0)
+            if n_pts > 20000:
+                idx = rng.choice(n_pts, size=20000, replace=False)
+                kde = gaussian_kde(np.vstack([x[idx], y[idx]]))
+            else:
+                kde = gaussian_kde(np.vstack([x, y]))
+
+            xgrid = np.linspace(x.min(), x.max(), 200)
+            ygrid = np.linspace(0, ylim * 1.1, 200)
+            xx, yy = np.meshgrid(xgrid, ygrid)
+            positions = np.vstack([xx.ravel(), yy.ravel()])
+            zz = kde(positions).reshape(xx.shape)
+
+            ax.pcolormesh(xx, yy, zz, shading="gouraud", cmap="Blues", rasterized=True)
+            ax.contour(xx, yy, zz, levels=6, colors="steelblue", linewidths=0.5, alpha=0.5)
+
+            mad = np.median(np.abs(y - np.median(y)))
+            r, _ = pearsonr(x, y)
             logging.info(f"  {title} {rep_id}: MAD={mad:.4f}  r={r:.4f}")
             ax.set_xlabel("GC Content")
             if si == 0:
                 ax.set_ylabel("Observed Readcov")
             ax.set_title(f"{rep_id}\nMAD={mad:.4f}  r={r:.4f}")
-            ax.set_xlim(0, 1)
-            ylim = np.nanquantile(reads[valid], 0.99)
+            ax.set_xlim(x.min(), x.max())
             ax.set_ylim(0, ylim * 1.1)
         fig.suptitle(title, fontsize=14)
         plt.tight_layout()
