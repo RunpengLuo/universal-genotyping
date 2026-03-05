@@ -7,4 +7,5 @@ tmp/
 CLAUDE.md
 third_party
 .claude/
+__pycache__/
 test*

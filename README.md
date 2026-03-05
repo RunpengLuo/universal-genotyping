@@ -5,6 +5,7 @@ A Snakemake pipeline for unified SNP genotyping, phasing, and allele counting ac
 ## Table of Contents
 
 - [Quick-Start](#quick-start)
+- [Workflow Overview](#workflow-overview)
 - [Documentation](#documentation)
 
 ---
@@ -21,23 +22,27 @@ snakemake --cores 1 \
     -s /path/to/workflow/Snakefile \
     --configfile config/config.yaml \
     --directory <output> \
-    --config sample_file=/path/to/sample_file.tsv
+    --config sample_file=/path/to/sample_file.tsv sample_id=<PATIENT_ID>
 
 # run the pipeline
 snakemake --cores <num_cores> \
     -s /path/to/workflow/Snakefile \
     --configfile config/config.yaml \
     --directory <output> \
-    --config sample_file=/path/to/sample_file.tsv
-
-# generate report
-snakemake --cores <num_cores> \
-    -s /path/to/workflow/Snakefile \
-    --configfile config/config.yaml \
-    --directory <output> \
-    --config sample_file=/path/to/sample_file.tsv \
-    --report report.html
+    --config sample_file=/path/to/sample_file.tsv sample_id=<PATIENT_ID>
 ```
+
+---
+
+## Workflow Overview
+
+### Bulk Genotyping
+
+![Bulk genotyping rulegraph](docs/rulegraph.bulk_genotyping.png)
+
+### Single-Cell Genotyping
+
+![Single-cell genotyping rulegraph](docs/rulegraph.single_cell_genotyping.png)
 
 ---
 
@@ -48,5 +53,5 @@ snakemake --cores <num_cores> \
 | [config/config.yaml](config/config.yaml) | Workflow configuration file. |
 | [config/samples.tsv](config/samples.tsv) | Template of sample file. |
 | [docs/step-by-step.md](docs/step-by-step.md) | Step-by-step guide for running all three workflow modes. |
-| [docs/spec.md](docs/spec.md) | Specification for input and output. |
-| [docs/resources.md](docs/resources.md) | SNP panels, phasing panels, GTF files, phasing tool downloads, and panel preparation scripts. |
+| [docs/spec.md](docs/spec.md) | Input/output reference. |
+| [resources/README.md](resources/README.md) | External data: SNP panels, phasing panels, GTF files, bias BEDs, phasing tools. |
