@@ -75,7 +75,8 @@ def weighted_bincount_mean(values, bin_idx, weights, n_bins):
     v = values[finite]
     sums = np.bincount(bi, weights=v * wt, minlength=n_bins)
     wt_sums = np.bincount(bi, weights=wt, minlength=n_bins)
-    return np.where(wt_sums > 0, sums / wt_sums, np.nan)
+    with np.errstate(invalid="ignore"):
+        return np.where(wt_sums > 0, sums / wt_sums, np.nan)
 
 
 ##################################################

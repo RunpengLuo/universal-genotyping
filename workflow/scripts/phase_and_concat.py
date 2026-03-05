@@ -173,6 +173,11 @@ else:
         f"({np.sum(snp_mask) / len(snps):.3%})"
     )
 
+_n_exon = int((snps["feature_type"] == "exon").sum())
+_n_total = len(snps)
+logging.info(
+    f"#exonic SNPs: {_n_exon}/{_n_total} ({_n_exon / max(_n_total, 1):.3%})")
+
 if sm.params["exon_only"]:
     exon_mask = (snps["feature_type"] == "exon").to_numpy()
     logging.info(f"exon filter: {np.sum(exon_mask)}/{len(snps)} SNPs passed")
