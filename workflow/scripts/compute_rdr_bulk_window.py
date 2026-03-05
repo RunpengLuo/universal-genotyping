@@ -116,7 +116,8 @@ def correct_readcount(
         )
 
     def _apply_stage(
-        prev, covariate, cov_lo, cov_hi, grid, seed, extra_ideal_mask=None
+        prev, covariate, cov_lo, cov_hi, grid, seed,
+        stage_name="", extra_ideal_mask=None,
     ):
         """Apply one LOWESS correction stage and return corrected values."""
         valid = (prev > 0) & np.isfinite(covariate)
@@ -126,10 +127,6 @@ def correct_readcount(
             ideal &= extra_ideal_mask
 
         ideal_idx = np.where(ideal)[0]
-        logging.info(
-            f"  {ideal_idx.size}/{int(valid.sum())} ideal bins "
-            f"({ideal_idx.size / max(valid.sum(), 1) * 100:.1f}%)"
-        )
         if ideal_idx.size > samplesize:
             rng = np.random.default_rng(seed)
             ideal_idx = rng.choice(ideal_idx, size=samplesize, replace=False)
@@ -148,32 +145,43 @@ def correct_readcount(
             scale = np.median(prev[valid_corr]) / np.median(corrected[valid_corr])
             corrected[valid_corr] *= scale
 
+        n_valid = int(valid.sum())
+        n_ideal = ideal_idx.size
         n_nan = int(np.isnan(corrected).sum())
-        logging.info(f"  {n_nan}/{n} NaN after correction")
+        ideal_pct = n_ideal / max(n_valid, 1) * 100
+        nan_pct = n_nan / max(n, 1) * 100
+        logging.info(
+            f"    {stage_name:<5s}  {n_ideal:>8d}/{n_valid} ({ideal_pct:5.1f}%) fit,  "
+            f"{n_nan:>8d}/{n} ({nan_pct:5.1f}%) NaN"
+        )
         return corrected
 
-    logging.info("  GC stage:")
     gc_lo = np.nanquantile(gc, doutlier)
     gc_hi = np.nanquantile(gc, 1.0 - doutlier)
     grid_01 = np.linspace(0, 1, grid_size)
     extra = (mappability >= min_mappability) if mappability is not None else None
     cor = _apply_stage(
-        reads, gc, gc_lo, gc_hi, grid_01, seed=seed, extra_ideal_mask=extra
+        reads, gc, gc_lo, gc_hi, grid_01, seed=seed,
+        stage_name="GC", extra_ideal_mask=extra,
     )
 
     if mappability is not None:
-        logging.info("  MAP stage:")
         map_lo = np.nanquantile(mappability, doutlier)
         map_hi = np.nanquantile(mappability, 1.0 - doutlier)
-        cor = _apply_stage(cor, mappability, map_lo, map_hi, grid_01, seed=seed + 1)
+        cor = _apply_stage(
+            cor, mappability, map_lo, map_hi, grid_01, seed=seed + 1,
+            stage_name="MAP",
+        )
 
     if repliseq is not None:
-        logging.info("  REPLI stage:")
         repli_finite = np.isfinite(repliseq)
         repli_lo = np.nanquantile(repliseq[repli_finite], doutlier)
         repli_hi = np.nanquantile(repliseq[repli_finite], 1.0 - doutlier)
         grid_repli = np.linspace(repli_lo, repli_hi, grid_size)
-        cor = _apply_stage(cor, repliseq, repli_lo, repli_hi, grid_repli, seed=seed + 2)
+        cor = _apply_stage(
+            cor, repliseq, repli_lo, repli_hi, grid_repli, seed=seed + 2,
+            stage_name="REPLI",
+        )
 
     return cor.astype(np.float32)
 
@@ -216,7 +224,7 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
 
             mad = np.median(np.abs(y - np.median(y)))
             r, _ = pearsonr(x, y)
-            logging.info(f"  {title} {rep_id}: MAD={mad:.4f}  r={r:.4f}")
+            logging.info(f"  {title:<24s} {rep_id:<8s}: MAD={mad:.4f}  r={r:.4f}")
             ax.set_xlabel("GC Content")
             if si == 0:
                 ax.set_ylabel("Observed Readcov")
@@ -234,7 +242,8 @@ def log_nan_summary(name, mat, labels, n_total):
     for i, label in enumerate(labels):
         col = mat[:, i] if mat.ndim == 2 else mat
         n_nan = int(np.isnan(col).sum())
-        logging.info(f"  {name} {label}: {n_nan}/{n_total} NaN")
+        pct = n_nan / max(n_total, 1) * 100
+        logging.info(f"  {name:<16s} {label:<8s}: {n_nan:>8d}/{n_total} ({pct:5.1f}%) NaN")
 
 
 def log_mad_and_plot(
@@ -255,7 +264,7 @@ def log_mad_and_plot(
         m = np.isfinite(v)
         if m.any():
             mad = np.median(np.abs(v[m] - np.median(v[m])))
-            logging.info(f"  {prefix} {label}: MAD={mad:.4f}")
+            logging.info(f"  {prefix:<28s} {label:<8s}: MAD={mad:.4f}")
         plot_file = os.path.join(qc_dir, f"{prefix}.{label}.pdf")
         plot_1d_sample(
             pos_df,
@@ -329,7 +338,8 @@ logging.info(f"{n_windows} windows across {len(target_chroms)} chromosomes")
 bias_bed = pd.merge(
     left=coords, right=bias_bed_full, on=join_keys, how="left", sort=False
 )
-logging.info(f"GC BED matched {int(bias_bed['GC'].notna().sum())}/{n_windows} windows")
+_gc_matched = int(bias_bed["GC"].notna().sum())
+logging.info(f"GC BED matched {_gc_matched}/{n_windows} ({_gc_matched / max(n_windows, 1) * 100:.1f}%)")
 
 dp_raw = np.zeros((n_windows, nsamples), dtype=np.float32)
 for i, mos_df in enumerate(mos_dfs):
@@ -352,8 +362,9 @@ log_mad_and_plot(
 # --- Filter windows ---
 regions = read_region_file(region_bed_file)
 win_mask_region = get_mask_by_region_intervals(bias_bed, regions)
+_n_excl = int((~win_mask_region).sum())
 logging.info(
-    f"region filter: excluding {int((~win_mask_region).sum())}/{n_windows} windows"
+    f"region filter: excluding {_n_excl}/{n_windows} ({_n_excl / max(n_windows, 1) * 100:.1f}%)"
 )
 
 bias_bed = bias_bed.loc[win_mask_region].reset_index(drop=True)
@@ -364,7 +375,7 @@ if blacklist_bed_file is not None:
     bl_regions = read_region_file(blacklist_bed_file)
     bl_mask = get_mask_by_region_intervals(bias_bed, bl_regions)
     n_bl = int(bl_mask.sum())
-    logging.info(f"blacklist filter: excluding {n_bl}/{n_windows} windows")
+    logging.info(f"blacklist filter: excluding {n_bl}/{n_windows} ({n_bl / max(n_windows, 1) * 100:.1f}%)")
     bias_bed = bias_bed.loc[~bl_mask].reset_index(drop=True)
     mos_dfs = [df.loc[~bl_mask].reset_index(drop=True) for df in mos_dfs]
     n_windows = len(bias_bed)
@@ -379,8 +390,9 @@ repli_vals = (
     else None
 )
 if repli_vals is not None:
+    _n_finite = int(np.isfinite(repli_vals).sum())
     logging.info(
-        f"REPLI column: {int(np.isfinite(repli_vals).sum())}/{n_windows} finite"
+        f"REPLI column: {_n_finite}/{n_windows} ({_n_finite / max(n_windows, 1) * 100:.1f}%) finite"
     )
 else:
     logging.info("no REPLI column; skipping replication timing correction")
@@ -446,7 +458,8 @@ if has_normal:
 
     normal_dp = dp_corrected[:, 0]
     valid = np.isfinite(normal_dp) & (normal_dp > 0)
-    logging.info(f"normal: {int(valid.sum())}/{n_windows} valid windows")
+    _n_valid = int(valid.sum())
+    logging.info(f"normal: {_n_valid}/{n_windows} ({_n_valid / max(n_windows, 1) * 100:.1f}%) valid")
 
     with np.errstate(invalid="ignore", divide="ignore"):
         rdr_mat = dp_corrected[:, 1:] / normal_dp[:, None]
@@ -470,7 +483,7 @@ else:
 
 tumor_rep_ids = rep_ids[tumor_sidx:]
 n_nan_rdr = int(np.isnan(rdr_mat[:, 0]).sum())
-logging.info(f"window RDR: {n_nan_rdr}/{n_windows} NaN")
+logging.info(f"window RDR: {n_nan_rdr}/{n_windows} ({n_nan_rdr / max(n_windows, 1) * 100:.1f}%) NaN")
 
 rdr_ylim = np.round(np.nanquantile(rdr_mat, 0.99)).astype(int) + 1
 log_mad_and_plot(
@@ -538,7 +551,7 @@ for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
         bb_ends,
     )
     if len(ov_win) == 0:
-        logging.info(f"  {chrom}: {n_bb_chr} bins, 0 windows assigned")
+        logging.info(f"  {chrom:<5s}: {n_bb_chr:>5d} bins, {0:>7d} windows")
         continue
     n_assigned = len(np.unique(ov_win))
 
@@ -552,7 +565,7 @@ for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
             vals, ov_bin, ov_wt, n_bb_chr
         )
 
-    logging.info(f"  {chrom}: {n_bb_chr} bins, {n_assigned} windows assigned")
+    logging.info(f"  {chrom:<5s}: {n_bb_chr:>5d} bins, {n_assigned:>7d} windows")
 
 bb_corr = bbs[["#CHR", "START", "END"]].copy()
 for col in bias_cols:
@@ -620,7 +633,8 @@ else:
                 bb_rdr[valid_i, i] = col[valid_i] / med
 
 n_nan_bb = int(np.isnan(bb_rdr[:, 0]).sum())
-logging.info(f"bb RDR: {n_bb - n_nan_bb}/{n_bb} bins filled, {n_nan_bb} NaN")
+_n_filled = n_bb - n_nan_bb
+logging.info(f"bb RDR: {_n_filled}/{n_bb} ({_n_filled / max(n_bb, 1) * 100:.1f}%) filled, {n_nan_bb} NaN")
 
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=bb_rdr)
 np.savez_compressed(sm.output["dp_mtx_bb"], mat=bb_dp)

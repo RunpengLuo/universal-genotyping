@@ -585,7 +585,7 @@ def plot_1d_sample(
     alpha=0.6,
     figsize=(40, 3),
     min_ylim=0.0,
-    max_ylim=1.0,
+    max_ylim=None,
     mask: np.ndarray | None = None,
     smooth: bool = False,
     smooth_frac: float = 0.05,
@@ -704,7 +704,7 @@ def plot_1d_sample(
         if val_type in ["AF", "BAF"]:
             ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
             ax.set_ylim(-0.05, 1.05)
-        else:
+        elif max_ylim is not None:
             ax.set_ylim(min_ylim, max_ylim)
 
         ax.set_xlabel(val_type)
