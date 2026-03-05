@@ -1,6 +1,6 @@
 # Step-by-Step Guide
 
-All three modes share the same command structure — only `workflow_mode` in `config/config.yaml` and the sample file differ. Fill in the paths in `config/config.yaml` (reference genome, SNP panel, phasing panel, tool binaries, output directories, etc.) before running any mode.
+All modes share the same command structure. Fill in paths in `config/config.yaml` before running.
 
 ```sh
 snakemake --cores <N> \
@@ -10,38 +10,39 @@ snakemake --cores <N> \
     --config sample_file=/path/to/samples.tsv sample_id=<PATIENT_ID>
 ```
 
-`sample_id` selects which patient to process from the sample sheet (must match a value in the `SAMPLE` column). This allows a single multi-patient sample sheet to be shared across runs.
+`sample_id` selects which patient to process (must match a `SAMPLE` value in the sample sheet). `assay_types` in the config controls which assay types to include.
 
 ---
 
 ## Mode 1: `bulk_genotyping`
 
-Use this mode when you have bulk WGS or WES BAM files. The pipeline genotypes bi-allelic SNPs from the matched-normal BAM via `bcftools`, phases them using the configured phaser (Eagle, SHAPEIT, or LongPhase), pileups allele counts per sample, and computes GC-corrected read-depth ratios (RDR).
+For bulk WGS/WES BAMs. Genotypes SNPs via `bcftools`, phases with Eagle/SHAPEIT/LongPhase, computes allele counts and bias-corrected RDR.
 
-1. Prepare a sample sheet listing only bulk samples (`assay_type` ∈ `{bulkWGS, bulkWES}`). Include both normal and tumor rows, setting `sample_type` accordingly.
-2. Set `workflow_mode: bulk_genotyping` in `config/config.yaml`.
-3. Run the pipeline. Primary outputs in `allele_dir/{assay_type}/`: `bb.tsv.gz`, `bb.Tallele.npz`, `bb.Aallele.npz`, `bb.Ballele.npz`, `bb.depth.npz`, `bb.rdr.npz`.
+1. Prepare a sample sheet with bulk samples (`assay_type` in `{bulkWGS, bulkWES}`), both normal and tumor.
+2. Set `workflow_mode: bulk_genotyping` and `assay_types: ["bulkWGS"]` (or `["bulkWES"]`) in config.
+3. Choose RDR method:
+   - `rdr_method: "window"` (default) — fixed-window mosdepth + HMMcopy-style LOWESS correction (GC, mappability, replication timing).
+   - `rdr_method: "bin"` — adaptive-bin mosdepth + quantile/spline/LOESS correction using a pre-built `bias_bed`.
+4. Run the pipeline. Primary outputs in `bb_dir/{assay_type}/`: `bb.tsv.gz`, `bb.{Tallele,Aallele,Ballele,baf,depth,rdr}.npz`.
 
 ---
 
 ## Mode 2: `single_cell_genotyping`
 
-Use this mode when you have single-cell or spatial data (scRNA, scATAC, VISIUM, VISIUM3prime). SNPs are genotyped from a pseudobulk pileup across all BAMs using `cellsnp-lite`, phased, then piled up per cell. Gene expression or ATAC accessibility is aggregated into the same genomic bins.
+For scRNA, scATAC, VISIUM, or VISIUM3prime. Genotypes SNPs from pseudobulk pileup via `cellsnp-lite`, phases, pileups per cell, and bins allele counts.
 
-1. Prepare a sample sheet listing only non-bulk samples (`assay_type` ∈ `{scRNA, scATAC, VISIUM, VISIUM3prime}`). For paired scMultiome, give the scRNA and scATAC rows the same `REP_ID`. Fill in `PATH_to_barcodes` and `PATH_to_10x_ranger` for every row.
-2. Set `workflow_mode: single_cell_genotyping` in `config/config.yaml`.
-3. Run the pipeline. Primary outputs in `allele_dir/{assay_type}/`: `bb.tsv.gz`, `bb.Tallele.npz`, `bb.Aallele.npz`, `bb.Ballele.npz`, `barcodes.tsv.gz`, `{assay_type}.h5ad`.
+1. Prepare a sample sheet with non-bulk samples. For multiome, give scRNA and scATAC rows the same `REP_ID`. Fill in `PATH_to_barcodes` and `PATH_to_10x_ranger`.
+2. Set `workflow_mode: single_cell_genotyping` and `assay_types` accordingly.
+3. Run the pipeline. Primary outputs in `bb_dir/{assay_type}/`: `bb.raw.tsv.gz`, `bb.raw.{Tallele,Aallele,Ballele}.npz`, plus `barcodes.tsv.gz` in `allele_dir`.
 
-**Tip:** If you already ran Mode 1 on matched bulk data from the same patient, you can skip re-genotyping by setting `het_snp_vcf: <output_dir>/phase/phased_het_snps.vcf.gz` in the config. Only pileup and postprocessing will run.
+**Tip:** To skip re-genotyping when matched bulk data was already processed, set `het_snp_vcf` in the config to point to the prior run's `phase/phased_het_snps.vcf.gz`.
 
 ---
 
 ## Mode 3: `copytyping_preprocess`
 
-Use this mode when phased het SNPs and a CNV profile (e.g., from HATCHet3) are already available. The pipeline skips genotyping and phasing entirely, and instead aggregates per-cell allele counts directly onto the provided CNV segments.
+For when phased het SNPs and a CNV profile (e.g., from HATCHet3) are already available. Skips genotyping/phasing; aggregates per-cell allele counts onto CNV segments.
 
-1. Prepare a sample sheet listing non-bulk samples (same as Mode 2).
-2. Set `workflow_mode: copytyping_preprocess` in `config/config.yaml`, and provide:
-   - `het_snp_vcf`: path to phased het SNP VCF (e.g., from a prior Mode 1 run).
-   - `seg_ucn`: path to HATCHet3 segment-level copy-number file.
-3. Run the pipeline. Primary outputs in `allele_dir/{assay_type}/`: `cnv_segments.tsv`, `X_count.npz`, `Y_count.npz`, `D_count.npz`.
+1. Prepare a sample sheet with non-bulk samples (same as Mode 2).
+2. Set `workflow_mode: copytyping_preprocess`, and provide `het_snp_vcf` and `seg_ucn` in config.
+3. Run the pipeline. Primary outputs in `bb_dir/{assay_type}/`: `cnv_segments.tsv`, `{X,Y,D}_count.npz`.
