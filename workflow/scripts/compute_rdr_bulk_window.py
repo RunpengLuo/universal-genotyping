@@ -254,6 +254,7 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
             )
             mad = np.median(np.abs(reads[valid] - np.median(reads[valid])))
             r, _ = pearsonr(gc[valid], reads[valid])
+            logging.info(f"  {title} {rep_id}: MAD={mad:.4f}  r={r:.4f}")
             ax.set_xlabel("GC Content")
             if si == 0:
                 ax.set_ylabel("Observed Readcov")
@@ -339,18 +340,32 @@ pdf = PdfPages(os.path.join(qc_dir, "window_depth_correction.pdf"))
 plot_gc_correction_pdf(gc_vals, dp_mat, dp_corrected, rep_ids, pdf)
 pdf.close()
 
+rd_ylim = max(
+    np.nanquantile(dp_mat, 0.99),
+    np.nanquantile(dp_corrected, 0.99),
+)
+logging.info(f"depth plot shared y-lim={rd_ylim:.2f}")
 for i, rep_id in enumerate(rep_ids):
-    _, rd_ylim = np.nanquantile(dp_mat[:, i], [0.01, 0.99])
+    v = dp_mat[:, i]
+    m = np.isfinite(v) & (v > 0)
+    mad = np.median(np.abs(v[m] - np.median(v[m])))
+    logging.info(f"  depth before correction {rep_id}: MAD={mad:.4f}")
+
     plot_file = os.path.join(qc_dir, f"depth_window_before_correction.{rep_id}.pdf")
     plot_1d_sample(
-        gc_bed, dp_mat[:, i], genome_size, plot_file,
+        gc_bed, v, genome_size, plot_file,
         unit="window", val_type="RD", max_ylim=rd_ylim,
     )
-    _, rd_ylim_cor = np.nanquantile(dp_corrected[:, i], [0.01, 0.99])
+
+    vc = dp_corrected[:, i]
+    mc = np.isfinite(vc) & (vc > 0)
+    mad_c = np.median(np.abs(vc[mc] - np.median(vc[mc])))
+    logging.info(f"  depth after correction {rep_id}: MAD={mad_c:.4f}")
+
     plot_file = os.path.join(qc_dir, f"depth_window_after_correction.{rep_id}.pdf")
     plot_1d_sample(
-        gc_bed, dp_corrected[:, i], genome_size, plot_file,
-        unit="window", val_type="RD", max_ylim=rd_ylim_cor,
+        gc_bed, vc, genome_size, plot_file,
+        unit="window", val_type="RD", max_ylim=rd_ylim,
     )
 
 np.savez_compressed(sm.output["dp_mtx"], mat=dp_corrected)
@@ -378,13 +393,18 @@ with np.errstate(invalid="ignore", divide="ignore"):
 rdr_mat[~valid, :] = np.nan
 
 rdr_ylim = np.round(np.nanquantile(rdr_mat, 0.99)).astype(int) + 1
-logging.info(f"RDR y-lim={rdr_ylim}")
+logging.info(f"window RDR y-lim={rdr_ylim}")
 
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
+    v = rdr_mat[:, i]
+    m = np.isfinite(v)
+    mad = np.median(np.abs(v[m] - np.median(v[m])))
+    logging.info(f"  window RDR {rep_id}: MAD={mad:.4f}")
+
     plot_file = os.path.join(qc_dir, f"rdr_window.{rep_id}.pdf")
     plot_1d_sample(
         gc_bed,
-        rdr_mat[:, i],
+        v,
         genome_size,
         plot_file,
         unit="window",
@@ -454,17 +474,21 @@ n_filled = int(np.isfinite(bb_rdr[:, 0]).sum())
 logging.info(f"bb RDR: {n_filled}/{n_bb} bins filled from window RDR")
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=bb_rdr)
 
-bb_rdr_ylim = np.round(np.nanquantile(bb_rdr, 0.99)).astype(int) + 1
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
+    v = bb_rdr[:, i]
+    m = np.isfinite(v)
+    mad = np.median(np.abs(v[m] - np.median(v[m])))
+    logging.info(f"  bb RDR {rep_id}: MAD={mad:.4f}")
+
     plot_file = os.path.join(qc_dir, f"rdr_bb.{rep_id}.pdf")
     plot_1d_sample(
         bbs,
-        bb_rdr[:, i],
+        v,
         genome_size,
         plot_file,
         unit="bb",
         val_type="RDR",
-        max_ylim=bb_rdr_ylim,
+        max_ylim=rdr_ylim,
     )
 
 logging.info("finished.")
