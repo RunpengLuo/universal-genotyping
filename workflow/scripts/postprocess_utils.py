@@ -502,6 +502,10 @@ def plot_1d_sample(
     min_ylim=0.0,
     max_ylim=1.0,
     mask: np.ndarray | None = None,
+    smooth: bool = False,
+    smooth_frac: float = 0.05,
+    smooth_color: str = "orange",
+    smooth_linewidth: float = 1.5,
 ):
     """
     plot any features like AF, RDR, etc., in 1d chromosome scatter plot.
@@ -551,6 +555,16 @@ def plot_1d_sample(
             ax.legend(loc="upper right", fontsize=8, markerscale=2)
         else:
             ax.scatter(x[m], y[m], s=s, alpha=alpha, rasterized=True)
+        # optional LOWESS smooth trend line
+        if smooth and m.sum() > 10:
+            from statsmodels.nonparametric.smoothers_lowess import lowess as _lowess
+            sx = x[m]
+            sy = y[m]
+            order = np.argsort(sx)
+            sx, sy = sx[order], sy[order]
+            fit = _lowess(sy, sx, frac=smooth_frac, return_sorted=True)
+            ax.plot(fit[:, 0], fit[:, 1], color=smooth_color,
+                    linewidth=smooth_linewidth, zorder=5)
         if val_type in ["AF", "BAF"]:
             ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
             ax.set_ylim(-0.05, 1.05)

@@ -83,7 +83,8 @@ for i, rep_id in enumerate(rep_ids):
         plot_file,
         unit="bb",
         val_type="RD",
-        max_ylim=rd_ylim
+        max_ylim=rd_ylim,
+        smooth=True,
     )
 
 ##################################################
@@ -152,6 +153,7 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
         unit="bb",
         val_type="RDR",
         max_ylim=rdr_ylim,
+        smooth=True,
     )
 
 ##################################################
@@ -183,6 +185,7 @@ if gc_correct:
         plot_file,
         unit="bb",
         val_type="GC",
+        smooth=True,
     )
 
 # plot per-sample RDRs (after corrections)
@@ -196,6 +199,7 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
         unit="bb",
         val_type="RDR",
         max_ylim=rdr_ylim,
+        smooth=True,
     )
 
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=rdr_mtx_bb)

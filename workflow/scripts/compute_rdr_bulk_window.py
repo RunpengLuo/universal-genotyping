@@ -264,7 +264,7 @@ def log_nan_summary(name, mat, labels, n_total):
 
 
 def log_mad_and_plot(pos_df, mat, labels, genome_size, qc_dir, prefix,
-                     unit, val_type, ylim):
+                     unit, val_type, ylim, **plot_kwargs):
     """Log MAD per column and generate 1-D chromosome scatter plots."""
     for i, label in enumerate(labels):
         v = mat[:, i]
@@ -274,7 +274,8 @@ def log_mad_and_plot(pos_df, mat, labels, genome_size, qc_dir, prefix,
             logging.info(f"  {prefix} {label}: MAD={mad:.4f}")
         plot_file = os.path.join(qc_dir, f"{prefix}.{label}.pdf")
         plot_1d_sample(pos_df, v, genome_size, plot_file,
-                       unit=unit, val_type=val_type, max_ylim=ylim)
+                       unit=unit, val_type=val_type, max_ylim=ylim,
+                       **plot_kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -293,6 +294,10 @@ region_bed_file = sm.input["region_bed"]
 sample_name = sm.params["sample_name"]
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
+win_qc_dir = os.path.join(qc_dir, "window")
+bb_qc_dir = os.path.join(qc_dir, "bb")
+os.makedirs(win_qc_dir, exist_ok=True)
+os.makedirs(bb_qc_dir, exist_ok=True)
 mosdepth_dir = sm.params["mosdepth_dir"]
 chromosomes = sm.params["chromosomes"]
 
@@ -368,16 +373,18 @@ for i, rep_id in enumerate(rep_ids):
 log_nan_summary("corrected depth", dp_corrected, rep_ids, n_windows)
 
 # QC: GC correction density plots
-pdf = PdfPages(os.path.join(qc_dir, "window_depth_correction.pdf"))
+pdf = PdfPages(os.path.join(win_qc_dir, "depth_correction.pdf"))
 plot_gc_correction_pdf(gc_vals, dp_mat, dp_corrected, rep_ids, pdf)
 pdf.close()
 
 # QC: per-sample depth genome plots (before & after)
 rd_ylim = max(np.nanquantile(dp_mat, 0.99), np.nanquantile(dp_corrected, 0.99))
-log_mad_and_plot(bias_bed, dp_mat, rep_ids, genome_size, qc_dir,
-                 "depth_window_before_correction", "window", "RD", rd_ylim)
-log_mad_and_plot(bias_bed, dp_corrected, rep_ids, genome_size, qc_dir,
-                 "depth_window_after_correction", "window", "RD", rd_ylim)
+log_mad_and_plot(bias_bed, dp_mat, rep_ids, genome_size, win_qc_dir,
+                 "depth_before_correction", "window", "RD", rd_ylim,
+                 smooth=True)
+log_mad_and_plot(bias_bed, dp_corrected, rep_ids, genome_size, win_qc_dir,
+                 "depth_after_correction", "window", "RD", rd_ylim,
+                 smooth=True)
 
 np.savez_compressed(sm.output["dp_mtx"], mat=dp_corrected)
 
@@ -419,8 +426,8 @@ n_nan_rdr = int(np.isnan(rdr_mat[:, 0]).sum())
 logging.info(f"window RDR: {n_nan_rdr}/{n_windows} NaN")
 
 rdr_ylim = np.round(np.nanquantile(rdr_mat, 0.99)).astype(int) + 1
-log_mad_and_plot(bias_bed, rdr_mat, tumor_rep_ids, genome_size, qc_dir,
-                 "rdr_window", "window", "RDR", rdr_ylim)
+log_mad_and_plot(bias_bed, rdr_mat, tumor_rep_ids, genome_size, win_qc_dir,
+                 "rdr", "window", "RDR", rdr_ylim, smooth=True)
 
 np.savez_compressed(sm.output["rdr_mtx"], mat=rdr_mat)
 
@@ -492,6 +499,20 @@ logging.info(f"wrote bb corr_factors: {bias_cols}, {n_bb} rows")
 
 log_nan_summary("bb depth", bb_dp, rep_ids, n_bb)
 
+# QC: bb-level depth 1D plots
+bb_rd_ylim = max(np.nanquantile(bb_dp, 0.99), 1.0)
+log_mad_and_plot(bbs, bb_dp, rep_ids, genome_size, bb_qc_dir,
+                 "depth", "bb", "RD", bb_rd_ylim, smooth=True)
+
+# QC: window-level and bb-level GC/bias 1D plots
+for col in bias_cols:
+    plot_1d_sample(bias_bed, bias_bed[col].to_numpy(), genome_size,
+                   os.path.join(win_qc_dir, f"{col}.pdf"),
+                   unit="window", val_type=col, smooth=True)
+    plot_1d_sample(bbs, bb_bias[col], genome_size,
+                   os.path.join(bb_qc_dir, f"{col}.pdf"),
+                   unit="bb", val_type=col, smooth=True)
+
 # --- Bin-level RDR ---
 logging.info("computing bb RDR from aggregated depth")
 if has_normal:
@@ -516,7 +537,7 @@ logging.info(f"bb RDR: {n_bb - n_nan_bb}/{n_bb} bins filled, {n_nan_bb} NaN")
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=bb_rdr)
 np.savez_compressed(sm.output["dp_mtx_bb"], mat=bb_dp)
 
-log_mad_and_plot(bbs, bb_rdr, tumor_rep_ids, genome_size, qc_dir,
-                 "rdr_bb", "bb", "RDR", rdr_ylim)
+log_mad_and_plot(bbs, bb_rdr, tumor_rep_ids, genome_size, bb_qc_dir,
+                 "rdr", "bb", "RDR", rdr_ylim, smooth=True)
 
 logging.info("finished.")
