@@ -216,8 +216,14 @@ else:
         final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Ballele.npz")
         if assay_type in bulk_assays:
             final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.baf.npz")
-            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.depth.npz")
             final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.rdr.npz")
+            # bb.depth.npz only produced by bin method
+            if config.get("rdr_method", "bin") == "bin":
+                final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.depth.npz")
+            # window method also produces window-level files
+            if config.get("rdr_method", "bin") == "window":
+                final_targets.append(config["bb_dir"] + f"/{assay_type}/window.depth.npz")
+                final_targets.append(config["bb_dir"] + f"/{assay_type}/window.rdr.npz")
         else:
             final_targets.append(
                 config["allele_dir"] + f"/{assay_type}/barcodes.tsv.gz"
@@ -230,6 +236,7 @@ include: "rules/genotype_snps.smk"
 include: "rules/phase_snps.smk"
 include: "rules/pileup_snps.smk"
 include: "rules/postprocess.smk"
+include: "rules/rdr_estimation.smk"
 
 
 rule all:

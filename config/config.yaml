@@ -154,15 +154,28 @@ params_postprocess:
 
 ##################################################
 # compute RDRs - bulk only
+# "bin" = adaptive-bin mosdepth + post-RDR correction (original)
+# "window" = fixed-window mosdepth + HMMcopy loess correction
+rdr_method: "bin"           # "bin" (default) | "window"
+
 params_mosdepth:
   read_quality: 11
   extra_params: "--no-per-base --fast-mode"
 
 params_compute_rdr:
-  gc_correct: true
-  correction_method: "quantile"   # "quantile" (default) | "spline" (ASCAT-style)
+  # --- shared ---
   mappability_file: null           # path to mappability BED track, null = skip
+  # --- bin method (rdr_method: "bin") ---
+  gc_correct: true
+  correction_method: "quantile"   # "quantile" (default) | "spline" (ASCAT-style) | "loess" (Benjamini/HMMcopy, pre-RDR)
   rt_file: null                    # path to ASCAT RT TSV (e.g. RT_G1000_WGS_hg38.txt), null = skip RT
+  # --- window method (rdr_method: "window") ---
+  gc_bed: null              # path to pre-built fixed-width GC BED (required for window mode)
+  window_size: 500          # mosdepth window size (bp)
+  samplesize: 50000         # max ideal bins for loess
+  routlier: 0.01            # read-count outlier quantile
+  doutlier: 0.001           # GC/map domain outlier quantile
+  min_mappability: 0.9      # min mappability for ideal bins
 
 ##################################################
 threads:

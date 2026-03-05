@@ -76,30 +76,39 @@ Used for filtering unreliable genomic regions (`blacklist_file` in config).
 
 The script [`resources/scripts/build_blacklist.hg38.py`](../resources/scripts/build_blacklist.hg38.py) generates a merged blacklist BED by:
 
-1. Running hmmcopy_utils (`generateMap.pl` + `mapCounter`) to compute per-base mappability from a reference FASTA
-2. Filtering bins with low average mappability
+1. Running [GEM-mappability](https://sourceforge.net/projects/gemlibrary/) to compute per-base mappability from a reference FASTA, then converting to BigWig via `wigToBigWig`
+2. Binning with `mapCounter` and filtering bins with low average mappability
 3. Downloading UCSC repeat/segdup tables (genomicSuperDups, simpleRepeat)
 4. Merging all intervals with pyranges into a single gzipped BED
 
-**Dependencies:** [hmmcopy_utils](https://github.com/shahcompbio/hmmcopy_utils) (`generateMap.pl`, `mapCounter`) and [bowtie](https://bowtie-bio.sourceforge.net/index.shtml).
+**Dependencies:** [GEM library](https://sourceforge.net/projects/gemlibrary/) (`gem-indexer`, `gem-mappability`, `gem-2-wig`), [UCSC wigToBigWig](https://hgdownload.soe.ucsc.edu/admin/exe/), and [hmmcopy_utils](https://github.com/shahcompbio/hmmcopy_utils) (`mapCounter`).
 
 **Quick start:**
 
 ```bash
+# Auto-download NCBI GRCh38 reference (downloaded, indexed, and removed on exit)
+python resources/scripts/build_blacklist.hg38.py \
+  --download_reference \
+  --out_file /path/to/blacklist.hg38.bed.gz \
+  --threads 8
+
+# With a local reference FASTA
 python resources/scripts/build_blacklist.hg38.py \
   --reference /path/to/hg38.fa \
   --out_file /path/to/blacklist.hg38.bed.gz \
-  --build_index --threads 8
+  --threads 8
 
 # Keep intermediate files (mappability BigWig, etc.) for inspection
 python resources/scripts/build_blacklist.hg38.py \
   --reference /path/to/hg38.fa \
   --out_file /path/to/blacklist.hg38.bed.gz \
-  --build_index --threads 8 \
+  --threads 8 \
   --work_dir /path/to/intermediates
 ```
 
-**Choosing `--read_length`:** Use the default **150** for both standard short-read WGS/WES and PacBio HiFi workflows. `generateMap.pl` aligns synthetic k-mers with bowtie (a short-read aligner), so passing long-read lengths (10 kb+) is not supported. The blacklist also includes UCSC segdups and simple repeats regardless of read length.
+**Choosing `--read_length`:** Default is **150** for standard short-read WGS/WES. GEM-mappability supports arbitrary k-mer lengths. The blacklist also includes UCSC segdups and simple repeats regardless of read length.
+
+**Pre-computed mappability BigWigs:** If you prefer to skip the GEM pipeline, [pre-built hg38 mappability files](https://zenodo.org/records/5521424) (generated with GEM) are available for read lengths 35–250 bp. Place the `.bw` file in your `--work_dir` as `mappability.bw` and the script will skip step 1.
 
 Run `python resources/scripts/build_blacklist.hg38.py --help` for full usage.
 

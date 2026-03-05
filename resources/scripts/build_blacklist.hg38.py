@@ -3,14 +3,15 @@
 
 Combines the functionality of the former build_mappability.sh and
 build_blacklist.hg38.py into a single script.  Given a reference FASTA,
-it runs hmmcopy_utils (generateMap.pl + mapCounter) to produce per-base
-mappability, bins and filters low-mappability regions, downloads UCSC
-repeat/segdup tables, merges everything with pyranges, and writes a
-gzipped blacklist BED.
+it runs GEM-mappability to produce per-base mappability, converts to
+BigWig via wigToBigWig, bins with mapCounter, filters low-mappability
+regions, downloads UCSC repeat/segdup tables, merges everything with
+pyranges, and writes a gzipped blacklist BED.
 
 Dependencies on PATH:
-  - generateMap.pl, mapCounter, bowtie  (hmmcopy_utils + bowtie)
-  - bowtie-build  (only if --build_index is used)
+  - gem-indexer, gem-mappability, gem-2-wig  (GEM library)
+  - wigToBigWig  (UCSC Kent utilities)
+  - mapCounter  (hmmcopy_utils)
 """
 
 import argparse
@@ -103,71 +104,97 @@ def download_reference(dest_dir):
     return fa_path
 
 
-def check_dependencies(build_index, download_reference):
+def check_dependencies(download_ref):
     """Verify required executables are on PATH."""
-    required = ["generateMap.pl", "mapCounter", "bowtie"]
-    if build_index:
-        required.append("bowtie-build")
-    if download_reference:
+    required = ["gem-indexer", "gem-mappability", "gem-2-wig", "wigToBigWig", "mapCounter"]
+    if download_ref:
         required.append("samtools")
     missing = [cmd for cmd in required if shutil.which(cmd) is None]
     if missing:
         sys.exit(
             f"Error: the following commands were not found on PATH: {', '.join(missing)}\n"
-            "Install hmmcopy_utils (https://github.com/shahcompbio/hmmcopy_utils) "
-            "and bowtie (https://bowtie-bio.sourceforge.net)."
+            "Install GEM library (https://sourceforge.net/projects/gemlibrary/), "
+            "UCSC wigToBigWig, and hmmcopy_utils mapCounter."
         )
 
 
-def run_bowtie_build(reference, index_base, threads):
-    """Build a bowtie index from the reference FASTA.
+def run_gem_mappability(reference, work_dir, map_bw, read_length, threads):
+    """Run GEM-mappability pipeline to produce a per-base mappability BigWig.
 
-    Skips if the index files already exist.
-    """
-    if os.path.isfile(f"{index_base}.1.ebwt") or os.path.isfile(f"{index_base}.1.ebwtl"):
-        print(f"[Step 0] [skip] Bowtie index already exists at {index_base}")
-        return
-    cmd = ["bowtie-build", reference, index_base, "--threads", str(threads)]
-    print(f"[Step 0] Building bowtie index: {' '.join(cmd)}")
-    subprocess.run(cmd, check=True)
-    print("  Done.")
+    Pipeline:
+      gem-indexer   → {prefix}.gem
+      gem-mappability → {prefix}.mappability
+      gem-2-wig     → {prefix}.wig + {prefix}.sizes
+      wigToBigWig   → mappability.bw
 
+    Skips the entire pipeline if the output BigWig already exists.
+    Each sub-step is also skipped if its output already exists.
 
-def run_generate_map(reference, index_base, map_bw, read_length):
-    """Run generateMap.pl to produce a per-base mappability BigWig.
-
-    Skips if the output BigWig already exists.
+    Reference:
+      https://evodify.com/gem-mappability/
+      https://github.com/xuefzhao/Reference.Mappability
     """
     if os.path.isfile(map_bw):
         print(f"[Step 1] [skip] Mappability BigWig already exists: {map_bw}")
         return
-    print(f"[Step 1] Running generateMap.pl (read_length={read_length}) ...")
-    out_dir = os.path.dirname(map_bw)
-    cmd = [
-        "generateMap.pl",
-        "-b", reference,
-        "-w", str(read_length),
-        "-o", map_bw,
-    ]
-    print(" ".join(cmd))
-    result = subprocess.run(
-        cmd,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    if result.stderr:
-        print(result.stderr, file=sys.stderr, end="")
-    if result.returncode != 0:
-        sys.exit(f"generateMap.pl failed (exit code {result.returncode})")
+
+    gem_prefix = os.path.join(work_dir, "gem_index")
+    gem_index = f"{gem_prefix}.gem"
+    map_prefix = os.path.join(work_dir, f"mappability_{read_length}")
+    map_file = f"{map_prefix}.mappability"
+    wig_file = f"{map_prefix}.wig"
+    sizes_file = f"{map_prefix}.sizes"
+
+    # 1a. gem-indexer
+    if os.path.isfile(gem_index):
+        print(f"[Step 1a] [skip] GEM index already exists: {gem_index}")
+    else:
+        cmd = ["gem-indexer", "-i", reference, "-o", gem_prefix, "-T", str(threads)]
+        print(f"[Step 1a] Building GEM index: {' '.join(cmd)}")
+        subprocess.run(cmd, check=True)
+        if not os.path.isfile(gem_index):
+            sys.exit(f"gem-indexer succeeded but output missing: {gem_index}")
+        print(f"  Output: {gem_index}")
+
+    # 1b. gem-mappability
+    if os.path.isfile(map_file):
+        print(f"[Step 1b] [skip] Mappability file already exists: {map_file}")
+    else:
+        cmd = [
+            "gem-mappability",
+            "-I", gem_index,
+            "-l", str(read_length),
+            "-o", map_prefix,
+            "-T", str(threads),
+        ]
+        print(f"[Step 1b] Computing mappability: {' '.join(cmd)}")
+        subprocess.run(cmd, check=True)
+        if not os.path.isfile(map_file):
+            sys.exit(f"gem-mappability succeeded but output missing: {map_file}")
+        print(f"  Output: {map_file}")
+
+    # 1c. gem-2-wig
+    if os.path.isfile(wig_file) and os.path.isfile(sizes_file):
+        print(f"[Step 1c] [skip] WIG already exists: {wig_file}")
+    else:
+        cmd = [
+            "gem-2-wig",
+            "-I", gem_index,
+            "-i", map_file,
+            "-o", map_prefix,
+        ]
+        print(f"[Step 1c] Converting to WIG: {' '.join(cmd)}")
+        subprocess.run(cmd, check=True)
+        if not os.path.isfile(wig_file):
+            sys.exit(f"gem-2-wig succeeded but output missing: {wig_file}")
+        print(f"  Output: {wig_file}, {sizes_file}")
+
+    # 1d. wigToBigWig
+    cmd = ["wigToBigWig", wig_file, sizes_file, map_bw]
+    print(f"[Step 1d] Converting to BigWig: {' '.join(cmd)}")
+    subprocess.run(cmd, check=True)
     if not os.path.isfile(map_bw):
-        # List files generateMap.pl actually created to aid debugging
-        created = [f for f in os.listdir(out_dir) if f.startswith("mappability")]
-        sys.exit(
-            f"generateMap.pl exited successfully but output file is missing: {map_bw}\n"
-            f"Files matching 'mappability*' in {out_dir}: {created or '(none)'}\n"
-            "The output path may need a different extension or generateMap.pl "
-            "may require wigToBigWig on PATH."
-        )
+        sys.exit(f"wigToBigWig succeeded but output missing: {map_bw}")
     print(f"  Output: {map_bw}")
 
 
@@ -232,21 +259,22 @@ def main():
     parser = argparse.ArgumentParser(
         description=(
             "Build a merged repeat/segdup/low-mappability blacklist BED for hg38. "
-            "Runs hmmcopy_utils (generateMap.pl + mapCounter) to compute mappability "
-            "from a reference FASTA, downloads UCSC repeat tables, and merges "
-            "everything into a single gzipped blacklist BED."
+            "Runs GEM-mappability + mapCounter to compute mappability from a "
+            "reference FASTA, downloads UCSC repeat tables, and merges everything "
+            "into a single gzipped blacklist BED."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Dependencies:\n"
-            "  generateMap.pl, mapCounter, bowtie  (hmmcopy_utils + bowtie)\n"
-            "  bowtie-build  (only with --build_index)\n\n"
+            "  gem-indexer, gem-mappability, gem-2-wig  (GEM library)\n"
+            "  wigToBigWig  (UCSC Kent utilities)\n"
+            "  mapCounter  (hmmcopy_utils)\n\n"
             "Examples:\n"
             "  # With a local reference FASTA\n"
             "  python build_blacklist.hg38.py \\\n"
             "    --reference /path/to/hg38.fa \\\n"
             "    --out_file /path/to/blacklist.hg38.bed.gz \\\n"
-            "    --build_index --threads 8\n\n"
+            "    --threads 8\n\n"
             "  # Auto-download NCBI GRCh38 (downloaded to temp dir, removed on exit)\n"
             "  python build_blacklist.hg38.py \\\n"
             "    --download_reference \\\n"
@@ -274,19 +302,15 @@ def main():
     )
     parser.add_argument(
         "--read_length", type=int, default=150,
-        help="Read length for generateMap.pl (default: 150).",
+        help="Read length for GEM-mappability (default: 150).",
     )
     parser.add_argument(
         "--threads", type=int, default=4,
-        help="Threads for bowtie alignment (default: 4).",
+        help="Threads for GEM indexing and mappability (default: 4).",
     )
     parser.add_argument(
         "--min_map_score", type=float, default=0.9,
         help="Exclude bins with average mappability below this threshold (default: 0.9).",
-    )
-    parser.add_argument(
-        "--build_index", action="store_true",
-        help="Build a bowtie index before running generateMap.pl.",
     )
     parser.add_argument(
         "--work_dir", default=None,
@@ -298,8 +322,8 @@ def main():
     if args.reference and not os.path.isfile(args.reference):
         sys.exit(f"Error: reference file not found: {args.reference}")
 
-    # Check dependencies (download implies build_index)
-    check_dependencies(args.build_index or args.download_reference, args.download_reference)
+    # Check dependencies
+    check_dependencies(args.download_reference)
 
     # Set up work directory
     user_work_dir = args.work_dir is not None
@@ -311,7 +335,6 @@ def main():
 
     # Resolve reference
     if args.download_reference:
-        args.build_index = True  # downloaded FASTA has no pre-built index
         reference = download_reference(work_dir)
     else:
         reference = os.path.abspath(args.reference)
@@ -323,31 +346,15 @@ def main():
     print(f"  Read length:   {args.read_length}")
     print(f"  Threads:       {args.threads}")
     print(f"  Min map score: {args.min_map_score}")
-    print(f"  Build index:   {args.build_index}")
     print(f"  Work dir:      {work_dir}")
     print()
 
     beds = []
-    index_base = os.path.join(work_dir, "ref_index")
     map_bw = os.path.join(work_dir, "mappability.bw")
     binned_tsv = os.path.join(work_dir, "binned_mappability.tsv")
 
-    # Step 0 (optional): build bowtie index
-    if args.build_index:
-        run_bowtie_build(reference, index_base, args.threads)
-    else:
-        if not (
-            os.path.isfile(f"{index_base}.1.ebwt")
-            or os.path.isfile(f"{index_base}.1.ebwtl")
-        ):
-            print(
-                f"Warning: no bowtie index found at {index_base}.*\n"
-                "  Use --build_index to create one, or ensure generateMap.pl\n"
-                "  can locate the index via its own defaults."
-            )
-
-    # Step 1: generateMap.pl → per-base BigWig
-    run_generate_map(reference, index_base, map_bw, args.read_length)
+    # Step 1: GEM-mappability → per-base BigWig
+    run_gem_mappability(reference, work_dir, map_bw, args.read_length, args.threads)
 
     # Step 2: mapCounter → binned DataFrame (cached to TSV)
     if os.path.isfile(binned_tsv):

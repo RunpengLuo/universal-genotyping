@@ -86,12 +86,39 @@ for i, rep_id in enumerate(rep_ids):
         max_ylim=rd_ylim
     )
 
+##################################################
+# Compute GC content (needed for both loess pre-correction and post-RDR methods)
+corr_factors = compute_gc_content(bbs, reference, mappability_file, genome_size)
+corr_factors.to_csv(sm.output["corr_factors"], sep="\t", header=True, index=False)
+
+##################################################
+# Loess: correct raw depth for GC bias BEFORE computing RDR
+if gc_correct and correction_method == "loess":
+    logging.info("loess GC correction on raw depth (pre-RDR)")
+    gc_vals = corr_factors["GC"].to_numpy()
+    mapp_vals = corr_factors["MAP"].to_numpy() if mappability_file is not None else None
+
+    dp_mtx_bb_raw = dp_mtx_bb.copy()  # keep raw for diagnostics
+    dp_mtx_bb = gc_correct_depth_loess(
+        dp_mtx_bb, gc_vals, mappability=mapp_vals,
+    )
+
+    # diagnostic plots: depth vs GC before/after for each sample
+    from matplotlib.backends.backend_pdf import PdfPages
+    pdf = PdfPages(os.path.join(qc_dir, "loess_depth_correction.pdf"))
+    for i, rep_id in enumerate(rep_ids):
+        plot_depth_gc_correction(
+            gc_vals, dp_mtx_bb_raw[:, i], dp_mtx_bb[:, i], rep_id, pdf,
+        )
+    pdf.close()
+
+##################################################
 if has_normal:
     bases_mtx_bb = dp_mtx_bb * bbs["BLOCKSIZE"].to_numpy()[:, None]
     total_bases = np.sum(bases_mtx_bb, axis=0)
     library_correction = total_bases[0] / total_bases[1:]
     logging.info(f"RDR library normalization factor: {library_correction}")
-    
+
     # view
     normal_dp = dp_mtx_bb[:, 0]
 
@@ -128,9 +155,8 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
     )
 
 ##################################################
-corr_factors = compute_gc_content(bbs, reference, mappability_file, genome_size)
-corr_factors.to_csv(sm.output["corr_factors"], sep="\t", header=True, index=False)
-if gc_correct:
+# Post-RDR GC correction (quantile / spline methods — skip if loess already applied)
+if gc_correct and correction_method != "loess":
     has_mapp = mappability_file is not None
     rt_df = None
     if rt_file is not None:
@@ -147,6 +173,8 @@ if gc_correct:
             rdr_mtx_bb, corr_factors, rep_ids[tumor_sidx:],
             has_mapp=has_mapp, rt_df=rt_df, out_dir=qc_dir,
         )
+
+if gc_correct:
     plot_file = os.path.join(qc_dir, f"gc_content_bb.pdf")
     plot_1d_sample(
         corr_factors,

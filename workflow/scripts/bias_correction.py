@@ -407,6 +407,144 @@ def select_best_rt_cellline(
     return best_name, best_corr
 
 
+def gc_correct_depth_loess(
+    dp_mat: np.ndarray,
+    gc: np.ndarray,
+    samplesize: int = 50000,
+    routlier: float = 0.01,
+    doutlier: float = 0.001,
+    mappability: np.ndarray = None,
+    min_mappability: float = 0.9,
+) -> np.ndarray:
+    """Correct raw read depth for GC bias using two-stage loess (Benjamini & Speed 2012).
+
+    Applies per-sample GC correction on raw depth *before* computing RDR.
+    The two-stage approach follows HMMcopy: a tight loess on ideal bins,
+    then a smoothing pass on a fine GC grid.
+
+    Parameters
+    ----------
+    dp_mat : np.ndarray
+        Raw depth matrix (bins x samples).
+    gc : np.ndarray
+        Per-bin GC fraction in [0, 1].
+    samplesize : int
+        Maximum number of ideal bins to use for loess fitting.
+    routlier : float
+        Upper quantile for read count outlier removal (e.g. 0.01 = top 1%).
+    doutlier : float
+        Quantile for GC domain outlier removal (top/bottom, e.g. 0.001 = 0.1%).
+    mappability : np.ndarray or None
+        Per-bin mappability values. If provided, only bins with
+        mappability >= *min_mappability* are used for fitting.
+    min_mappability : float
+        Minimum mappability threshold for ideal bins.
+
+    Returns
+    -------
+    np.ndarray
+        GC-corrected depth matrix (same shape as *dp_mat*).
+    """
+    n_bins, n_samples = dp_mat.shape
+    corrected = np.copy(dp_mat).astype(np.float64)
+
+    gc_lo = np.nanquantile(gc, doutlier)
+    gc_hi = np.nanquantile(gc, 1.0 - doutlier)
+
+    for si in range(n_samples):
+        reads = dp_mat[:, si].astype(np.float64)
+
+        # Step 1: valid bins (positive reads, valid GC)
+        valid = (reads > 0) & np.isfinite(gc) & (gc >= 0)
+
+        # Step 2: ideal bins for fitting
+        read_hi = np.nanquantile(reads[valid], 1.0 - routlier)
+        ideal = valid & (reads <= read_hi) & (gc >= gc_lo) & (gc <= gc_hi)
+        if mappability is not None:
+            ideal &= (mappability >= min_mappability)
+
+        ideal_idx = np.where(ideal)[0]
+        logging.info(
+            f"sample {si}: {ideal_idx.size} ideal bins out of {int(valid.sum())} valid"
+        )
+
+        # Step 3: subsample
+        if ideal_idx.size > samplesize:
+            rng = np.random.default_rng(42 + si)
+            ideal_idx = rng.choice(ideal_idx, size=samplesize, replace=False)
+
+        gc_ideal = gc[ideal_idx]
+        reads_ideal = reads[ideal_idx]
+
+        # Step 4a: stage 1 — tight loess on ideal bins
+        stage1 = lowess(reads_ideal, gc_ideal, frac=0.03, return_sorted=True)
+        # stage1 is (N, 2) sorted by gc; columns are (gc, fitted)
+
+        # Step 4b: stage 2 — evaluate stage-1 on fine grid, then smooth
+        grid = np.linspace(0, 1, 1001)
+        stage1_interp = interp1d(
+            stage1[:, 0], stage1[:, 1],
+            kind="linear", bounds_error=False, fill_value="extrapolate",
+        )
+        grid_pred = stage1_interp(grid)
+        stage2 = lowess(grid_pred, grid, frac=0.3, return_sorted=True)
+        final_interp = interp1d(
+            stage2[:, 0], stage2[:, 1],
+            kind="linear", bounds_error=False, fill_value="extrapolate",
+        )
+
+        # Step 5: correct all bins
+        predicted = final_interp(gc)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            corr = np.where(
+                (predicted > 0) & (reads > 0),
+                reads / predicted,
+                0.0,
+            )
+        # Rescale so corrected median matches original median (for valid bins)
+        valid_corr = (predicted > 0) & (reads > 0)
+        if valid_corr.any():
+            scale = np.median(reads[valid_corr]) / np.median(corr[valid_corr])
+            corr[valid_corr] *= scale
+
+        corrected[:, si] = corr
+
+    return corrected.astype(np.float32)
+
+
+def plot_depth_gc_correction(
+    gc, dp_before, dp_after, rep_id, pdf,
+):
+    """One-page diagnostic: depth vs GC before and after loess correction."""
+    mad = lambda x: np.median(np.abs(x - np.median(x)))
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    valid = (dp_before > 0) & np.isfinite(gc)
+    mad_before = mad(dp_before[valid])
+    r_before, _ = pearsonr(gc[valid], dp_before[valid])
+    axes[0].scatter(gc[valid], dp_before[valid], s=2, alpha=0.2, rasterized=True)
+    axes[0].set_xlabel("GC")
+    axes[0].set_ylabel("Read depth")
+    axes[0].set_title(f"Before GC correction\nMAD={mad_before:.4f}  r(GC,depth)={r_before:.4f}")
+
+    valid2 = (dp_after > 0) & np.isfinite(gc)
+    mad_after = mad(dp_after[valid2])
+    r_after, _ = pearsonr(gc[valid2], dp_after[valid2])
+    axes[1].scatter(gc[valid2], dp_after[valid2], s=2, alpha=0.2, rasterized=True)
+    axes[1].set_xlabel("GC")
+    axes[1].set_ylabel("Read depth")
+    axes[1].set_title(f"After GC correction\nMAD={mad_after:.4f}  r(GC,depth)={r_after:.4f}")
+
+    fig.suptitle(f"{rep_id} — loess depth correction", fontsize=14)
+    plt.tight_layout()
+    pdf.savefig(fig, dpi=150)
+    plt.close(fig)
+    logging.info(
+        f"{rep_id}: MAD {mad_before:.4f} -> {mad_after:.4f}, "
+        f"r(GC,depth) {r_before:.4f} -> {r_after:.4f}"
+    )
+
+
 def bias_correction_rdr_spline(
     raw_rdr_mat: np.ndarray,
     gc_df: pd.DataFrame,
