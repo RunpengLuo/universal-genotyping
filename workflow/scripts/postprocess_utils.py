@@ -18,6 +18,67 @@ from io_utils import *
 
 
 ##################################################
+# Overlap helpers (shared by compute_rdr_bulk_bin and compute_rdr_bulk_window)
+##################################################
+
+
+def compute_overlap_weights(win_s, win_e, bb_starts, bb_ends):
+    """Find all (window, bin) overlaps and return bp-length weights.
+
+    Returns
+    -------
+    ov_win : np.ndarray[intp]   window-local indices
+    ov_bin : np.ndarray[intp]   bin-local indices
+    ov_wt  : np.ndarray[float64] overlap length in bp
+    """
+    n_bb = len(bb_starts)
+    first_bin = np.searchsorted(bb_ends, win_s, side="right")
+    last_bin = np.searchsorted(bb_starts, win_e, side="left") - 1
+
+    ov_win_list, ov_bin_list, ov_wt_list = [], [], []
+    for wi in range(len(win_s)):
+        fb, lb = int(first_bin[wi]), int(last_bin[wi])
+        if fb > lb or fb >= n_bb or lb < 0:
+            continue
+        fb = max(fb, 0)
+        lb = min(lb, n_bb - 1)
+        ws, we = int(win_s[wi]), int(win_e[wi])
+        if we <= ws:
+            continue
+        for bi in range(fb, lb + 1):
+            ov_start = max(ws, int(bb_starts[bi]))
+            ov_end = min(we, int(bb_ends[bi]))
+            ov_len = ov_end - ov_start
+            if ov_len > 0:
+                ov_win_list.append(wi)
+                ov_bin_list.append(bi)
+                ov_wt_list.append(ov_len)
+
+    if not ov_win_list:
+        return (
+            np.array([], dtype=np.intp),
+            np.array([], dtype=np.intp),
+            np.array([], dtype=np.float64),
+        )
+    return (
+        np.array(ov_win_list, dtype=np.intp),
+        np.array(ov_bin_list, dtype=np.intp),
+        np.array(ov_wt_list, dtype=np.float64),
+    )
+
+
+def weighted_bincount_mean(values, bin_idx, weights, n_bins):
+    """Weighted mean per bin via bincount.  NaN-aware: ignores NaN values."""
+    finite = np.isfinite(values)
+    bi = bin_idx[finite]
+    wt = weights[finite]
+    v = values[finite]
+    sums = np.bincount(bi, weights=v * wt, minlength=n_bins)
+    wt_sums = np.bincount(bi, weights=wt, minlength=n_bins)
+    return np.where(wt_sums > 0, sums / wt_sums, np.nan)
+
+
+##################################################
 def canon_mat_one_replicate(
     parent_keys: pd.Index,
     vcf_file: str,

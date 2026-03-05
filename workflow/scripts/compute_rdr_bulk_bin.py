@@ -12,8 +12,17 @@ import numpy as np
 import pandas as pd
 
 from utils import *
-from bias_correction import *
-from postprocess_utils import plot_1d_sample
+from bias_correction import (
+    gc_correct_depth_loess,
+    plot_depth_gc_correction,
+    bias_correction_rdr_quantreg,
+    bias_correction_rdr_spline,
+)
+from postprocess_utils import (
+    plot_1d_sample,
+    compute_overlap_weights,
+    weighted_bincount_mean,
+)
 
 ##################################################
 logging.basicConfig(
@@ -25,10 +34,8 @@ logging.basicConfig(
 # input
 sample_file = sm.input["sample_file"]
 bb_file = sm.input["bb_file"]
-reference = sm.input["reference"]
+bias_bed_file = sm.input["bias_bed"]
 genome_size = sm.input["genome_size"]
-mappability_file = maybe_path(sm.input["mappability_file"])
-rt_file = maybe_path(sm.input["rt_file"])
 region_bed_file = maybe_path(sm.input["region_bed"])
 
 baf_mtx_bb = np.load(sm.input["baf_mtx_bb"])["mat"]
@@ -37,10 +44,17 @@ sample_name = sm.params["sample_name"]
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 mosdepth_dir = sm.params["mosdepth_dir"]
-gc_correct = bool(sm.params["gc_correct"])
 correction_method = str(sm.params["correction_method"])
+chromosomes = sm.params["chromosomes"]
 
 logging.info("run compute_rdr_bulk")
+
+##################################################
+logging.info("load bias BED")
+bias_bed_full = pd.read_table(bias_bed_file, sep="\t")
+assert "#CHR" in bias_bed_full.columns and "GC" in bias_bed_full.columns, (
+    f"bias_bed must have #CHR, START, END, GC columns; got {bias_bed_full.columns.tolist()}"
+)
 
 ##################################################
 logging.info("concat mosdepth per-sample depth data")
@@ -66,10 +80,72 @@ dp_mtx_bb = bbs[rep_ids].to_numpy(dtype=np.float32)
 np.savez_compressed(sm.output["dp_mtx_bb"], mat=dp_mtx_bb)
 
 ##################################################
+# Aggregate bias_bed windows into adaptive bins via overlap weighting
+logging.info("aggregate bias_bed windows into adaptive bins")
+target_chroms = {f"chr{c}" for c in chromosomes}
+bias_bed_full = bias_bed_full[bias_bed_full["#CHR"].isin(target_chroms)].reset_index(drop=True)
+
+bias_cols = ["GC"]
+if "MAP" in bias_bed_full.columns:
+    bias_cols.append("MAP")
+if "REPLI" in bias_bed_full.columns:
+    bias_cols.append("REPLI")
+
+bias_arrays = {col: bias_bed_full[col].to_numpy(dtype=np.float64) for col in bias_cols}
+bb_bias = {col: np.full(nbb, np.nan, dtype=np.float64) for col in bias_cols}
+
+win_chr = bias_bed_full["#CHR"].to_numpy()
+win_start = bias_bed_full["START"].to_numpy(dtype=np.int64)
+win_end = bias_bed_full["END"].to_numpy(dtype=np.int64)
+
+for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
+    win_mask = win_chr == chrom
+    win_idx_chr = np.where(win_mask)[0]
+    if len(win_idx_chr) == 0:
+        continue
+
+    bb_starts = bb_grp["START"].to_numpy(dtype=np.int64)
+    bb_ends = bb_grp["END"].to_numpy(dtype=np.int64)
+    bb_global_idx = bb_grp.index.to_numpy()
+    n_bb_chr = len(bb_grp)
+
+    ov_win, ov_bin, ov_wt = compute_overlap_weights(
+        win_start[win_idx_chr],
+        win_end[win_idx_chr],
+        bb_starts,
+        bb_ends,
+    )
+    if len(ov_win) == 0:
+        logging.info(f"  {chrom}: {n_bb_chr} bins, 0 windows assigned")
+        continue
+
+    for col in bias_cols:
+        vals = bias_arrays[col][win_idx_chr][ov_win]
+        bb_bias[col][bb_global_idx] = weighted_bincount_mean(
+            vals, ov_bin, ov_wt, n_bb_chr
+        )
+
+    logging.info(f"  {chrom}: {n_bb_chr} bins, {len(np.unique(ov_win))} windows assigned")
+
+corr_factors = bbs[["#CHR", "START", "END"]].copy()
+for col in bias_cols:
+    corr_factors[col] = bb_bias[col]
+corr_factors.to_csv(sm.output["corr_factors"], sep="\t", header=True, index=False)
+logging.info(f"wrote corr_factors: {bias_cols}, {nbb} rows")
+
+##################################################
 has_normal = "normal" in sample_types
-logging.info(f"compute RDRs, has_normal={has_normal}, gc_correct={gc_correct}")
+logging.info(f"compute RDRs, has_normal={has_normal}")
 assert has_normal, "no normal sample, TODO"
 tumor_sidx = {False: 0, True: 1}[has_normal]
+
+gc_vals = corr_factors["GC"].to_numpy()
+mapp_vals = corr_factors["MAP"].to_numpy() if "MAP" in corr_factors.columns else None
+repli_vals = (
+    corr_factors["REPLI"].to_numpy(dtype=np.float64)
+    if "REPLI" in corr_factors.columns
+    else None
+)
 
 # plot per-sample read-depth
 rd_quantile = [0.01, 0.99]
@@ -90,16 +166,9 @@ for i, rep_id in enumerate(rep_ids):
     )
 
 ##################################################
-# Compute GC content (needed for both loess pre-correction and post-RDR methods)
-corr_factors = compute_gc_content(bbs, reference, mappability_file, genome_size)
-corr_factors.to_csv(sm.output["corr_factors"], sep="\t", header=True, index=False)
-
-##################################################
 # Loess: correct raw depth for GC bias BEFORE computing RDR
-if gc_correct and correction_method == "loess":
+if correction_method == "loess":
     logging.info("loess GC correction on raw depth (pre-RDR)")
-    gc_vals = corr_factors["GC"].to_numpy()
-    mapp_vals = corr_factors["MAP"].to_numpy() if mappability_file is not None else None
 
     dp_mtx_bb_raw = dp_mtx_bb.copy()  # keep raw for diagnostics
     dp_mtx_bb = gc_correct_depth_loess(
@@ -172,14 +241,8 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
 
 ##################################################
 # Post-RDR GC correction (quantile / spline methods — skip if loess already applied)
-if gc_correct and correction_method != "loess":
-    has_mapp = mappability_file is not None
-    rt_df = None
-    if rt_file is not None:
-        rt_df = load_rt_for_bins(bbs, rt_file)
-        logging.info(
-            f"loaded RT for {rt_df.shape[1] - 3} cell lines, {rt_df.shape[0]} bins"
-        )
+if correction_method != "loess":
+    has_mapp = mapp_vals is not None
 
     if correction_method == "spline":
         rdr_mtx_bb = bias_correction_rdr_spline(
@@ -187,7 +250,7 @@ if gc_correct and correction_method != "loess":
             corr_factors,
             rep_ids[tumor_sidx:],
             has_mapp=has_mapp,
-            rt_df=rt_df,
+            rt_vals=repli_vals,
             out_dir=qc_dir,
         )
     else:  # "quantile" — current default
@@ -196,22 +259,21 @@ if gc_correct and correction_method != "loess":
             corr_factors,
             rep_ids[tumor_sidx:],
             has_mapp=has_mapp,
-            rt_df=rt_df,
+            rt_vals=repli_vals,
             out_dir=qc_dir,
         )
 
-if gc_correct:
-    plot_file = os.path.join(qc_dir, f"gc_content_bb.pdf")
-    plot_1d_sample(
-        corr_factors,
-        corr_factors["GC"].to_numpy(),
-        genome_size,
-        plot_file,
-        unit="bb",
-        val_type="GC",
-        smooth=True,
-        region_bed=region_bed_file,
-    )
+plot_file = os.path.join(qc_dir, f"gc_content_bb.pdf")
+plot_1d_sample(
+    corr_factors,
+    corr_factors["GC"].to_numpy(),
+    genome_size,
+    plot_file,
+    unit="bb",
+    val_type="GC",
+    smooth=True,
+    region_bed=region_bed_file,
+)
 
 # plot per-sample RDRs (after corrections)
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):

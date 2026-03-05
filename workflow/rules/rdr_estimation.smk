@@ -17,6 +17,11 @@ if workflow_mode == "bulk_genotyping":
 
     if _rdr_method == "bin":
 
+        _rdr_cfg_bin = config["params_compute_rdr"]
+        assert _rdr_cfg_bin.get("bias_bed") is not None, (
+            "rdr_method='bin' requires params_compute_rdr.bias_bed to be set"
+        )
+
         rule run_mosdepth_bulk:
             input:
                 bam=lambda wc: get_data[(wc.assay_type, wc.rep_id)][1],
@@ -62,18 +67,8 @@ if workflow_mode == "bulk_genotyping":
                     otherwise=[],
                 ),
                 baf_mtx_bb=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/raw/bb.raw.baf.npz",
-                reference=config["reference"],
+                bias_bed=_rdr_cfg_bin["bias_bed"],
                 genome_size=config["genome_size"],
-                mappability_file=branch(
-                    config["params_compute_rdr"].get("mappability_file") is None,
-                    then=[],
-                    otherwise=config["params_compute_rdr"]["mappability_file"],
-                ),
-                rt_file=branch(
-                    config["params_compute_rdr"].get("rt_file") is None,
-                    then=[],
-                    otherwise=config["params_compute_rdr"]["rt_file"],
-                ),
                 region_bed=branch(
                     config.get("region_bed") is None,
                     then=[],
@@ -90,8 +85,8 @@ if workflow_mode == "bulk_genotyping":
                 sample_name=SAMPLE_ID,
                 mosdepth_dir=lambda wc: config["bb_dir"]
                 + f"/{wc.assay_type}/out_mosdepth",
-                gc_correct=config["params_compute_rdr"]["gc_correct"],
-                correction_method=config["params_compute_rdr"].get("correction_method", "quantile"),
+                correction_method=_rdr_cfg_bin.get("correction_method", "quantile"),
+                chromosomes=config["chromosomes"],
             log:
                 config["log_dir"] + "/compute_rdr_bulk.{assay_type}.log",
             script:
