@@ -31,15 +31,6 @@ def _select_rt_for_sample(raw_rdrs, rt_df, autosomes_mask):
     return rt_df[name].to_numpy(), name
 
 
-def _log_histogram(label, values):
-    """Log a compact histogram of *values*."""
-    logging.info(f"hist: {label}")
-    counts, edges = np.histogram(values)
-    logging.info("bin_left\tbin_right\tcount")
-    for l, r, c in zip(edges[:-1], edges[1:], counts):
-        logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
-
-
 def compute_gc_content(
     bin_info: pd.DataFrame, ref_file: str, mapp_file=None, genome_size=None
 ):
@@ -96,21 +87,22 @@ def compute_gc_content(
     return gc_df
 
 
-def bias_correction_rdr(
+def bias_correction_rdr_quantreg(
     raw_rdr_mat: np.ndarray,
     gc_df: pd.DataFrame,
     rep_ids: list,
     has_mapp=False,
     rt_df=None,
     out_dir=None,
-    eps_quantile=0.01,
     gc_quantile=[0.05, 0.95],
+    eps=1e-8,
 ):
-    """Correct read-depth ratios (RDR) for GC-content (and optionally mappability) bias.
+    """Correct RDR for GC (+ mappability, + RT) bias via median quantile regression in log2 space.
 
-    Fits a median quantile regression of RDR on GC (quadratic) per tumor sample,
-    divides raw RDR by the fitted expected RDR, and normalizes by the mean
-    corrected RDR. Saves diagnostic scatter and hexbin plots.
+    Fits a quadratic median quantile regression of log2(RDR) on GC per sample,
+    with optional mappability and replication-timing covariates. Corrected RDR
+    is computed from residuals shifted to the sample mean, then exponentiated
+    and mean-normalized to 1.
 
     Parameters
     ----------
@@ -122,12 +114,14 @@ def bias_correction_rdr(
         Replicate identifiers (tumor samples only).
     has_mapp : bool
         If True, include mappability as a covariate.
+    rt_df : pd.DataFrame or None
+        RT DataFrame from ``load_rt_for_bins``, or None to skip RT.
     out_dir : str or None
         Directory for diagnostic plots.
-    eps_quantile : float
-        Lower quantile of expected RDR used as floor to avoid division by zero.
     gc_quantile : list[float]
         Lower and upper GC quantiles defining the fitting range.
+    eps : float
+        Small constant added before log2 to avoid log(0).
 
     Returns
     -------
@@ -145,19 +139,21 @@ def bias_correction_rdr(
 
     pdf = PdfPages(os.path.join(out_dir, "correction_diagnostics.pdf")) if out_dir else None
 
-    gccorr_rdr_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
+    corrected_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
     for si, rep_id in enumerate(rep_ids):
         raw_rdrs = raw_rdr_mat[:, si]
+        log_rdr = np.log2(raw_rdrs + eps)
         rt_vals, best_rt_name = _select_rt_for_sample(raw_rdrs, rt_df, autosomes_mask)
 
         # Build formula, fit_df, pred_df dynamically
         sample_fit_mask = fit_mask.copy()
+        sample_fit_mask &= np.isfinite(log_rdr)
         if rt_vals is not None:
             sample_fit_mask &= np.isfinite(rt_vals)
 
-        fit_df = pd.DataFrame({"RD": raw_rdrs[sample_fit_mask], "GC": gc[sample_fit_mask]})
+        fit_df = pd.DataFrame({"log_RD": log_rdr[sample_fit_mask], "GC": gc[sample_fit_mask]})
         pred_df = pd.DataFrame({"GC": gc})
-        formula = "RD ~ GC + I(GC**2)"
+        formula = "log_RD ~ GC + I(GC**2)"
         if has_mapp:
             fit_df["MAP"] = mapv[sample_fit_mask]
             pred_df["MAP"] = mapv
@@ -169,31 +165,35 @@ def bias_correction_rdr(
 
         res = smf.quantreg(formula, data=fit_df).fit(q=0.5)
         logging.info(res.summary())
-        exp_rdrs = res.predict(pred_df).to_numpy()
+        predicted = res.predict(pred_df).to_numpy()
 
-        eps = np.nanquantile(exp_rdrs, eps_quantile)
-        logging.info(f"inferred epsilon for exp RDR={eps}")
-        den = np.clip(np.nan_to_num(exp_rdrs, nan=eps), eps, None)
-        corr_rdrs = raw_rdrs / den
+        residuals = log_rdr - predicted
+        mean_log_rdr_fit = np.mean(log_rdr[sample_fit_mask])
+        corrected_log_rdr = residuals + mean_log_rdr_fit
+        corr_rdrs = np.exp2(corrected_log_rdr)
 
-        corr_factor = np.mean(corr_rdrs)
-        logging.info(f"GC correction factor={corr_factor}")
+        nan_mask = ~np.isfinite(log_rdr)
+        if rt_vals is not None:
+            nan_mask |= ~np.isfinite(rt_vals)
+        if nan_mask.any():
+            med_corr = np.nanmedian(corr_rdrs[~nan_mask])
+            corr_rdrs[nan_mask] = med_corr
+            logging.info(
+                f"{rep_id}: imputed {nan_mask.sum()} NaN bins with median={med_corr:.4f}"
+            )
 
-        _log_histogram("raw RDR", raw_rdrs)
-        _log_histogram("expected RDR corr_fit", exp_rdrs)
-        _log_histogram("corr_rdrs", corr_rdrs)
-
-        gccorr_rdr_mat[:, si] = corr_rdrs / corr_factor
+        exp_rdrs = np.exp2(predicted)
+        corrected_mat[:, si] = corr_rdrs / np.mean(corr_rdrs)
         if pdf is not None:
             plot_correction_diagnostics(
-                gc, raw_rdrs, gccorr_rdr_mat[:, si],
+                gc, raw_rdrs, corrected_mat[:, si],
                 fitted_rdr=exp_rdrs, rep_id=rep_id, pdf=pdf,
                 rt_vals=rt_vals, rt_name=best_rt_name,
             )
 
     if pdf is not None:
         pdf.close()
-    return gccorr_rdr_mat
+    return corrected_mat
 
 
 def plot_correction_diagnostics(
@@ -425,12 +425,14 @@ def bias_correction_rdr_spline(
     rt_df=None,
     out_dir=None,
     gc_quantile=(0.05, 0.95),
+    eps=1e-8,
 ):
-    """ASCAT-style spline RDR correction using natural splines on GC (+MAP, +RT).
+    """Correct RDR for GC (+ mappability, + RT) bias via natural cubic splines in log2 space.
 
-    Works in log-space: fits OLS on natural cubic spline basis (df=5) of GC and
-    optionally mappability and replication timing. Corrected RDR is computed as
-    residuals shifted to the mean log-RDR, then exponentiated.
+    Fits OLS on a natural spline basis (df=5) of GC per sample, with optional
+    mappability and replication-timing covariates. Corrected RDR is computed
+    from residuals shifted to the sample mean, then exponentiated and
+    mean-normalized to 1.
 
     Parameters
     ----------
@@ -448,6 +450,8 @@ def bias_correction_rdr_spline(
         Directory for diagnostic plots.
     gc_quantile : tuple[float, float]
         Lower and upper GC quantiles defining the fitting range.
+    eps : float
+        Small constant added before log2 to avoid log(0).
 
     Returns
     -------
@@ -468,7 +472,7 @@ def bias_correction_rdr_spline(
     corrected_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
     for si, rep_id in enumerate(rep_ids):
         raw_rdrs = raw_rdr_mat[:, si]
-        log_rdr = np.log2(raw_rdrs + 1e-8)
+        log_rdr = np.log2(raw_rdrs + eps)
         rt_vals, best_rt_name = _select_rt_for_sample(raw_rdrs, rt_df, autosomes_mask)
 
         cov_df = pd.DataFrame({"log_rdr": log_rdr, "GC": gc})
@@ -526,9 +530,7 @@ def bias_correction_rdr_spline(
                 f"{rep_id}: imputed {nan_mask.sum()} NaN bins with median={med_corr:.4f}"
             )
 
-        corr_factor = np.mean(corrected_rdr)
-        logging.info(f"{rep_id}: spline correction factor={corr_factor:.4f}")
-        corrected_mat[:, si] = corrected_rdr / corr_factor
+        corrected_mat[:, si] = corrected_rdr / np.mean(corrected_rdr)
 
         if pdf is not None:
             fitted_rdr = np.exp2(predicted)
