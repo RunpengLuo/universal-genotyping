@@ -143,7 +143,7 @@ if gc_correct:
             has_mapp=has_mapp, rt_df=rt_df, out_dir=qc_dir,
         )
     else:  # "quantile" — current default
-        rdr_mtx_bb = bias_correction_rdr(
+        rdr_mtx_bb = bias_correction_rdr_quantreg(
             rdr_mtx_bb, corr_factors, rep_ids[tumor_sidx:],
             has_mapp=has_mapp, rt_df=rt_df, out_dir=qc_dir,
         )
