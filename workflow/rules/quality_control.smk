@@ -19,6 +19,7 @@ if workflow_mode == "bulk_genotyping":
             baf_mtx_bb=config["bb_dir"] + "/{assay_type}/raw/bb.raw.baf.npz",
             corr_factors=config["bb_dir"] + "/{assay_type}/raw/bb.raw.corr_factors.tsv.gz",
             sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
+            region_bed=config["region_bed"],
         output:
             bb_file=config["bb_dir"] + "/{assay_type}/bb.tsv.gz",
             rdr_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.rdr.npz",
@@ -83,10 +84,46 @@ if workflow_mode == "bulk_genotyping":
 
             logging.info(f"kept {mask.sum()}/{n} bins after all filters")
 
-            bb[mask].to_csv(output.bb_file, sep="\t", index=False, compression="gzip")
+            bb_out = bb[mask].copy().reset_index(drop=True)
+
+            # reassign bin boundaries to fill regions (avoid gaps from removed bins)
+            from scripts.io_utils import read_region_file
+
+            regions = read_region_file(input.region_bed)
+            bin_pos = (bb_out["START0"].to_numpy(dtype=np.float64)
+                       + bb_out["END0"].to_numpy(dtype=np.float64)) / 2
+
+            region_grps = regions.groupby("#CHR", sort=False)
+            for chrom in bb_out["#CHR"].unique():
+                if chrom not in region_grps.groups:
+                    continue
+                chrom_idx = np.where(bb_out["#CHR"].to_numpy() == chrom)[0]
+
+                for _, reg in region_grps.get_group(chrom).iterrows():
+                    rs, re = int(reg["START"]), int(reg["END"])
+                    in_reg = chrom_idx[
+                        (bin_pos[chrom_idx] >= rs) & (bin_pos[chrom_idx] < re)
+                    ]
+                    if len(in_reg) == 0:
+                        continue
+                    if len(in_reg) == 1:
+                        bb_out.loc[in_reg[0], "START"] = rs
+                        bb_out.loc[in_reg[0], "END"] = re
+                    else:
+                        pos = bin_pos[in_reg]
+                        mids = np.ceil((pos[:-1] + pos[1:]) / 2).astype(np.int64)
+                        bounds = np.concatenate([[rs], mids, [re]])
+                        bb_out.loc[in_reg, "START"] = bounds[:-1]
+                        bb_out.loc[in_reg, "END"] = bounds[1:]
+
+            bb_out["BLOCKSIZE"] = bb_out["END"] - bb_out["START"]
+            logging.info(f"reassigned bin boundaries to fill {len(regions)} regions")
+
+            bb_out.to_csv(output.bb_file, sep="\t", index=False, compression="gzip")
             np.savez_compressed(output.rdr_mtx_bb, mat=rdr[mask])
             np.savez_compressed(output.dp_mtx_bb, mat=dp[mask])
             np.savez_compressed(output.tot_mtx_bb, mat=tot[mask])
             np.savez_compressed(output.a_mtx_bb, mat=a_mat[mask])
             np.savez_compressed(output.b_mtx_bb, mat=b_mat[mask])
             np.savez_compressed(output.baf_mtx_bb, mat=baf[mask])
+            logging.info("done")
