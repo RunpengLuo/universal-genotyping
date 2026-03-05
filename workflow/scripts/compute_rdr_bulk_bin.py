@@ -29,6 +29,7 @@ reference = sm.input["reference"]
 genome_size = sm.input["genome_size"]
 mappability_file = maybe_path(sm.input["mappability_file"])
 rt_file = maybe_path(sm.input["rt_file"])
+region_bed_file = maybe_path(sm.input["region_bed"])
 
 baf_mtx_bb = np.load(sm.input["baf_mtx_bb"])["mat"]
 
@@ -85,6 +86,7 @@ for i, rep_id in enumerate(rep_ids):
         val_type="RD",
         max_ylim=rd_ylim,
         smooth=True,
+        region_bed=region_bed_file,
     )
 
 ##################################################
@@ -101,15 +103,22 @@ if gc_correct and correction_method == "loess":
 
     dp_mtx_bb_raw = dp_mtx_bb.copy()  # keep raw for diagnostics
     dp_mtx_bb = gc_correct_depth_loess(
-        dp_mtx_bb, gc_vals, mappability=mapp_vals,
+        dp_mtx_bb,
+        gc_vals,
+        mappability=mapp_vals,
     )
 
     # diagnostic plots: depth vs GC before/after for each sample
     from matplotlib.backends.backend_pdf import PdfPages
+
     pdf = PdfPages(os.path.join(qc_dir, "loess_depth_correction.pdf"))
     for i, rep_id in enumerate(rep_ids):
         plot_depth_gc_correction(
-            gc_vals, dp_mtx_bb_raw[:, i], dp_mtx_bb[:, i], rep_id, pdf,
+            gc_vals,
+            dp_mtx_bb_raw[:, i],
+            dp_mtx_bb[:, i],
+            rep_id,
+            pdf,
         )
     pdf.close()
 
@@ -127,11 +136,15 @@ if has_normal:
     num_valid = int(mask.sum())
 
     if num_valid < nbb:
-        logging.warning(f"#invalid normal sample bins due to infinite/zero depth={nbb - num_valid}/{nbb}")
+        logging.warning(
+            f"#invalid normal sample bins due to infinite/zero depth={nbb - num_valid}/{nbb}"
+        )
         if num_valid == 0:
             raise ValueError("All normal bins invalid; cannot impute.")
         fill = float(np.nanmedian(normal_dp[mask]))
-        logging.warning(f"impute normal depth via global nanmedian over valid normal bins: {fill}")
+        logging.warning(
+            f"impute normal depth via global nanmedian over valid normal bins: {fill}"
+        )
         normal_dp[~mask] = fill
 
     rdr_mtx_bb = dp_mtx_bb[:, 1:] / dp_mtx_bb[:, 0][:, None]
@@ -154,6 +167,7 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
         val_type="RDR",
         max_ylim=rdr_ylim,
         smooth=True,
+        region_bed=region_bed_file,
     )
 
 ##################################################
@@ -163,17 +177,27 @@ if gc_correct and correction_method != "loess":
     rt_df = None
     if rt_file is not None:
         rt_df = load_rt_for_bins(bbs, rt_file)
-        logging.info(f"loaded RT for {rt_df.shape[1] - 3} cell lines, {rt_df.shape[0]} bins")
+        logging.info(
+            f"loaded RT for {rt_df.shape[1] - 3} cell lines, {rt_df.shape[0]} bins"
+        )
 
     if correction_method == "spline":
         rdr_mtx_bb = bias_correction_rdr_spline(
-            rdr_mtx_bb, corr_factors, rep_ids[tumor_sidx:],
-            has_mapp=has_mapp, rt_df=rt_df, out_dir=qc_dir,
+            rdr_mtx_bb,
+            corr_factors,
+            rep_ids[tumor_sidx:],
+            has_mapp=has_mapp,
+            rt_df=rt_df,
+            out_dir=qc_dir,
         )
     else:  # "quantile" — current default
         rdr_mtx_bb = bias_correction_rdr_quantreg(
-            rdr_mtx_bb, corr_factors, rep_ids[tumor_sidx:],
-            has_mapp=has_mapp, rt_df=rt_df, out_dir=qc_dir,
+            rdr_mtx_bb,
+            corr_factors,
+            rep_ids[tumor_sidx:],
+            has_mapp=has_mapp,
+            rt_df=rt_df,
+            out_dir=qc_dir,
         )
 
 if gc_correct:
@@ -186,6 +210,7 @@ if gc_correct:
         unit="bb",
         val_type="GC",
         smooth=True,
+        region_bed=region_bed_file,
     )
 
 # plot per-sample RDRs (after corrections)
@@ -200,6 +225,7 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
         val_type="RDR",
         max_ylim=rdr_ylim,
         smooth=True,
+        region_bed=region_bed_file,
     )
 
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=rdr_mtx_bb)

@@ -178,6 +178,13 @@ params_compute_rdr:
   min_mappability: 0.9      # min mappability for ideal bins
 
 ##################################################
+# filter bins - bulk only
+params_filter_bins:
+  gc_lo: 0.01        # lower GC quantile threshold
+  gc_hi: 0.99        # upper GC quantile threshold
+  map_tol: 0.2       # minimum mappability
+
+##################################################
 threads:
   genotype: 8
   phase: 2

@@ -35,6 +35,7 @@ logging.basicConfig(
 # Helper functions
 # ---------------------------------------------------------------------------
 
+
 def correct_readcount(
     reads,
     gc,
@@ -79,21 +80,31 @@ def correct_readcount(
     n = len(reads)
 
     def _fit_lowess_interp(y, x, grid):
-        """Tight LOWESS → grid smooth → final interpolator."""
+        """Tight LOWESS -> grid smooth -> final interpolator."""
         s1 = lowess(y, x, frac=0.03, return_sorted=True)
-        s1_fn = interp1d(s1[:, 0], s1[:, 1], kind="linear",
-                         bounds_error=False, fill_value="extrapolate")
+        s1_fn = interp1d(
+            s1[:, 0],
+            s1[:, 1],
+            kind="linear",
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
         s2 = lowess(s1_fn(grid), grid, frac=0.3, return_sorted=True)
-        return interp1d(s2[:, 0], s2[:, 1], kind="linear",
-                        bounds_error=False, fill_value="extrapolate")
+        return interp1d(
+            s2[:, 0],
+            s2[:, 1],
+            kind="linear",
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
 
-    def _apply_stage(prev, covariate, cov_lo, cov_hi, grid, seed,
-                     extra_ideal_mask=None):
+    def _apply_stage(
+        prev, covariate, cov_lo, cov_hi, grid, seed, extra_ideal_mask=None
+    ):
         """Apply one LOWESS correction stage and return corrected values."""
         valid = (prev > 0) & np.isfinite(covariate)
         val_hi = np.nanquantile(prev[valid], 1.0 - routlier)
-        ideal = (valid & (prev <= val_hi)
-                 & (covariate >= cov_lo) & (covariate <= cov_hi))
+        ideal = valid & (prev <= val_hi) & (covariate >= cov_lo) & (covariate <= cov_hi)
         if extra_ideal_mask is not None:
             ideal &= extra_ideal_mask
 
@@ -124,23 +135,21 @@ def correct_readcount(
         logging.info(f"  {n_nan}/{n} NaN after correction")
         return corrected
 
-    # --- Stage 1: GC correction ---
     logging.info("  GC stage:")
     gc_lo = np.nanquantile(gc, doutlier)
     gc_hi = np.nanquantile(gc, 1.0 - doutlier)
     grid_01 = np.linspace(0, 1, 1001)
     extra = (mappability >= min_mappability) if mappability is not None else None
-    cor = _apply_stage(reads, gc, gc_lo, gc_hi, grid_01, seed=42,
-                       extra_ideal_mask=extra)
+    cor = _apply_stage(
+        reads, gc, gc_lo, gc_hi, grid_01, seed=42, extra_ideal_mask=extra
+    )
 
-    # --- Stage 2: Mappability correction ---
     if mappability is not None:
         logging.info("  MAP stage:")
         map_lo = np.nanquantile(mappability, doutlier)
         map_hi = np.nanquantile(mappability, 1.0 - doutlier)
         cor = _apply_stage(cor, mappability, map_lo, map_hi, grid_01, seed=43)
 
-    # --- Stage 3: Replication timing correction ---
     if repliseq is not None:
         logging.info("  REPLI stage:")
         repli_finite = np.isfinite(repliseq)
@@ -153,11 +162,7 @@ def correct_readcount(
 
 
 def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
-    """Two-page PDF: page 1 = before GC correction, page 2 = after.
-
-    Each page has one subplot per sample showing a KDE density plot
-    of GC Content vs Observed Readcov.
-    """
+    """Two-page PDF: before/after GC correction KDE density plots."""
     nsamples = len(rep_ids)
     panel_w = max(5, 5 * nsamples)
 
@@ -182,13 +187,15 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
                 kde = gaussian_kde(np.vstack([x, y]))
 
             xgrid = np.linspace(x.min(), x.max(), 200)
-            ygrid = np.linspace(0, ylim * 1.5, 200)  # taller than ylim so density tapers
+            ygrid = np.linspace(0, ylim * 1.5, 200)
             xx, yy = np.meshgrid(xgrid, ygrid)
             positions = np.vstack([xx.ravel(), yy.ravel()])
             zz = kde(positions).reshape(xx.shape)
 
             ax.pcolormesh(xx, yy, zz, shading="gouraud", cmap="Blues", rasterized=True)
-            ax.contour(xx, yy, zz, levels=6, colors="steelblue", linewidths=0.5, alpha=0.5)
+            ax.contour(
+                xx, yy, zz, levels=6, colors="steelblue", linewidths=0.5, alpha=0.5
+            )
 
             mad = np.median(np.abs(y - np.median(y)))
             r, _ = pearsonr(x, y)
@@ -238,10 +245,16 @@ def compute_overlap_weights(win_s, win_e, bb_starts, bb_ends):
                 ov_wt_list.append(ov_len)
 
     if not ov_win_list:
-        return np.array([], dtype=np.intp), np.array([], dtype=np.intp), np.array([], dtype=np.float64)
-    return (np.array(ov_win_list, dtype=np.intp),
-            np.array(ov_bin_list, dtype=np.intp),
-            np.array(ov_wt_list, dtype=np.float64))
+        return (
+            np.array([], dtype=np.intp),
+            np.array([], dtype=np.intp),
+            np.array([], dtype=np.float64),
+        )
+    return (
+        np.array(ov_win_list, dtype=np.intp),
+        np.array(ov_bin_list, dtype=np.intp),
+        np.array(ov_wt_list, dtype=np.float64),
+    )
 
 
 def weighted_bincount_mean(values, bin_idx, weights, n_bins):
@@ -263,8 +276,18 @@ def log_nan_summary(name, mat, labels, n_total):
         logging.info(f"  {name} {label}: {n_nan}/{n_total} NaN")
 
 
-def log_mad_and_plot(pos_df, mat, labels, genome_size, qc_dir, prefix,
-                     unit, val_type, ylim, **plot_kwargs):
+def log_mad_and_plot(
+    pos_df,
+    mat,
+    labels,
+    genome_size,
+    qc_dir,
+    prefix,
+    unit,
+    val_type,
+    ylim,
+    **plot_kwargs,
+):
     """Log MAD per column and generate 1-D chromosome scatter plots."""
     for i, label in enumerate(labels):
         v = mat[:, i]
@@ -273,9 +296,16 @@ def log_mad_and_plot(pos_df, mat, labels, genome_size, qc_dir, prefix,
             mad = np.median(np.abs(v[m] - np.median(v[m])))
             logging.info(f"  {prefix} {label}: MAD={mad:.4f}")
         plot_file = os.path.join(qc_dir, f"{prefix}.{label}.pdf")
-        plot_1d_sample(pos_df, v, genome_size, plot_file,
-                       unit=unit, val_type=val_type, max_ylim=ylim,
-                       **plot_kwargs)
+        plot_1d_sample(
+            pos_df,
+            v,
+            genome_size,
+            plot_file,
+            unit=unit,
+            val_type=val_type,
+            max_ylim=ylim,
+            **plot_kwargs,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -284,12 +314,12 @@ def log_mad_and_plot(pos_df, mat, labels, genome_size, qc_dir, prefix,
 
 logging.info("run compute_rdr_bulk_window")
 
-# --- Inputs & params ---
 sample_file = sm.input["sample_file"]
 bb_file = sm.input["bb_file"]
 bias_bed_file = sm.input["bias_bed"]
 genome_size = sm.input["genome_size"]
 region_bed_file = sm.input["region_bed"]
+blacklist_bed_file = maybe_path(sm.input["blacklist_bed"])
 
 sample_name = sm.params["sample_name"]
 qc_dir = sm.output["qc_dir"]
@@ -306,7 +336,7 @@ routlier = float(sm.params["routlier"])
 doutlier = float(sm.params["doutlier"])
 min_mappability = float(sm.params["min_mappability"])
 
-# --- Load & filter windows ---
+# --- Load windows ---
 logging.info("load bias BED and mosdepth depth")
 bias_bed_full = pd.read_table(bias_bed_file, sep="\t")
 assert "#CHR" in bias_bed_full.columns and "GC" in bias_bed_full.columns, (
@@ -333,23 +363,62 @@ coords = mos_dfs[0][join_keys].copy()
 n_windows = len(coords)
 logging.info(f"{n_windows} windows across {len(target_chroms)} chromosomes")
 
-bias_bed = pd.merge(left=coords, right=bias_bed_full, on=join_keys, how="left", sort=False)
+bias_bed = pd.merge(
+    left=coords, right=bias_bed_full, on=join_keys, how="left", sort=False
+)
 logging.info(f"GC BED matched {int(bias_bed['GC'].notna().sum())}/{n_windows} windows")
 
+dp_raw = np.zeros((n_windows, nsamples), dtype=np.float32)
+for i, mos_df in enumerate(mos_dfs):
+    dp_raw[:, i] = mos_df["DEPTH"].to_numpy(dtype=np.float32)
+rd_raw_ylim = max(np.nanquantile(dp_raw, 0.99), 1.0)
+log_mad_and_plot(
+    bias_bed,
+    dp_raw,
+    rep_ids,
+    genome_size,
+    win_qc_dir,
+    "depth_before_correction",
+    "window",
+    "RD",
+    rd_raw_ylim,
+    region_bed=region_bed_file,
+    blacklist_bed=blacklist_bed_file,
+)
+
+# --- Filter windows ---
 regions = read_region_file(region_bed_file)
 win_mask_region = get_mask_by_region_intervals(bias_bed, regions)
-logging.info(f"excluding {int((~win_mask_region).sum())}/{n_windows} centromeric windows")
+logging.info(
+    f"region filter: excluding {int((~win_mask_region).sum())}/{n_windows} windows"
+)
 
 bias_bed = bias_bed.loc[win_mask_region].reset_index(drop=True)
 mos_dfs = [df.loc[win_mask_region].reset_index(drop=True) for df in mos_dfs]
 n_windows = len(bias_bed)
-logging.info(f"after filtering: {n_windows} windows")
+
+if blacklist_bed_file is not None:
+    bl_regions = read_region_file(blacklist_bed_file)
+    bl_mask = get_mask_by_region_intervals(bias_bed, bl_regions)
+    n_bl = int(bl_mask.sum())
+    logging.info(f"blacklist filter: excluding {n_bl}/{n_windows} windows")
+    bias_bed = bias_bed.loc[~bl_mask].reset_index(drop=True)
+    mos_dfs = [df.loc[~bl_mask].reset_index(drop=True) for df in mos_dfs]
+    n_windows = len(bias_bed)
+
+logging.info(f"{n_windows} windows after filtering")
 
 gc_vals = bias_bed["GC"].to_numpy()
 map_vals = bias_bed["MAP"].to_numpy() if "MAP" in bias_bed.columns else None
-repli_vals = bias_bed["REPLI"].to_numpy(dtype=np.float64) if "REPLI" in bias_bed.columns else None
+repli_vals = (
+    bias_bed["REPLI"].to_numpy(dtype=np.float64)
+    if "REPLI" in bias_bed.columns
+    else None
+)
 if repli_vals is not None:
-    logging.info(f"REPLI column: {int(np.isfinite(repli_vals).sum())}/{n_windows} finite")
+    logging.info(
+        f"REPLI column: {int(np.isfinite(repli_vals).sum())}/{n_windows} finite"
+    )
 else:
     logging.info("no REPLI column; skipping replication timing correction")
 
@@ -364,27 +433,36 @@ dp_corrected = np.zeros_like(dp_mat, dtype=np.float32)
 for i, rep_id in enumerate(rep_ids):
     logging.info(f"correcting {rep_id}")
     dp_corrected[:, i] = correct_readcount(
-        dp_mat[:, i], gc_vals,
-        mappability=map_vals, repliseq=repli_vals,
-        samplesize=samplesize, routlier=routlier,
-        doutlier=doutlier, min_mappability=min_mappability,
+        dp_mat[:, i],
+        gc_vals,
+        mappability=map_vals,
+        repliseq=repli_vals,
+        samplesize=samplesize,
+        routlier=routlier,
+        doutlier=doutlier,
+        min_mappability=min_mappability,
     )
 
 log_nan_summary("corrected depth", dp_corrected, rep_ids, n_windows)
 
-# QC: GC correction density plots
 pdf = PdfPages(os.path.join(win_qc_dir, "depth_correction.pdf"))
 plot_gc_correction_pdf(gc_vals, dp_mat, dp_corrected, rep_ids, pdf)
 pdf.close()
 
-# QC: per-sample depth genome plots (before & after)
-rd_ylim = max(np.nanquantile(dp_mat, 0.99), np.nanquantile(dp_corrected, 0.99))
-log_mad_and_plot(bias_bed, dp_mat, rep_ids, genome_size, win_qc_dir,
-                 "depth_before_correction", "window", "RD", rd_ylim,
-                 smooth=True)
-log_mad_and_plot(bias_bed, dp_corrected, rep_ids, genome_size, win_qc_dir,
-                 "depth_after_correction", "window", "RD", rd_ylim,
-                 smooth=True)
+rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0)
+log_mad_and_plot(
+    bias_bed,
+    dp_corrected,
+    rep_ids,
+    genome_size,
+    win_qc_dir,
+    "depth_after_correction",
+    "window",
+    "RD",
+    rd_ylim,
+    smooth=True,
+    region_bed=region_bed_file,
+)
 
 np.savez_compressed(sm.output["dp_mtx"], mat=dp_corrected)
 
@@ -414,7 +492,9 @@ else:
         col = dp_corrected[:, i]
         valid_i = np.isfinite(col) & (col > 0)
         if not valid_i.any():
-            logging.warning(f"  {rep_ids[i]}: no valid depth, skipping median-centering")
+            logging.warning(
+                f"  {rep_ids[i]}: no valid depth, skipping median-centering"
+            )
             continue
         med = np.median(col[valid_i])
         logging.info(f"  median-centering {rep_ids[i]}: median={med:.4f}")
@@ -426,22 +506,36 @@ n_nan_rdr = int(np.isnan(rdr_mat[:, 0]).sum())
 logging.info(f"window RDR: {n_nan_rdr}/{n_windows} NaN")
 
 rdr_ylim = np.round(np.nanquantile(rdr_mat, 0.99)).astype(int) + 1
-log_mad_and_plot(bias_bed, rdr_mat, tumor_rep_ids, genome_size, win_qc_dir,
-                 "rdr", "window", "RDR", rdr_ylim, smooth=True)
+log_mad_and_plot(
+    bias_bed,
+    rdr_mat,
+    tumor_rep_ids,
+    genome_size,
+    win_qc_dir,
+    "rdr",
+    "window",
+    "RDR",
+    rdr_ylim,
+    smooth=True,
+    region_bed=region_bed_file,
+)
 
 np.savez_compressed(sm.output["rdr_mtx"], mat=rdr_mat)
 
-# Save window-level bias BED
 out_cols = ["#CHR", "START", "END", "GC"]
 if "MAP" in bias_bed.columns:
     out_cols.append("MAP")
 if "REPLI" in bias_bed.columns:
     out_cols.append("REPLI")
 bias_bed[out_cols].to_csv(
-    sm.output["bins_tsv"], sep="\t", header=True, index=False, compression="gzip",
+    sm.output["bins_tsv"],
+    sep="\t",
+    header=True,
+    index=False,
+    compression="gzip",
 )
 
-# --- Aggregate windows → adaptive bins ---
+# --- Aggregate windows -> adaptive bins ---
 logging.info("aggregating window data into adaptive bins")
 bbs = pd.read_table(bb_file, sep="\t")
 n_bb = len(bbs)
@@ -471,47 +565,74 @@ for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
     n_bb_chr = len(bb_grp)
 
     ov_win, ov_bin, ov_wt = compute_overlap_weights(
-        win_start[win_idx_chr], win_end[win_idx_chr], bb_starts, bb_ends,
+        win_start[win_idx_chr],
+        win_end[win_idx_chr],
+        bb_starts,
+        bb_ends,
     )
     if len(ov_win) == 0:
         logging.info(f"  {chrom}: {n_bb_chr} bins, 0 windows assigned")
         continue
     n_assigned = len(np.unique(ov_win))
 
-    # Depth (all samples)
     for s in range(nsamples):
         vals = dp_corrected[win_idx_chr, s][ov_win]
         bb_dp[bb_global_idx, s] = weighted_bincount_mean(vals, ov_bin, ov_wt, n_bb_chr)
 
-    # Bias columns (GC, MAP, REPLI)
     for col in bias_cols:
         vals = bias_arrays[col][win_idx_chr][ov_win]
-        bb_bias[col][bb_global_idx] = weighted_bincount_mean(vals, ov_bin, ov_wt, n_bb_chr)
+        bb_bias[col][bb_global_idx] = weighted_bincount_mean(
+            vals, ov_bin, ov_wt, n_bb_chr
+        )
 
     logging.info(f"  {chrom}: {n_bb_chr} bins, {n_assigned} windows assigned")
 
-# Write bb-level correction factors
 bb_corr = bbs[["#CHR", "START", "END"]].copy()
 for col in bias_cols:
     bb_corr[col] = bb_bias[col]
-bb_corr.to_csv(sm.output["corr_factors"], sep="\t", header=True, index=False, compression="gzip")
+bb_corr.to_csv(
+    sm.output["corr_factors"], sep="\t", header=True, index=False, compression="gzip"
+)
 logging.info(f"wrote bb corr_factors: {bias_cols}, {n_bb} rows")
 
 log_nan_summary("bb depth", bb_dp, rep_ids, n_bb)
 
-# QC: bb-level depth 1D plots
 bb_rd_ylim = max(np.nanquantile(bb_dp, 0.99), 1.0)
-log_mad_and_plot(bbs, bb_dp, rep_ids, genome_size, bb_qc_dir,
-                 "depth", "bb", "RD", bb_rd_ylim, smooth=True)
+log_mad_and_plot(
+    bbs,
+    bb_dp,
+    rep_ids,
+    genome_size,
+    bb_qc_dir,
+    "depth",
+    "bb",
+    "RD",
+    bb_rd_ylim,
+    smooth=True,
+    region_bed=region_bed_file,
+)
 
-# QC: window-level and bb-level GC/bias 1D plots
 for col in bias_cols:
-    plot_1d_sample(bias_bed, bias_bed[col].to_numpy(), genome_size,
-                   os.path.join(win_qc_dir, f"{col}.pdf"),
-                   unit="window", val_type=col, smooth=True)
-    plot_1d_sample(bbs, bb_bias[col], genome_size,
-                   os.path.join(bb_qc_dir, f"{col}.pdf"),
-                   unit="bb", val_type=col, smooth=True)
+    plot_1d_sample(
+        bias_bed,
+        bias_bed[col].to_numpy(),
+        genome_size,
+        os.path.join(win_qc_dir, f"{col}.pdf"),
+        unit="window",
+        val_type=col,
+        smooth=True,
+        region_bed=region_bed_file,
+    )
+    plot_1d_sample(
+        bbs,
+        bb_bias[col],
+        genome_size,
+        os.path.join(bb_qc_dir, f"{col}.pdf"),
+        unit="bb",
+        val_type=col,
+        smooth=True,
+        region_bed=region_bed_file,
+    )
 
 # --- Bin-level RDR ---
 logging.info("computing bb RDR from aggregated depth")
@@ -537,7 +658,18 @@ logging.info(f"bb RDR: {n_bb - n_nan_bb}/{n_bb} bins filled, {n_nan_bb} NaN")
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=bb_rdr)
 np.savez_compressed(sm.output["dp_mtx_bb"], mat=bb_dp)
 
-log_mad_and_plot(bbs, bb_rdr, tumor_rep_ids, genome_size, bb_qc_dir,
-                 "rdr", "bb", "RDR", rdr_ylim, smooth=True)
+log_mad_and_plot(
+    bbs,
+    bb_rdr,
+    tumor_rep_ids,
+    genome_size,
+    bb_qc_dir,
+    "rdr",
+    "bb",
+    "RDR",
+    rdr_ylim,
+    smooth=True,
+    region_bed=region_bed_file,
+)
 
 logging.info("finished.")

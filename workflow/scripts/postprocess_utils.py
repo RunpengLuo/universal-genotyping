@@ -248,7 +248,9 @@ def get_mask_by_region(snps: pd.DataFrame, regions: pd.DataFrame) -> np.ndarray:
     return mask
 
 
-def get_mask_by_region_intervals(bins_df: pd.DataFrame, regions: pd.DataFrame) -> np.ndarray:
+def get_mask_by_region_intervals(
+    bins_df: pd.DataFrame, regions: pd.DataFrame
+) -> np.ndarray:
     """Return a boolean mask indicating whether each bin overlaps any region.
 
     Parameters
@@ -442,6 +444,8 @@ def plot_allele_freqs(
     unit="SNP",
     suffix="",
     snp_mask=None,
+    region_bed=None,
+    blacklist_bed=None,
 ):
     """Generate genome-wide allele-frequency scatter plots.
 
@@ -468,6 +472,10 @@ def plot_allele_freqs(
         Feature unit label (e.g., ``"SNP"``, ``"bin"``).
     suffix : str
         Optional filename suffix.
+    region_bed : str or None
+        Path to whitelist region BED file for background shading.
+    blacklist_bed : str or None
+        Path to blacklist BED file for background shading.
     """
     logging.info(
         f"QC analysis - plot {allele}-{unit} allele frequency, {unit}={allele}, apply_pseudobulk={apply_pseudobulk}"
@@ -475,7 +483,17 @@ def plot_allele_freqs(
     if apply_pseudobulk:
         af = compute_af_pseudobulk(tot_mtx, b_mtx)
         plot_file = os.path.join(plot_dir, f"af_{allele}_{unit}.pseudobulk{suffix}.pdf")
-        plot_1d_sample(pos_df, af, genome_size, plot_file, unit=unit, val_type="AF", mask=snp_mask)
+        plot_1d_sample(
+            pos_df,
+            af,
+            genome_size,
+            plot_file,
+            unit=unit,
+            val_type="AF",
+            mask=snp_mask,
+            region_bed=region_bed,
+            blacklist_bed=blacklist_bed,
+        )
     else:
         _tot_mtx = tot_mtx.tocsc() if issparse(tot_mtx) else tot_mtx
         _b_mtx = b_mtx.tocsc() if issparse(b_mtx) else b_mtx
@@ -484,7 +502,17 @@ def plot_allele_freqs(
                 plot_dir, f"af_{allele}_{unit}.{rep_id}{suffix}.pdf"
             )
             af = compute_af_per_sample(_tot_mtx, _b_mtx, i)
-            plot_1d_sample(pos_df, af, genome_size, plot_file, unit=unit, val_type="AF", mask=snp_mask)
+            plot_1d_sample(
+                pos_df,
+                af,
+                genome_size,
+                plot_file,
+                unit=unit,
+                val_type="AF",
+                mask=snp_mask,
+                region_bed=region_bed,
+                blacklist_bed=blacklist_bed,
+            )
     return
 
 
@@ -506,12 +534,27 @@ def plot_1d_sample(
     smooth_frac: float = 0.05,
     smooth_color: str = "orange",
     smooth_linewidth: float = 1.5,
+    region_bed: str | None = None,
+    blacklist_bed: str | None = None,
 ):
     """
     plot any features like AF, RDR, etc., in 1d chromosome scatter plot.
     """
     logging.info(f"chromosome wide {unit}-level {val_type} plot, out_file={out_file}")
     chrom_sizes = get_chr_sizes(genome_size)
+
+    # pre-load region BED and group by chromosome
+    _region_by_chr = {}
+    if region_bed is not None:
+        _region_df = read_region_file(region_bed)
+        for _ch, _grp in _region_df.groupby("#CHR", sort=False):
+            _region_by_chr[_ch] = list(zip(_grp["START"], _grp["END"]))
+
+    _blacklist_by_chr = {}
+    if blacklist_bed is not None:
+        _bl_df = read_region_file(blacklist_bed)
+        for _ch, _grp in _bl_df.groupby("#CHR", sort=False):
+            _blacklist_by_chr[_ch] = list(zip(_grp["START"], _grp["END"]))
 
     ch = pos_df["#CHR"].to_numpy()
     if "POS" in pos_df.columns:
@@ -545,26 +588,56 @@ def plot_1d_sample(
             logging.warning(f"{chrom}: all {val_type} values are non-finite")
             continue
         fig, ax = plt.subplots(1, 1, figsize=figsize)
+        # shade whitelist regions as background
+        if chrom in _region_by_chr:
+            for reg_start, reg_end in _region_by_chr[chrom]:
+                ax.axvspan(reg_start, reg_end, color="lightblue", alpha=0.15, zorder=0)
+        # shade blacklist regions as background
+        if chrom in _blacklist_by_chr:
+            for bl_start, bl_end in _blacklist_by_chr[chrom]:
+                ax.axvspan(bl_start, bl_end, color="lightcoral", alpha=0.2, zorder=0)
         if mask_chr is not None:
             kept = m & mask_chr
             filt = m & ~mask_chr
             if filt.any():
-                ax.scatter(x[filt], y[filt], s=s, alpha=0.8, color="red", rasterized=True, label=f"filtered ({filt.sum()})")
+                ax.scatter(
+                    x[filt],
+                    y[filt],
+                    s=s,
+                    alpha=0.8,
+                    color="red",
+                    rasterized=True,
+                    label=f"filtered ({filt.sum()})",
+                )
             if kept.any():
-                ax.scatter(x[kept], y[kept], s=s, alpha=0.8, color="blue", rasterized=True, label=f"kept ({kept.sum()})")
+                ax.scatter(
+                    x[kept],
+                    y[kept],
+                    s=s,
+                    alpha=0.8,
+                    color="blue",
+                    rasterized=True,
+                    label=f"kept ({kept.sum()})",
+                )
             ax.legend(loc="upper right", fontsize=8, markerscale=2)
         else:
             ax.scatter(x[m], y[m], s=s, alpha=alpha, rasterized=True)
         # optional LOWESS smooth trend line
         if smooth and m.sum() > 10:
             from statsmodels.nonparametric.smoothers_lowess import lowess as _lowess
+
             sx = x[m]
             sy = y[m]
             order = np.argsort(sx)
             sx, sy = sx[order], sy[order]
             fit = _lowess(sy, sx, frac=smooth_frac, return_sorted=True)
-            ax.plot(fit[:, 0], fit[:, 1], color=smooth_color,
-                    linewidth=smooth_linewidth, zorder=5)
+            ax.plot(
+                fit[:, 0],
+                fit[:, 1],
+                color=smooth_color,
+                linewidth=smooth_linewidth,
+                zorder=5,
+            )
         if val_type in ["AF", "BAF"]:
             ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
             ax.set_ylim(-0.05, 1.05)

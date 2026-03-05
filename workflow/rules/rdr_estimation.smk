@@ -20,7 +20,7 @@ if workflow_mode == "bulk_genotyping":
         rule run_mosdepth_bulk:
             input:
                 bam=lambda wc: get_data[(wc.assay_type, wc.rep_id)][1],
-                bed_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/bb.bed.gz",
+                bed_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/raw/bb.raw.bed.gz",
             output:
                 mosdepth_file=config["bb_dir"]
                 + "/{assay_type}/out_mosdepth/{rep_id}.regions.bed.gz",
@@ -51,7 +51,7 @@ if workflow_mode == "bulk_genotyping":
             input:
                 sample_file=lambda wc: config["bb_dir"]
                 + f"/{wc.assay_type}/sample_ids.tsv",
-                bb_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/bb.tsv.gz",
+                bb_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/raw/bb.raw.tsv.gz",
                 mosdepth_files=lambda wc: branch(
                     assay2rep_ids.get(wc.assay_type) is not None,
                     then=[
@@ -61,7 +61,7 @@ if workflow_mode == "bulk_genotyping":
                     ],
                     otherwise=[],
                 ),
-                baf_mtx_bb=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/bb.baf.npz",
+                baf_mtx_bb=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/raw/bb.raw.baf.npz",
                 reference=config["reference"],
                 genome_size=config["genome_size"],
                 mappability_file=branch(
@@ -74,10 +74,15 @@ if workflow_mode == "bulk_genotyping":
                     then=[],
                     otherwise=config["params_compute_rdr"]["rt_file"],
                 ),
+                region_bed=branch(
+                    config.get("region_bed") is None,
+                    then=[],
+                    otherwise=config["region_bed"],
+                ),
             output:
-                dp_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.depth.npz",
-                rdr_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.rdr.npz",
-                corr_factors=config["bb_dir"] + "/{assay_type}/corr_factors.tsv.gz",
+                dp_mtx_bb=config["bb_dir"] + "/{assay_type}/raw/bb.raw.depth.npz",
+                rdr_mtx_bb=config["bb_dir"] + "/{assay_type}/raw/bb.raw.rdr.npz",
+                corr_factors=config["bb_dir"] + "/{assay_type}/raw/bb.raw.corr_factors.tsv.gz",
                 qc_dir=directory(config["qc_dir"] + "/{assay_type}/compute_rdr_bulk/"),
             wildcard_constraints:
                 assay_type="(bulkDNA|bulkWGS|bulkWES)",
@@ -138,7 +143,7 @@ if workflow_mode == "bulk_genotyping":
             input:
                 sample_file=lambda wc: config["bb_dir"]
                 + f"/{wc.assay_type}/sample_ids.tsv",
-                bb_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/bb.tsv.gz",
+                bb_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/raw/bb.raw.tsv.gz",
                 bias_bed=_rdr_cfg["bias_bed"],
                 mosdepth_files=lambda wc: [
                     config["bb_dir"]
@@ -147,13 +152,18 @@ if workflow_mode == "bulk_genotyping":
                 ],
                 genome_size=config["genome_size"],
                 region_bed=lambda wc: config["region_bed"],
+                blacklist_bed=branch(
+                    config.get("blacklist_bed") is None,
+                    then=[],
+                    otherwise=config["blacklist_bed"],
+                ),
             output:
                 dp_mtx=config["bb_dir"] + "/{assay_type}/window.depth.npz",
                 rdr_mtx=config["bb_dir"] + "/{assay_type}/window.rdr.npz",
-                rdr_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.rdr.npz",
-                dp_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.depth.npz",
+                rdr_mtx_bb=config["bb_dir"] + "/{assay_type}/raw/bb.raw.rdr.npz",
+                dp_mtx_bb=config["bb_dir"] + "/{assay_type}/raw/bb.raw.depth.npz",
                 bins_tsv=config["bb_dir"] + "/{assay_type}/window.bins.tsv.gz",
-                corr_factors=config["bb_dir"] + "/{assay_type}/bb.corr_factors.tsv.gz",
+                corr_factors=config["bb_dir"] + "/{assay_type}/raw/bb.raw.corr_factors.tsv.gz",
                 qc_dir=directory(config["qc_dir"] + "/{assay_type}/compute_rdr_bulk_window/"),
             wildcard_constraints:
                 assay_type="(bulkDNA|bulkWGS|bulkWES)",

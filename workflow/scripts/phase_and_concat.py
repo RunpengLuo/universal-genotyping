@@ -18,12 +18,15 @@ from postprocess_utils import *
 from aggregation_utils import *
 from switchprobs import *
 
+
 def annotate_feature_type(snps, gtf_file):
     """Annotate SNPs with feature_type (exon/intron/intergenic) using a GTF file.
 
     Returns the gene_mask (bool Series) indicating which SNPs fall within a gene.
     """
-    genes_gtf = read_genes_gtf_file(gtf_file, id_col="gene_id")[["gene_id", "#CHR", "START", "END"]]
+    genes_gtf = read_genes_gtf_file(gtf_file, id_col="gene_id")[
+        ["gene_id", "#CHR", "START", "END"]
+    ]
     genes_gtf["gene_idx"] = np.arange(len(genes_gtf))
     snps = assign_pos_to_range(snps, genes_gtf, ref_id="gene_idx", pos_col="POS0")
     gene_mask = snps["gene_idx"].notna()
@@ -41,12 +44,9 @@ def annotate_feature_type(snps, gtf_file):
 
 
 ##################################################
-"""
-Phase and concat allele-level count matrices.
-"""
 setup_logging(sm.log[0])
+logging.info("phase and concat allele-level count matrices")
 
-# inputs
 vcf_files = sm.input["vcfs"]
 sample_tsvs = sm.input["sample_tsvs"]
 tot_mtx_files = sm.input["tot_mtxs"]
@@ -65,15 +65,14 @@ assay_type = sm.params["assay_type"]
 rep_ids = sm.params["rep_ids"]
 sample_types = sm.params["sample_types"]
 
-
 bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
 is_bulk_assay = assay_type in bulk_assays
 
 ##################################################
 logging.info(
-    f"phase and concat, sample name={sample_name}, assay_type={assay_type}, is_bulk_assay={is_bulk_assay}"
+    f"sample_name={sample_name}, assay_type={assay_type}, "
+    f"is_bulk_assay={is_bulk_assay}, rep_ids={rep_ids}"
 )
-logging.info(f"rep_ids={rep_ids}")
 
 snps = read_VCF(snp_vcf, addkey=True, add_phase1=True, add_pos0=True)
 parent_keys = pd.Index(snps["KEY"])
@@ -81,7 +80,6 @@ assert not parent_keys.duplicated().any(), "invalid bi-allelic SNP VCF file"
 
 if is_bulk_assay:
     has_normal = "normal" in sample_types
-    # If normal sample exists, make first column be normal sample.
     if has_normal:
         normal_idx = list(sample_types).index("normal")
         rep_ids[0], rep_ids[normal_idx] = rep_ids[normal_idx], rep_ids[0]
@@ -95,7 +93,6 @@ if is_bulk_assay:
             ad_mtx_files[0],
         )
 
-# concat to form SNP by sample mats
 barcodes_list = []
 tot_mtx_list = []
 ad_mtx_list = []
@@ -116,7 +113,6 @@ all_barcodes = pd.concat(barcodes_list, axis=0, ignore_index=True)
 tot_mtx, ref_mtx, alt_mtx = merge_mats(tot_mtx_list, ad_mtx_list)
 a_mtx, b_mtx = apply_phase_to_mat(tot_mtx, ref_mtx, alt_mtx, snps["PHASE"].to_numpy())
 
-# convert to dense mats for bulk sample
 if is_bulk_assay:
     tot_mtx = tot_mtx.toarray()
     ref_mtx = ref_mtx.toarray()
@@ -125,45 +121,45 @@ if is_bulk_assay:
     b_mtx = b_mtx.toarray()
 
 ##################################################
-# annotate&filter SNPs
 num_snps_before = len(snps)
 
 snp_mask = np.ones(len(snps), dtype=bool)
 regions = read_region_file(region_bed)
 region_mask = get_mask_by_region(snps, regions)
-logging.info(f"filter by non-region SNPs, #passed SNPs={np.sum(region_mask)}/{len(snps)}")
-snp_mask = snp_mask & region_mask
+logging.info(f"region filter: {np.sum(region_mask)}/{len(snps)} SNPs passed")
+snp_mask &= region_mask
 
 if blacklist_bed is not None:
     bl_regions = read_region_file(blacklist_bed)
     bl_mask = get_mask_by_region(snps, bl_regions)
-    logging.info(f"#SNPs in repeat/segdup regions={np.sum(bl_mask)}/{len(snps)}")
-    snp_mask = snp_mask & ~bl_mask
+    logging.info(f"blacklist filter: {np.sum(bl_mask)}/{len(snps)} SNPs in blacklist")
+    snp_mask &= ~bl_mask
 
 snps, genes_gtf, gene_mask = annotate_feature_type(snps, gtf_file)
 if is_bulk_assay:
-    # Map gene_idx -> gene_id; intergenic SNPs get "intergenic"
     snps["feature_id"] = "intergenic"
     if gene_mask.any():
         snps.loc[gene_mask, "gene_idx"] = snps.loc[gene_mask, "gene_idx"].astype(int)
-        snps.loc[gene_mask, "feature_id"] = genes_gtf.set_index("gene_idx").loc[
-            snps.loc[gene_mask, "gene_idx"], "gene_id"
-        ].values
+        snps.loc[gene_mask, "feature_id"] = (
+            genes_gtf.set_index("gene_idx")
+            .loc[snps.loc[gene_mask, "gene_idx"], "gene_id"]
+            .values
+        )
 
     snps.drop(columns=["gene_idx"], inplace=True, errors="ignore")
 
-    snp_mask = snp_mask & get_mask_by_depth(
+    snp_mask &= get_mask_by_depth(
         snps, tot_mtx, min_dp=max(int(sm.params["min_depth"]), 1)
     )
     if has_normal:
         normal_mask = get_mask_by_het_balanced(
             snps, ref_mtx, alt_mtx, float(sm.params["gamma"]), normal_idx=0
         )
-        snp_mask = snp_mask & normal_mask
+        snp_mask &= normal_mask
 else:
     snps.drop(columns=["gene_idx"], inplace=True, errors="ignore")
 
-    logging.info(f"annotate SNPs with feature_id")
+    logging.info("annotate SNPs with feature_id")
     adata: sc.AnnData = sc.read_h5ad(sm.input["h5ad_file"])
     feature_df = adata.var.reset_index(drop=False).rename(
         columns={"index": "feature_id"}
@@ -171,24 +167,31 @@ else:
     feature_df["feature_idx"] = np.arange(len(feature_df))
 
     snps = assign_pos_to_range(snps, feature_df, ref_id="feature_idx", pos_col="POS0")
-    snp_mask = snp_mask & snps["feature_idx"].notna().to_numpy()
+    snp_mask &= snps["feature_idx"].notna().to_numpy()
     logging.info(
-        f"#SNPs overlap with {assay_type} features={np.sum(snp_mask)}/{len(snps)} ({np.sum(snp_mask) / len(snps):.3%})"
+        f"{assay_type} feature overlap: {np.sum(snp_mask)}/{len(snps)} "
+        f"({np.sum(snp_mask) / len(snps):.3%})"
     )
 
 if sm.params["exon_only"]:
     exon_mask = (snps["feature_type"] == "exon").to_numpy()
-    logging.info(
-        f"filter by non-exonic SNPs, #passed SNPs={np.sum(exon_mask)}/{len(snps)}"
-    )
-    snp_mask = snp_mask & exon_mask
+    logging.info(f"exon filter: {np.sum(exon_mask)}/{len(snps)} SNPs passed")
+    snp_mask &= exon_mask
 
-# Pre-filter QC: AF plot with mask overlay showing kept vs filtered SNPs
 plot_allele_freqs(
-    snps, rep_ids, tot_mtx, ref_mtx, genome_size, qc_dir,
+    snps,
+    rep_ids,
+    tot_mtx,
+    ref_mtx,
+    genome_size,
+    qc_dir,
     apply_pseudobulk=not is_bulk_assay,
-    allele="ref", unit="snp", suffix=f"_{assay_type}_prefilter",
+    allele="ref",
+    unit="snp",
+    suffix=f"_{assay_type}_prefilter",
     snp_mask=snp_mask,
+    region_bed=region_bed,
+    blacklist_bed=blacklist_bed,
 )
 
 snps = snps.loc[snp_mask, :].reset_index(drop=True)
@@ -201,14 +204,14 @@ if not is_bulk_assay:
         on="feature_idx",
         sort=False,
     ).reset_index(drop=True)
-    # fake START/END field, TODO refine by gene interval?
+    # TODO refine by gene interval?
     snps["START"] = snps["POS0"]
     snps["END"] = snps["POS"]
 
 snps = assign_snp_bounderies(snps, regions, colname="region_id")
 
 num_snps_after = np.sum(snp_mask)
-logging.info(f"#SNPs={num_snps_after}/{num_snps_before} after SNP filtering")
+logging.info(f"#SNPs={num_snps_after}/{num_snps_before} after filtering")
 
 tot_mtx = tot_mtx[snp_mask, :]
 ref_mtx = ref_mtx[snp_mask, :]
@@ -217,7 +220,6 @@ a_mtx = a_mtx[snp_mask, :]
 b_mtx = b_mtx[snp_mask, :]
 
 ##################################################
-# QC plots
 plot_allele_freqs(
     snps,
     rep_ids,
@@ -229,6 +231,8 @@ plot_allele_freqs(
     allele="ref",
     unit="snp",
     suffix=f"_{assay_type}",
+    region_bed=region_bed,
+    blacklist_bed=blacklist_bed,
 )
 plot_allele_freqs(
     snps,
@@ -241,12 +245,25 @@ plot_allele_freqs(
     allele="B",
     unit="snp",
     suffix=f"_{assay_type}",
+    region_bed=region_bed,
+    blacklist_bed=blacklist_bed,
 )
 
 ##################################################
-logging.info(f"saving output files")
+logging.info("saving output files")
 snps[
-    ["#CHR", "POS", "POS0", "START", "END", "GT", "PHASE", "region_id", "feature_id", "feature_type"]
+    [
+        "#CHR",
+        "POS",
+        "POS0",
+        "START",
+        "END",
+        "GT",
+        "PHASE",
+        "region_id",
+        "feature_id",
+        "feature_type",
+    ]
 ].to_csv(sm.output["snp_info"], sep="\t", header=True, index=False)
 if is_bulk_assay:
     np.savez_compressed(sm.output["tot_mtx_snp"], mat=tot_mtx)
@@ -256,7 +273,6 @@ else:
     save_npz(sm.output["tot_mtx_snp"], tot_mtx)
     save_npz(sm.output["a_mtx_snp"], a_mtx)
     save_npz(sm.output["b_mtx_snp"], b_mtx)
-    # legacy CalicoST allele-level data
     snp_ids = snps["#CHR"].astype(str) + "_" + snps["POS"].astype(str)
     np.save(sm.output["unique_snp_ids"], snp_ids.to_numpy())
     save_npz(sm.output["cell_snp_Aallele"], a_mtx)
@@ -267,4 +283,4 @@ sample_df["SAMPLE_NAME"] = sample_name
 sample_df["REP_ID"] = rep_ids
 sample_df["sample_type"] = sample_types
 sample_df.to_csv(sm.output["sample_file"], sep="\t", header=True, index=False)
-logging.info(f"finished.")
+logging.info("finished.")

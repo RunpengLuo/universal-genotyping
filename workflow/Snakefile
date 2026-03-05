@@ -210,21 +210,22 @@ if workflow_mode == "copytyping_preprocess":
 else:
     for assay_type in assay_types:
         final_targets.append(config["bb_dir"] + f"/{assay_type}/sample_ids.tsv")
-        final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.tsv.gz")
-        final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Tallele.npz")
-        final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Aallele.npz")
-        final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Ballele.npz")
         if assay_type in bulk_assays:
+            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.tsv.gz")
+            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Tallele.npz")
+            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Aallele.npz")
+            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Ballele.npz")
             final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.baf.npz")
             final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.rdr.npz")
-            # bb.depth.npz only produced by bin method
-            if config.get("rdr_method", "bin") == "bin":
-                final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.depth.npz")
-            # window method also produces window-level files
+            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.depth.npz")
             if config.get("rdr_method", "bin") == "window":
                 final_targets.append(config["bb_dir"] + f"/{assay_type}/window.depth.npz")
                 final_targets.append(config["bb_dir"] + f"/{assay_type}/window.rdr.npz")
         else:
+            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.raw.tsv.gz")
+            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.raw.Tallele.npz")
+            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.raw.Aallele.npz")
+            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.raw.Ballele.npz")
             final_targets.append(
                 config["allele_dir"] + f"/{assay_type}/barcodes.tsv.gz"
             )
@@ -237,6 +238,7 @@ include: "rules/phase_snps.smk"
 include: "rules/pileup_snps.smk"
 include: "rules/postprocess.smk"
 include: "rules/rdr_estimation.smk"
+include: "rules/quality_control.smk"
 
 
 rule all:
