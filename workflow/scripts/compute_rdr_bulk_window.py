@@ -535,6 +535,7 @@ bb_dp = np.full((n_bb, nsamples), np.nan, dtype=np.float32)
 
 win_chr = bias_bed["#CHR"].to_numpy()
 win_start = bias_bed["START"].to_numpy(dtype=np.int64)
+win_end = bias_bed["END"].to_numpy(dtype=np.int64)
 
 for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
     win_mask = win_chr == chrom
@@ -547,39 +548,75 @@ for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
     bb_global_idx = bb_grp.index.to_numpy()
     n_bb_chr = len(bb_grp)
 
-    win_starts_chr = win_start[win_idx_chr]
-    bin_idx = np.searchsorted(bb_starts, win_starts_chr, side="right") - 1
-    valid_assign = (bin_idx >= 0) & (bin_idx < n_bb_chr)
-    valid_assign[valid_assign] &= (
-        win_starts_chr[valid_assign] < bb_ends[bin_idx[valid_assign]]
-    )
+    win_s = win_start[win_idx_chr]
+    win_e = win_end[win_idx_chr]
+
+    # For each window, find all overlapping bins weighted by overlap fraction.
+    # first_bin: leftmost bin overlapping the window (by window start)
+    # last_bin:  rightmost bin overlapping the window (by window end - 1)
+    first_bin = np.searchsorted(bb_ends, win_s, side="right")      # first bin whose end > win_start
+    last_bin = np.searchsorted(bb_starts, win_e, side="left") - 1   # last bin whose start < win_end
+
+    # Build (window_local_idx, bin_idx, overlap_weight) arrays
+    ov_win_list, ov_bin_list, ov_wt_list = [], [], []
+    for wi in range(len(win_idx_chr)):
+        fb, lb = int(first_bin[wi]), int(last_bin[wi])
+        if fb > lb or fb >= n_bb_chr or lb < 0:
+            continue
+        fb = max(fb, 0)
+        lb = min(lb, n_bb_chr - 1)
+        ws, we = int(win_s[wi]), int(win_e[wi])
+        win_len = we - ws
+        if win_len <= 0:
+            continue
+        for bi in range(fb, lb + 1):
+            ov_start = max(ws, int(bb_starts[bi]))
+            ov_end = min(we, int(bb_ends[bi]))
+            ov_len = ov_end - ov_start
+            if ov_len > 0:
+                ov_win_list.append(wi)
+                ov_bin_list.append(bi)
+                ov_wt_list.append(ov_len / win_len)
+
+    if len(ov_win_list) == 0:
+        logging.info(f"  {chrom}: {n_bb_chr} bins, 0 windows assigned")
+        continue
+
+    ov_win = np.array(ov_win_list, dtype=np.intp)
+    ov_bin = np.array(ov_bin_list, dtype=np.intp)
+    ov_wt = np.array(ov_wt_list, dtype=np.float64)
+    n_windows_assigned = len(np.unique(ov_win))
 
     # Aggregate corrected depth (all samples)
     for s in range(nsamples):
         dp_chr = dp_corrected[win_idx_chr, s]
-        finite = valid_assign & np.isfinite(dp_chr)
-        bi = bin_idx[finite]
-        vals = dp_chr[finite]
-        sums = np.bincount(bi, weights=vals, minlength=n_bb_chr)
-        counts = np.bincount(bi, minlength=n_bb_chr)
-        means = np.where(counts > 0, sums / counts, np.nan)
+        vals = dp_chr[ov_win]
+        finite = np.isfinite(vals)
+        bi_f = ov_bin[finite]
+        wt_f = ov_wt[finite]
+        v_f = vals[finite]
+        sums = np.bincount(bi_f, weights=v_f * wt_f, minlength=n_bb_chr)
+        wt_sums = np.bincount(bi_f, weights=wt_f, minlength=n_bb_chr)
+        means = np.where(wt_sums > 0, sums / wt_sums, np.nan)
         bb_dp[bb_global_idx, s] = means
 
     # Aggregate RDR (tumor samples only)
     n_defaulted = 0
     for t in range(n_tumors):
         rdr_chr = rdr_mat[win_idx_chr, t]
-        finite = valid_assign & np.isfinite(rdr_chr)
-        bi = bin_idx[finite]
-        vals = rdr_chr[finite]
-        sums = np.bincount(bi, weights=vals, minlength=n_bb_chr)
-        counts = np.bincount(bi, minlength=n_bb_chr)
-        means = np.where(counts > 0, sums / counts, 1.0)
+        vals = rdr_chr[ov_win]
+        finite = np.isfinite(vals)
+        bi_f = ov_bin[finite]
+        wt_f = ov_wt[finite]
+        v_f = vals[finite]
+        sums = np.bincount(bi_f, weights=v_f * wt_f, minlength=n_bb_chr)
+        wt_sums = np.bincount(bi_f, weights=wt_f, minlength=n_bb_chr)
+        means = np.where(wt_sums > 0, sums / wt_sums, 1.0)
         bb_rdr[bb_global_idx, t] = means
         if t == 0:
-            n_defaulted = int((counts == 0).sum())
+            n_defaulted = int((wt_sums == 0).sum())
     logging.info(
-        f"  {chrom}: {n_bb_chr} bins, {int(valid_assign.sum())} windows assigned, "
+        f"  {chrom}: {n_bb_chr} bins, {n_windows_assigned} windows assigned, "
         f"{n_defaulted} bins defaulted to 1.0"
     )
 
