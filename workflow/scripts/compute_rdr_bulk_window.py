@@ -257,6 +257,8 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
                 ax.set_ylabel("Observed Readcov")
             ax.set_title(f"{rep_id}\nMAD={mad:.4f}  r={r:.4f}")
             ax.set_xlim(0, 1)
+            ylim = np.nanquantile(reads[valid], 0.99)
+            ax.set_ylim(0, ylim * 1.1)
         fig.suptitle(title, fontsize=14)
         plt.tight_layout()
         pdf.savefig(fig, dpi=150)
@@ -324,6 +326,20 @@ for i, rep_id in enumerate(rep_ids):
 pdf = PdfPages(os.path.join(qc_dir, "window_depth_correction.pdf"))
 plot_gc_correction_pdf(gc_vals, dp_mat, dp_corrected, rep_ids, pdf)
 pdf.close()
+
+for i, rep_id in enumerate(rep_ids):
+    _, rd_ylim = np.nanquantile(dp_mat[:, i], [0.01, 0.99])
+    plot_file = os.path.join(qc_dir, f"depth_window_before_correction.{rep_id}.pdf")
+    plot_1d_sample(
+        gc_bed, dp_mat[:, i], genome_size, plot_file,
+        unit="window", val_type="RD", max_ylim=rd_ylim,
+    )
+    _, rd_ylim_cor = np.nanquantile(dp_corrected[:, i], [0.01, 0.99])
+    plot_file = os.path.join(qc_dir, f"depth_window_after_correction.{rep_id}.pdf")
+    plot_1d_sample(
+        gc_bed, dp_corrected[:, i], genome_size, plot_file,
+        unit="window", val_type="RD", max_ylim=rd_ylim_cor,
+    )
 
 np.savez_compressed(sm.output["dp_mtx"], mat=dp_corrected)
 
@@ -425,5 +441,18 @@ for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
 n_filled = int(np.isfinite(bb_rdr[:, 0]).sum())
 logging.info(f"bb RDR: {n_filled}/{n_bb} bins filled from window RDR")
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=bb_rdr)
+
+bb_rdr_ylim = np.round(np.nanquantile(bb_rdr, 0.99)).astype(int) + 1
+for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
+    plot_file = os.path.join(qc_dir, f"rdr_bb.{rep_id}.pdf")
+    plot_1d_sample(
+        bbs,
+        bb_rdr[:, i],
+        genome_size,
+        plot_file,
+        unit="bb",
+        val_type="RDR",
+        max_ylim=bb_rdr_ylim,
+    )
 
 logging.info("finished.")
