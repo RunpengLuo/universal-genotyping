@@ -94,15 +94,15 @@ def bias_correction_rdr_quantreg(
     has_mapp=False,
     rt_df=None,
     out_dir=None,
+    eps_quantile=0.01,
     gc_quantile=[0.05, 0.95],
-    eps=1e-8,
 ):
-    """Correct RDR for GC (+ mappability, + RT) bias via median quantile regression in log2 space.
+    """Correct RDR for GC (+ mappability, + RT) bias via median quantile regression.
 
-    Fits a quadratic median quantile regression of log2(RDR) on GC per sample,
-    with optional mappability and replication-timing covariates. Corrected RDR
-    is computed from residuals shifted to the sample mean, then exponentiated
-    and mean-normalized to 1.
+    Fits a quadratic median quantile regression of RDR on GC per sample,
+    with optional mappability and replication-timing covariates. Corrected
+    RDR is raw RDR divided by the fitted expected RDR, then mean-normalized
+    to 1.
 
     Parameters
     ----------
@@ -118,10 +118,10 @@ def bias_correction_rdr_quantreg(
         RT DataFrame from ``load_rt_for_bins``, or None to skip RT.
     out_dir : str or None
         Directory for diagnostic plots.
+    eps_quantile : float
+        Lower quantile of expected RDR used as floor to avoid division by zero.
     gc_quantile : list[float]
         Lower and upper GC quantiles defining the fitting range.
-    eps : float
-        Small constant added before log2 to avoid log(0).
 
     Returns
     -------
@@ -142,18 +142,16 @@ def bias_correction_rdr_quantreg(
     corrected_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
     for si, rep_id in enumerate(rep_ids):
         raw_rdrs = raw_rdr_mat[:, si]
-        log_rdr = np.log2(raw_rdrs + eps)
         rt_vals, best_rt_name = _select_rt_for_sample(raw_rdrs, rt_df, autosomes_mask)
 
         # Build formula, fit_df, pred_df dynamically
         sample_fit_mask = fit_mask.copy()
-        sample_fit_mask &= np.isfinite(log_rdr)
         if rt_vals is not None:
             sample_fit_mask &= np.isfinite(rt_vals)
 
-        fit_df = pd.DataFrame({"log_RD": log_rdr[sample_fit_mask], "GC": gc[sample_fit_mask]})
+        fit_df = pd.DataFrame({"RD": raw_rdrs[sample_fit_mask], "GC": gc[sample_fit_mask]})
         pred_df = pd.DataFrame({"GC": gc})
-        formula = "log_RD ~ GC + I(GC**2)"
+        formula = "RD ~ GC + I(GC**2)"
         if has_mapp:
             fit_df["MAP"] = mapv[sample_fit_mask]
             pred_df["MAP"] = mapv
@@ -165,25 +163,17 @@ def bias_correction_rdr_quantreg(
 
         res = smf.quantreg(formula, data=fit_df).fit(q=0.5)
         logging.info(res.summary())
-        predicted = res.predict(pred_df).to_numpy()
+        exp_rdrs = res.predict(pred_df).to_numpy()
 
-        residuals = log_rdr - predicted
-        mean_log_rdr_fit = np.mean(log_rdr[sample_fit_mask])
-        corrected_log_rdr = residuals + mean_log_rdr_fit
-        corr_rdrs = np.exp2(corrected_log_rdr)
+        eps = np.nanquantile(exp_rdrs, eps_quantile)
+        logging.info(f"inferred epsilon for exp RDR={eps}")
+        den = np.clip(np.nan_to_num(exp_rdrs, nan=eps), eps, None)
+        corr_rdrs = raw_rdrs / den
 
-        nan_mask = ~np.isfinite(log_rdr)
-        if rt_vals is not None:
-            nan_mask |= ~np.isfinite(rt_vals)
-        if nan_mask.any():
-            med_corr = np.nanmedian(corr_rdrs[~nan_mask])
-            corr_rdrs[nan_mask] = med_corr
-            logging.info(
-                f"{rep_id}: imputed {nan_mask.sum()} NaN bins with median={med_corr:.4f}"
-            )
+        corr_factor = np.mean(corr_rdrs)
+        logging.info(f"normalization factor={corr_factor}")
 
-        exp_rdrs = np.exp2(predicted)
-        corrected_mat[:, si] = corr_rdrs / np.mean(corr_rdrs)
+        corrected_mat[:, si] = corr_rdrs / corr_factor
         if pdf is not None:
             plot_correction_diagnostics(
                 gc, raw_rdrs, corrected_mat[:, si],
@@ -516,21 +506,24 @@ def bias_correction_rdr_spline(
 
         residuals = log_rdr - predicted
         mean_log_rdr_fit = np.mean(log_rdr[fit_mask])
-        corrected_log_rdr = residuals + mean_log_rdr_fit
+        corr_log_rdrs = residuals + mean_log_rdr_fit
 
-        corrected_rdr = np.exp2(corrected_log_rdr)
+        corr_rdrs = np.exp2(corr_log_rdrs)
 
         nan_mask = ~np.isfinite(log_rdr)
         if rt_vals is not None:
             nan_mask |= ~np.isfinite(rt_vals)
         if nan_mask.any():
-            med_corr = np.nanmedian(corrected_rdr[~nan_mask])
-            corrected_rdr[nan_mask] = med_corr
+            med_corr = np.nanmedian(corr_rdrs[~nan_mask])
+            corr_rdrs[nan_mask] = med_corr
             logging.info(
                 f"{rep_id}: imputed {nan_mask.sum()} NaN bins with median={med_corr:.4f}"
             )
 
-        corrected_mat[:, si] = corrected_rdr / np.mean(corrected_rdr)
+        corr_factor = np.mean(corr_rdrs)
+        logging.info(f"normalization factor={corr_factor}")
+
+        corrected_mat[:, si] = corr_rdrs / corr_factor
 
         if pdf is not None:
             fitted_rdr = np.exp2(predicted)
