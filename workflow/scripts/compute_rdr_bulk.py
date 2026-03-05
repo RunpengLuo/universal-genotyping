@@ -145,7 +145,7 @@ if gc_correct:
     else:  # "quantile" — current default
         rdr_mtx_bb = bias_correction_rdr(
             rdr_mtx_bb, corr_factors, rep_ids[tumor_sidx:],
-            has_mapp=has_mapp, out_dir=qc_dir,
+            has_mapp=has_mapp, rt_df=rt_df, out_dir=qc_dir,
         )
     plot_file = os.path.join(qc_dir, f"gc_content_bb.pdf")
     plot_1d_sample(

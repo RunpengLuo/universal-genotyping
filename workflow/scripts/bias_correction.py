@@ -77,9 +77,10 @@ def bias_correction_rdr(
     gc_df: pd.DataFrame,
     rep_ids: list,
     has_mapp=False,
+    rt_df=None,
     out_dir=None,
     eps_quantile=0.01,
-    gc_quantile=[0.01, 0.99],
+    gc_quantile=[0.05, 0.95],
 ):
     """Correct read-depth ratios (RDR) for GC-content (and optionally mappability) bias.
 
@@ -117,23 +118,43 @@ def bias_correction_rdr(
     logging.info(f"GC-content range for fitting: [{gc_lo}, {gc_hi}]")
     fit_mask = (gc >= gc_lo) & (gc <= gc_hi)
 
+    chrs = gc_df["#CHR"].astype(str).to_numpy()
+    autosomes_mask = np.array([c not in ("X", "Y", "chrX", "chrY") for c in chrs])
+
     pdf = PdfPages(os.path.join(out_dir, "correction_diagnostics.pdf")) if out_dir else None
 
     gccorr_rdr_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
     for si, rep_id in enumerate(rep_ids):
         raw_rdrs = raw_rdr_mat[:, si]
-        gc_df = pd.DataFrame({"RD": raw_rdrs[fit_mask], "GC": gc[fit_mask]})
+
+        # Select best RT cell line (once per sample)
+        rt_vals = None
+        best_rt_name = None
+        if rt_df is not None:
+            best_rt_name, _ = select_best_rt_cellline(raw_rdrs, rt_df, autosomes_mask)
+            if best_rt_name is not None:
+                rt_vals = rt_df[best_rt_name].to_numpy()
+
+        # Build formula, fit_df, pred_df dynamically
+        sample_fit_mask = fit_mask.copy()
+        if rt_vals is not None:
+            sample_fit_mask &= np.isfinite(rt_vals)
+
+        fit_df = pd.DataFrame({"RD": raw_rdrs[sample_fit_mask], "GC": gc[sample_fit_mask]})
+        pred_df = pd.DataFrame({"GC": gc})
+        formula = "RD ~ GC + I(GC**2)"
         if has_mapp:
-            gc_df["MAP"] = mapv[fit_mask]
-            res = smf.quantreg("RD ~ GC + I(GC**2) + MAP + I(MAP**2)", data=gc_df).fit(
-                q=0.5
-            )
-            logging.info(res.summary())
-            exp_rdrs = res.predict(pd.DataFrame({"GC": gc, "MAP": mapv}))
-        else:
-            res = smf.quantreg("RD ~ GC + I(GC**2)", data=gc_df).fit(q=0.5)
-            logging.info(res.summary())
-            exp_rdrs = res.predict(pd.DataFrame({"GC": gc})).to_numpy()
+            fit_df["MAP"] = mapv[sample_fit_mask]
+            pred_df["MAP"] = mapv
+            formula += " + MAP + I(MAP**2)"
+        if rt_vals is not None:
+            fit_df["RT"] = rt_vals[sample_fit_mask]
+            pred_df["RT"] = np.where(np.isfinite(rt_vals), rt_vals, np.nanmedian(rt_vals))
+            formula += " + RT + I(RT**2)"
+
+        res = smf.quantreg(formula, data=fit_df).fit(q=0.5)
+        logging.info(res.summary())
+        exp_rdrs = res.predict(pred_df).to_numpy()
         eps = np.nanquantile(exp_rdrs, eps_quantile)
         logging.info(f"inferred epsilon for exp RDR={eps}")
         den = exp_rdrs.copy()
@@ -168,6 +189,7 @@ def bias_correction_rdr(
             plot_correction_diagnostics(
                 gc, raw_rdrs, gccorr_rdr_mat[:, si],
                 fitted_rdr=exp_rdrs, rep_id=rep_id, pdf=pdf,
+                rt_vals=rt_vals, rt_name=best_rt_name,
             )
 
     if pdf is not None:
@@ -403,7 +425,7 @@ def bias_correction_rdr_spline(
     has_mapp=False,
     rt_df=None,
     out_dir=None,
-    gc_quantile=(0.01, 0.99),
+    gc_quantile=(0.05, 0.95),
 ):
     """ASCAT-style spline RDR correction using natural splines on GC (+MAP, +RT).
 
