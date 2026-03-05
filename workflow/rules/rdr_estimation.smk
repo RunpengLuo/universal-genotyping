@@ -100,8 +100,8 @@ if workflow_mode == "bulk_genotyping":
     if _rdr_method == "window":
 
         _rdr_cfg = config["params_compute_rdr"]
-        assert _rdr_cfg.get("gc_bed") is not None, (
-            "rdr_method='window' requires params_compute_rdr.gc_bed to be set"
+        assert _rdr_cfg.get("bias_bed") is not None, (
+            "rdr_method='window' requires params_compute_rdr.bias_bed to be set"
         )
 
         rule run_mosdepth_bulk_window:
@@ -118,7 +118,7 @@ if workflow_mode == "bulk_genotyping":
                 out_prefix=config["bb_dir"] + "/{assay_type}/out_mosdepth_window/{rep_id}",
                 read_quality=config["params_mosdepth"]["read_quality"],
                 extra_params=config["params_mosdepth"].get("extra_params", ""),
-                window_size=_rdr_cfg.get("window_size", 1000),
+                window_size=_rdr_cfg.get("window_size", 1000),  # default 1000 bp
             log:
                 config["log_dir"]
                 + "/run_mosdepth_bulk_window/run_mosdepth_bulk_window.{assay_type}_{rep_id}.log",
@@ -139,7 +139,7 @@ if workflow_mode == "bulk_genotyping":
                 sample_file=lambda wc: config["bb_dir"]
                 + f"/{wc.assay_type}/sample_ids.tsv",
                 bb_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/bb.tsv.gz",
-                gc_bed=_rdr_cfg["gc_bed"],
+                bias_bed=_rdr_cfg["bias_bed"],
                 mosdepth_files=lambda wc: [
                     config["bb_dir"]
                     + f"/{wc.assay_type}/out_mosdepth_window/{rep_id}.regions.bed.gz"

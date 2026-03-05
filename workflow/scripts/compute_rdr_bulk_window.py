@@ -34,7 +34,7 @@ logging.basicConfig(
 # input
 sample_file = sm.input["sample_file"]
 bb_file = sm.input["bb_file"]
-gc_bed_file = sm.input["gc_bed"]
+bias_bed_file = sm.input["bias_bed"]
 genome_size = sm.input["genome_size"]
 region_bed_file = sm.input["region_bed"]
 
@@ -58,12 +58,14 @@ def correct_readcount(
     reads,
     gc,
     mappability=None,
+    repliseq=None,
     samplesize=50000,
     routlier=0.01,
     doutlier=0.001,
     min_mappability=0.9,
 ):
-    """Full HMMcopy-style correctReadcount: GC stage + optional mappability stage.
+    """HMMcopy-style correctReadcount: GC + optional mappability + optional
+    replication timing stages (ACEseq-style sequential LOWESS correction).
 
     Parameters
     ----------
@@ -73,6 +75,10 @@ def correct_readcount(
         Per-window GC fraction in [0, 1].
     mappability : np.ndarray or None
         Per-window mappability values in [0, 1]. If None, stage 2 is skipped.
+    repliseq : np.ndarray or None
+        Per-window consensus replication timing score. If None, stage 3 is
+        skipped.  Higher values = earlier replication = higher expected
+        coverage in cycling cells.
     samplesize : int
         Max number of ideal bins for loess fitting.
     routlier : float
@@ -147,65 +153,127 @@ def correct_readcount(
         cor_gc[valid_gc] *= scale
 
     # --- Stage 2: Mappability correction ---
-    if mappability is None:
-        return cor_gc.astype(np.float32)
+    if mappability is not None:
+        map_lo = np.nanquantile(mappability, doutlier)
+        map_hi = np.nanquantile(mappability, 1.0 - doutlier)
 
-    map_lo = np.nanquantile(mappability, doutlier)
-    map_hi = np.nanquantile(mappability, 1.0 - doutlier)
+        valid2 = (cor_gc > 0) & np.isfinite(mappability)
+        read_hi2 = np.nanquantile(cor_gc[valid2], 1.0 - routlier)
+        ideal2 = (
+            valid2
+            & (cor_gc <= read_hi2)
+            & (mappability >= map_lo)
+            & (mappability <= map_hi)
+        )
 
-    valid2 = (cor_gc > 0) & np.isfinite(mappability)
-    read_hi2 = np.nanquantile(cor_gc[valid2], 1.0 - routlier)
-    ideal2 = (
-        valid2
-        & (cor_gc <= read_hi2)
-        & (mappability >= map_lo)
-        & (mappability <= map_hi)
+        ideal_idx2 = np.where(ideal2)[0]
+        logging.info(
+            f"  MAP stage: {ideal_idx2.size}/{int(valid2.sum())} ideal bins ({ideal_idx2.size / valid2.sum() * 100:.1f}%)"
+        )
+
+        if ideal_idx2.size > samplesize:
+            rng = np.random.default_rng(43)
+            ideal_idx2 = rng.choice(ideal_idx2, size=samplesize, replace=False)
+
+        map_ideal = mappability[ideal_idx2]
+        cor_gc_ideal = cor_gc[ideal_idx2]
+
+        s1_map = lowess(cor_gc_ideal, map_ideal, frac=0.03, return_sorted=True)
+        grid_map = np.linspace(0, 1, 1001)
+        s1_map_interp = interp1d(
+            s1_map[:, 0],
+            s1_map[:, 1],
+            kind="linear",
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
+        grid_map_pred = s1_map_interp(grid_map)
+        s2_map = lowess(grid_map_pred, grid_map, frac=0.3, return_sorted=True)
+        final_map_interp = interp1d(
+            s2_map[:, 0],
+            s2_map[:, 1],
+            kind="linear",
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
+
+        map_predicted = final_map_interp(mappability)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            cor_map = np.where(
+                (map_predicted > 0) & (cor_gc > 0),
+                cor_gc / map_predicted,
+                0.0,
+            )
+        valid_map = (map_predicted > 0) & (cor_gc > 0)
+        if valid_map.any():
+            scale2 = np.median(cor_gc[valid_map]) / np.median(cor_map[valid_map])
+            cor_map[valid_map] *= scale2
+
+        cor_prev = cor_map
+    else:
+        cor_prev = cor_gc
+
+    # --- Stage 3: Replication timing correction (ACEseq-style) ---
+    if repliseq is None:
+        return cor_prev.astype(np.float32)
+
+    repli_finite = np.isfinite(repliseq)
+    repli_lo = np.nanquantile(repliseq[repli_finite], doutlier)
+    repli_hi = np.nanquantile(repliseq[repli_finite], 1.0 - doutlier)
+
+    valid3 = (cor_prev > 0) & repli_finite
+    read_hi3 = np.nanquantile(cor_prev[valid3], 1.0 - routlier)
+    ideal3 = (
+        valid3
+        & (cor_prev <= read_hi3)
+        & (repliseq >= repli_lo)
+        & (repliseq <= repli_hi)
     )
 
-    ideal_idx2 = np.where(ideal2)[0]
+    ideal_idx3 = np.where(ideal3)[0]
     logging.info(
-        f"  MAP stage: {ideal_idx2.size}/{int(valid2.sum())} ideal bins ({ideal_idx2.size / valid2.sum() * 100:.1f}%)"
+        f"  REPLI stage: {ideal_idx3.size}/{int(valid3.sum())} ideal bins ({ideal_idx3.size / valid3.sum() * 100:.1f}%)"
     )
 
-    if ideal_idx2.size > samplesize:
-        rng = np.random.default_rng(43)
-        ideal_idx2 = rng.choice(ideal_idx2, size=samplesize, replace=False)
+    if ideal_idx3.size > samplesize:
+        rng = np.random.default_rng(44)
+        ideal_idx3 = rng.choice(ideal_idx3, size=samplesize, replace=False)
 
-    map_ideal = mappability[ideal_idx2]
-    cor_gc_ideal = cor_gc[ideal_idx2]
+    repli_ideal = repliseq[ideal_idx3]
+    cor_prev_ideal = cor_prev[ideal_idx3]
 
-    s1_map = lowess(cor_gc_ideal, map_ideal, frac=0.03, return_sorted=True)
-    grid_map = np.linspace(0, 1, 1001)
-    s1_map_interp = interp1d(
-        s1_map[:, 0],
-        s1_map[:, 1],
+    s1_repli = lowess(cor_prev_ideal, repli_ideal, frac=0.03, return_sorted=True)
+    grid_repli = np.linspace(repli_lo, repli_hi, 1001)
+    s1_repli_interp = interp1d(
+        s1_repli[:, 0],
+        s1_repli[:, 1],
         kind="linear",
         bounds_error=False,
         fill_value="extrapolate",
     )
-    grid_map_pred = s1_map_interp(grid_map)
-    s2_map = lowess(grid_map_pred, grid_map, frac=0.3, return_sorted=True)
-    final_map_interp = interp1d(
-        s2_map[:, 0],
-        s2_map[:, 1],
+    grid_repli_pred = s1_repli_interp(grid_repli)
+    s2_repli = lowess(grid_repli_pred, grid_repli, frac=0.3, return_sorted=True)
+    final_repli_interp = interp1d(
+        s2_repli[:, 0],
+        s2_repli[:, 1],
         kind="linear",
         bounds_error=False,
         fill_value="extrapolate",
     )
 
-    map_predicted = final_map_interp(mappability)
+    repli_predicted = final_repli_interp(repliseq)
     with np.errstate(invalid="ignore", divide="ignore"):
-        cor_map = np.where(
-            (map_predicted > 0) & (cor_gc > 0),
-            cor_gc / map_predicted,
+        cor_repli = np.where(
+            (repli_predicted > 0) & (cor_prev > 0),
+            cor_prev / repli_predicted,
             0.0,
         )
-    valid_map = (map_predicted > 0) & (cor_gc > 0)
-    if valid_map.any():
-        scale2 = np.median(cor_gc[valid_map]) / np.median(cor_map[valid_map])
-        cor_map[valid_map] *= scale2
+    valid_repli = (repli_predicted > 0) & (cor_prev > 0)
+    if valid_repli.any():
+        scale3 = np.median(cor_prev[valid_repli]) / np.median(cor_repli[valid_repli])
+        cor_repli[valid_repli] *= scale3
 
-    return cor_map.astype(np.float32)
+    return cor_repli.astype(np.float32)
 
 
 def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
@@ -282,9 +350,9 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
 
 ##################################################
 logging.info("load GC BED")
-gc_bed_full = pd.read_table(gc_bed_file, sep="\t")
-assert "#CHR" in gc_bed_full.columns and "GC" in gc_bed_full.columns, (
-    f"gc_bed must have #CHR, START, END, GC columns; got {gc_bed_full.columns.tolist()}"
+bias_bed_full = pd.read_table(bias_bed_file, sep="\t")
+assert "#CHR" in bias_bed_full.columns and "GC" in bias_bed_full.columns, (
+    f"bias_bed must have #CHR, START, END, GC columns; got {bias_bed_full.columns.tolist()}"
 )
 
 ##################################################
@@ -309,24 +377,30 @@ coords = mos_dfs[0][join_keys].copy()
 n_windows = len(coords)
 logging.info(f"{n_windows} windows across {len(target_chroms)} chromosomes")
 
-gc_bed = pd.merge(left=coords, right=gc_bed_full, on=join_keys, how="left", sort=False)
-n_matched = int(gc_bed["GC"].notna().sum())
+bias_bed = pd.merge(left=coords, right=bias_bed_full, on=join_keys, how="left", sort=False)
+n_matched = int(bias_bed["GC"].notna().sum())
 logging.info(f"GC BED matched {n_matched}/{n_windows} windows")
 
 # exclude centromeric windows (not in region_bed)
 logging.info("building region mask from region_bed")
 regions = read_region_file(region_bed_file)
-win_mask_region = get_mask_by_region_intervals(gc_bed, regions)
+win_mask_region = get_mask_by_region_intervals(bias_bed, regions)
 n_excluded = int((~win_mask_region).sum())
 logging.info(f"excluding {n_excluded}/{n_windows} centromeric windows")
 
-gc_bed = gc_bed.loc[win_mask_region].reset_index(drop=True)
+bias_bed = bias_bed.loc[win_mask_region].reset_index(drop=True)
 mos_dfs = [df.loc[win_mask_region].reset_index(drop=True) for df in mos_dfs]
-n_windows = len(gc_bed)
+n_windows = len(bias_bed)
 logging.info(f"after filtering: {n_windows} windows")
 
-gc_vals = gc_bed["GC"].to_numpy()
-map_vals = gc_bed["MAP"].to_numpy() if "MAP" in gc_bed.columns else None
+gc_vals = bias_bed["GC"].to_numpy()
+map_vals = bias_bed["MAP"].to_numpy() if "MAP" in bias_bed.columns else None
+repli_vals = bias_bed["REPLI"].to_numpy(dtype=np.float64) if "REPLI" in bias_bed.columns else None
+if repli_vals is not None:
+    n_repli = int(np.isfinite(repli_vals).sum())
+    logging.info(f"REPLI column found: {n_repli}/{n_windows} finite values")
+else:
+    logging.info("no REPLI column in bias_bed; skipping replication timing correction")
 
 dp_mat = np.zeros((n_windows, nsamples), dtype=np.float32)
 for i, mos_df in enumerate(mos_dfs):
@@ -342,6 +416,7 @@ for i, rep_id in enumerate(rep_ids):
         dp_mat[:, i],
         gc_vals,
         mappability=map_vals,
+        repliseq=repli_vals,
         samplesize=samplesize,
         routlier=routlier,
         doutlier=doutlier,
@@ -365,7 +440,7 @@ for i, rep_id in enumerate(rep_ids):
 
     plot_file = os.path.join(qc_dir, f"depth_window_before_correction.{rep_id}.pdf")
     plot_1d_sample(
-        gc_bed, v, genome_size, plot_file,
+        bias_bed, v, genome_size, plot_file,
         unit="window", val_type="RD", max_ylim=rd_ylim,
     )
 
@@ -376,7 +451,7 @@ for i, rep_id in enumerate(rep_ids):
 
     plot_file = os.path.join(qc_dir, f"depth_window_after_correction.{rep_id}.pdf")
     plot_1d_sample(
-        gc_bed, vc, genome_size, plot_file,
+        bias_bed, vc, genome_size, plot_file,
         unit="window", val_type="RD", max_ylim=rd_ylim,
     )
 
@@ -388,7 +463,7 @@ logging.info(f"compute RDRs, has_normal={has_normal}")
 assert has_normal, "no normal sample for RDR computation"
 tumor_sidx = {False: 0, True: 1}[has_normal]
 
-window_sizes = (gc_bed["END"] - gc_bed["START"]).to_numpy(dtype=np.float64)
+window_sizes = (bias_bed["END"] - bias_bed["START"]).to_numpy(dtype=np.float64)
 
 bases_mat = dp_corrected * window_sizes[:, None]
 total_bases = np.sum(bases_mat, axis=0)
@@ -415,7 +490,7 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
 
     plot_file = os.path.join(qc_dir, f"rdr_window.{rep_id}.pdf")
     plot_1d_sample(
-        gc_bed,
+        bias_bed,
         v,
         genome_size,
         plot_file,
@@ -427,9 +502,11 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
 np.savez_compressed(sm.output["rdr_mtx"], mat=rdr_mat)
 
 out_cols = ["#CHR", "START", "END", "GC"]
-if "MAP" in gc_bed.columns:
+if "MAP" in bias_bed.columns:
     out_cols.append("MAP")
-gc_bed[out_cols].to_csv(
+if "REPLI" in bias_bed.columns:
+    out_cols.append("REPLI")
+bias_bed[out_cols].to_csv(
     sm.output["bins_tsv"],
     sep="\t",
     header=True,
@@ -444,8 +521,8 @@ n_bb = len(bbs)
 n_tumors = rdr_mat.shape[1]
 bb_rdr = np.full((n_bb, n_tumors), 1.0, dtype=np.float32)
 
-win_chr = gc_bed["#CHR"].to_numpy()
-win_start = gc_bed["START"].to_numpy(dtype=np.int64)
+win_chr = bias_bed["#CHR"].to_numpy()
+win_start = bias_bed["START"].to_numpy(dtype=np.int64)
 
 for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
     win_mask = win_chr == chrom

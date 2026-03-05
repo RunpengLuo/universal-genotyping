@@ -170,8 +170,8 @@ params_compute_rdr:
   correction_method: "quantile"   # "quantile" (default) | "spline" (ASCAT-style) | "loess" (Benjamini/HMMcopy, pre-RDR)
   rt_file: null                    # path to ASCAT RT TSV (e.g. RT_G1000_WGS_hg38.txt), null = skip RT
   # --- window method (rdr_method: "window") ---
-  gc_bed: null              # path to pre-built fixed-width GC BED (required for window mode)
-  window_size: 500          # mosdepth window size (bp)
+  bias_bed: null            # path to pre-built fixed-width bias BED with GC, MAP, REPLI columns (required for window mode)
+  window_size: 1000         # mosdepth window size (bp)
   samplesize: 50000         # max ideal bins for loess
   routlier: 0.01            # read-count outlier quantile
   doutlier: 0.001           # GC/map domain outlier quantile
