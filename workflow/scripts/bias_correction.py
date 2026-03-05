@@ -205,6 +205,7 @@ def plot_correction_diagnostics(
         Name of the selected RT cell line (used in axis labels).
     """
     mad = lambda x: np.median(np.abs(x - np.median(x)))
+    fitted_rdr = np.asarray(fitted_rdr)
 
     has_rt = rt_vals is not None
     if has_rt:
@@ -233,9 +234,8 @@ def plot_correction_diagnostics(
         valid = np.isfinite(rt_vals)
         mad_raw_rt = mad(raw_rdr[valid])
         mad_corr_rt = mad(corr_rdr[valid])
-        sort_idx_rt = np.argsort(rt_vals[valid])
         axes[1, 0].scatter(rt_vals[valid], raw_rdr[valid], s=2, alpha=0.2, rasterized=True)
-        axes[1, 0].plot(rt_vals[valid][sort_idx_rt], fitted_rdr[valid][sort_idx_rt], linewidth=2, color="red", label="fit")
+        axes[1, 0].scatter(rt_vals[valid], fitted_rdr[valid], s=2, alpha=0.2, color="red", label="fit", rasterized=True)
         axes[1, 0].legend()
         axes[1, 0].set_xlabel(f"RT ({rt_name})")
         axes[1, 0].set_ylabel("RDR")
