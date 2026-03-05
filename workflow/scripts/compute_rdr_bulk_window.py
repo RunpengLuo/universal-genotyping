@@ -460,24 +460,35 @@ np.savez_compressed(sm.output["dp_mtx"], mat=dp_corrected)
 ##################################################
 has_normal = "normal" in sample_types
 logging.info(f"compute RDRs, has_normal={has_normal}")
-assert has_normal, "no normal sample for RDR computation"
-tumor_sidx = {False: 0, True: 1}[has_normal]
 
-window_sizes = (bias_bed["END"] - bias_bed["START"]).to_numpy(dtype=np.float64)
+if has_normal:
+    tumor_sidx = 1
+    window_sizes = (bias_bed["END"] - bias_bed["START"]).to_numpy(dtype=np.float64)
 
-bases_mat = dp_corrected * window_sizes[:, None]
-total_bases = np.sum(bases_mat, axis=0)
-library_correction = total_bases[0] / total_bases[1:]
-logging.info(f"RDR library normalization factor: {library_correction}")
+    bases_mat = dp_corrected * window_sizes[:, None]
+    total_bases = np.sum(bases_mat, axis=0)
+    library_correction = total_bases[0] / total_bases[1:]
+    logging.info(f"RDR library normalization factor: {library_correction}")
 
-normal_dp = dp_corrected[:, 0].copy()
-valid = np.isfinite(normal_dp) & (normal_dp > 0)
-logging.info(f"normal: {int(valid.sum())}/{n_windows} valid bins")
+    normal_dp = dp_corrected[:, 0].copy()
+    valid = np.isfinite(normal_dp) & (normal_dp > 0)
+    logging.info(f"normal: {int(valid.sum())}/{n_windows} valid bins")
 
-with np.errstate(invalid="ignore", divide="ignore"):
-    rdr_mat = dp_corrected[:, 1:] / normal_dp[:, None]
-    rdr_mat *= library_correction[None, :]
-rdr_mat[~valid, :] = np.nan
+    with np.errstate(invalid="ignore", divide="ignore"):
+        rdr_mat = dp_corrected[:, 1:] / normal_dp[:, None]
+        rdr_mat *= library_correction[None, :]
+    rdr_mat[~valid, :] = np.nan
+else:
+    tumor_sidx = 0
+    # No matched normal: median-center each sample independently
+    rdr_mat = np.full_like(dp_corrected, np.nan)
+    for i in range(nsamples):
+        col = dp_corrected[:, i]
+        valid_i = np.isfinite(col) & (col > 0)
+        med = np.median(col[valid_i])
+        logging.info(f"  median-centering {rep_ids[i]}: median={med:.4f}")
+        with np.errstate(invalid="ignore", divide="ignore"):
+            rdr_mat[valid_i, i] = col[valid_i] / med
 
 rdr_ylim = np.round(np.nanquantile(rdr_mat, 0.99)).astype(int) + 1
 logging.info(f"window RDR y-lim={rdr_ylim}")
@@ -515,11 +526,12 @@ bias_bed[out_cols].to_csv(
 )
 
 ##################################################
-logging.info("aggregating window RDR into adaptive bins")
+logging.info("aggregating window data into adaptive bins")
 bbs = pd.read_table(bb_file, sep="\t")
 n_bb = len(bbs)
 n_tumors = rdr_mat.shape[1]
 bb_rdr = np.full((n_bb, n_tumors), 1.0, dtype=np.float32)
+bb_dp = np.full((n_bb, nsamples), np.nan, dtype=np.float32)
 
 win_chr = bias_bed["#CHR"].to_numpy()
 win_start = bias_bed["START"].to_numpy(dtype=np.int64)
@@ -542,6 +554,18 @@ for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
         win_starts_chr[valid_assign] < bb_ends[bin_idx[valid_assign]]
     )
 
+    # Aggregate corrected depth (all samples)
+    for s in range(nsamples):
+        dp_chr = dp_corrected[win_idx_chr, s]
+        finite = valid_assign & np.isfinite(dp_chr)
+        bi = bin_idx[finite]
+        vals = dp_chr[finite]
+        sums = np.bincount(bi, weights=vals, minlength=n_bb_chr)
+        counts = np.bincount(bi, minlength=n_bb_chr)
+        means = np.where(counts > 0, sums / counts, np.nan)
+        bb_dp[bb_global_idx, s] = means
+
+    # Aggregate RDR (tumor samples only)
     n_defaulted = 0
     for t in range(n_tumors):
         rdr_chr = rdr_mat[win_idx_chr, t]
@@ -562,6 +586,7 @@ for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
 n_filled = int(np.isfinite(bb_rdr[:, 0]).sum())
 logging.info(f"bb RDR: {n_filled}/{n_bb} bins filled from window RDR")
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=bb_rdr)
+np.savez_compressed(sm.output["dp_mtx_bb"], mat=bb_dp)
 
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
     v = bb_rdr[:, i]

@@ -151,6 +151,7 @@ if workflow_mode == "bulk_genotyping":
                 dp_mtx=config["bb_dir"] + "/{assay_type}/window.depth.npz",
                 rdr_mtx=config["bb_dir"] + "/{assay_type}/window.rdr.npz",
                 rdr_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.rdr.npz",
+                dp_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.depth.npz",
                 bins_tsv=config["bb_dir"] + "/{assay_type}/window.bins.tsv.gz",
                 qc_dir=directory(config["qc_dir"] + "/{assay_type}/compute_rdr_bulk_window/"),
             wildcard_constraints:

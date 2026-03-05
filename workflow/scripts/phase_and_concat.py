@@ -135,10 +135,10 @@ logging.info(f"filter by non-region SNPs, #passed SNPs={np.sum(region_mask)}/{le
 snp_mask = snp_mask & region_mask
 
 if blacklist_bed is not None:
-    repeat_regions = read_region_file(blacklist_bed)
-    repeat_mask = get_mask_by_region(snps, repeat_regions)
-    logging.info(f"#SNPs in repeat/segdup regions={np.sum(repeat_mask)}/{len(snps)}")
-    snp_mask = snp_mask & ~repeat_mask
+    bl_regions = read_region_file(blacklist_bed)
+    bl_mask = get_mask_by_region(snps, bl_regions)
+    logging.info(f"#SNPs in repeat/segdup regions={np.sum(bl_mask)}/{len(snps)}")
+    snp_mask = snp_mask & ~bl_mask
 
 snps, genes_gtf, gene_mask = annotate_feature_type(snps, gtf_file)
 if is_bulk_assay:
