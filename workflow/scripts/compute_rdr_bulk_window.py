@@ -15,7 +15,8 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 from scipy.stats import pearsonr
 
 from utils import *
-from postprocess_utils import plot_1d_sample
+from io_utils import read_region_file
+from postprocess_utils import plot_1d_sample, get_mask_by_region_intervals
 
 import matplotlib
 
@@ -35,6 +36,7 @@ sample_file = sm.input["sample_file"]
 bb_file = sm.input["bb_file"]
 gc_bed_file = sm.input["gc_bed"]
 genome_size = sm.input["genome_size"]
+region_bed_file = sm.input["region_bed"]
 
 sample_name = sm.params["sample_name"]
 qc_dir = sm.output["qc_dir"]
@@ -297,14 +299,24 @@ logging.info(f"{n_windows} windows across {len(target_chroms)} chromosomes")
 gc_bed = pd.merge(left=coords, right=gc_bed_full, on=join_keys, how="left", sort=False)
 n_matched = int(gc_bed["GC"].notna().sum())
 logging.info(f"GC BED matched {n_matched}/{n_windows} windows")
+
+# exclude centromeric windows (not in region_bed)
+logging.info("building region mask from region_bed")
+regions = read_region_file(region_bed_file)
+win_mask_region = get_mask_by_region_intervals(gc_bed, regions)
+n_excluded = int((~win_mask_region).sum())
+logging.info(f"excluding {n_excluded}/{n_windows} centromeric windows")
+
+gc_bed = gc_bed.loc[win_mask_region].reset_index(drop=True)
+mos_dfs = [df.loc[win_mask_region].reset_index(drop=True) for df in mos_dfs]
+n_windows = len(gc_bed)
+logging.info(f"after filtering: {n_windows} windows")
+
 gc_vals = gc_bed["GC"].to_numpy()
 map_vals = gc_bed["MAP"].to_numpy() if "MAP" in gc_bed.columns else None
 
 dp_mat = np.zeros((n_windows, nsamples), dtype=np.float32)
 for i, mos_df in enumerate(mos_dfs):
-    assert len(mos_df) == n_windows, (
-        f"{rep_ids[i]} rowcount={len(mos_df)} != {n_windows}"
-    )
     dp_mat[:, i] = mos_df["DEPTH"].to_numpy(dtype=np.float32)
 logging.info(f"depth matrix shape: {dp_mat.shape}")
 

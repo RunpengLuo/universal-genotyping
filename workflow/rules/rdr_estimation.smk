@@ -131,6 +131,7 @@ if workflow_mode == "bulk_genotyping":
                     {params.extra_params} \
                     "{params.out_prefix}" \
                     "{input.bam}" > {log} 2>&1
+                cat "{params.out_prefix}.mosdepth.summary.txt" >> {log} 2>/dev/null || true
                 """
 
         rule compute_rdr_bulk_window:
@@ -145,6 +146,7 @@ if workflow_mode == "bulk_genotyping":
                     for rep_id in assay2rep_ids[wc.assay_type]
                 ],
                 genome_size=config["genome_size"],
+                region_bed=lambda wc: config["region_bed"],
             output:
                 dp_mtx=config["bb_dir"] + "/{assay_type}/window.depth.npz",
                 rdr_mtx=config["bb_dir"] + "/{assay_type}/window.rdr.npz",

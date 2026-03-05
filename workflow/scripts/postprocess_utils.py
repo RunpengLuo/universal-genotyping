@@ -248,6 +248,27 @@ def get_mask_by_region(snps: pd.DataFrame, regions: pd.DataFrame) -> np.ndarray:
     return mask
 
 
+def get_mask_by_region_intervals(bins_df: pd.DataFrame, regions: pd.DataFrame) -> np.ndarray:
+    """Return a boolean mask indicating whether each bin overlaps any region.
+
+    Parameters
+    ----------
+    bins_df : pd.DataFrame
+        Must have ``#CHR``, ``START``, ``END`` columns (0-based half-open).
+    regions : pd.DataFrame
+        Must have ``Chromosome``, ``Start``, ``End`` columns (from ``read_region_file``).
+    """
+    tmp = bins_df[["#CHR", "START", "END"]].copy()
+    tmp["_idx"] = np.arange(len(tmp))
+    pr_bins = pr.PyRanges(
+        tmp.rename(columns={"#CHR": "Chromosome", "START": "Start", "END": "End"})
+    )
+    pr_regions = pr.PyRanges(regions)
+    overlapping = pr_bins.overlap(pr_regions).df
+    keep_idx = set(overlapping["_idx"].unique()) if not overlapping.empty else set()
+    return np.isin(np.arange(len(bins_df)), list(keep_idx))
+
+
 def get_mask_by_depth(snps: pd.DataFrame, tot_mtx: csr_matrix, min_dp=1):
     """Return a boolean mask keeping SNPs where every sample meets the minimum depth.
 
