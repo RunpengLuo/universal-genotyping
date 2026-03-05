@@ -161,7 +161,7 @@ if workflow_mode == "bulk_genotyping":
                 dp_mtx_bb=config["bb_dir"] + "/{assay_type}/raw/bb.raw.depth.npz",
                 bins_tsv=config["bb_dir"] + "/{assay_type}/window.bins.tsv.gz",
                 corr_factors=config["bb_dir"] + "/{assay_type}/raw/bb.raw.corr_factors.tsv.gz",
-                qc_dir=directory(config["qc_dir"] + "/{assay_type}/compute_rdr_bulk_window/"),
+                qc_dir=directory(config["qc_dir"] + "/{assay_type}/compute_rdr_bulk/"),
             wildcard_constraints:
                 assay_type="(bulkDNA|bulkWGS|bulkWES)",
             params:
