@@ -33,6 +33,7 @@ if workflow_mode == "bulk_genotyping":
             gc_lo=_filter_cfg.get("gc_lo", 0.01),
             gc_hi=_filter_cfg.get("gc_hi", 0.99),
             map_tol=_filter_cfg.get("map_tol", 0.2),
+            rdr_hi=_filter_cfg.get("rdr_hi", 0.999),
         log:
             config["log_dir"] + "/qc_filter_bulk_bb.{assay_type}.log",
         run:
@@ -58,6 +59,12 @@ if workflow_mode == "bulk_genotyping":
             nan_rdr = np.any(np.isnan(rdr), axis=1)
             mask &= ~nan_rdr
             logging.info(f"NaN RDR filter: {nan_rdr.sum()}/{n}")
+
+            max_rdr = np.nanmax(rdr, axis=1)
+            rdr_hi_val = np.nanquantile(max_rdr[mask], params.rdr_hi)
+            bad_rdr = max_rdr > rdr_hi_val
+            mask &= ~bad_rdr
+            logging.info(f"outlier RDR filter (>{params.rdr_hi} quantile = {rdr_hi_val:.3f}): {bad_rdr.sum()}/{n}")
 
             gc = corr["GC"].to_numpy()
             gc_lo_val = np.nanquantile(gc[mask], params.gc_lo)

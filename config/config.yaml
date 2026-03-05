@@ -150,6 +150,7 @@ params_filter_bins:
   gc_lo: 0.01
   gc_hi: 0.99
   map_tol: 0.2
+  rdr_hi: 0.999      # remove bins above 99.9th percentile RDR
 
 ##################################################
 threads:
