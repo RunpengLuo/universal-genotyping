@@ -50,6 +50,10 @@ def correct_readcount(
     routlier=0.01,
     doutlier=0.001,
     min_mappability=0.9,
+    lowess_frac_tight=0.03,
+    lowess_frac_smooth=0.3,
+    grid_size=1001,
+    seed=42,
 ):
     """HMMcopy-style correctReadcount: GC + optional mappability + optional
     replication timing stages (ACEseq-style sequential LOWESS correction).
@@ -74,6 +78,14 @@ def correct_readcount(
         Quantile for GC/mappability domain outlier removal (top/bottom).
     min_mappability : float
         Minimum mappability for ideal bins.
+    lowess_frac_tight : float
+        Bandwidth fraction for the first (tight) LOWESS pass.
+    lowess_frac_smooth : float
+        Bandwidth fraction for the second (smoothing) LOWESS pass.
+    grid_size : int
+        Number of grid points for LOWESS interpolation.
+    seed : int
+        Base random seed for subsampling ideal bins (incremented per stage).
 
     Returns
     -------
@@ -86,7 +98,7 @@ def correct_readcount(
 
     def _fit_lowess_interp(y, x, grid):
         """Tight LOWESS -> grid smooth -> final interpolator."""
-        s1 = lowess(y, x, frac=0.03, return_sorted=True)
+        s1 = lowess(y, x, frac=lowess_frac_tight, return_sorted=True)
         s1_fn = interp1d(
             s1[:, 0],
             s1[:, 1],
@@ -94,7 +106,7 @@ def correct_readcount(
             bounds_error=False,
             fill_value="extrapolate",
         )
-        s2 = lowess(s1_fn(grid), grid, frac=0.3, return_sorted=True)
+        s2 = lowess(s1_fn(grid), grid, frac=lowess_frac_smooth, return_sorted=True)
         return interp1d(
             s2[:, 0],
             s2[:, 1],
@@ -143,25 +155,25 @@ def correct_readcount(
     logging.info("  GC stage:")
     gc_lo = np.nanquantile(gc, doutlier)
     gc_hi = np.nanquantile(gc, 1.0 - doutlier)
-    grid_01 = np.linspace(0, 1, 1001)
+    grid_01 = np.linspace(0, 1, grid_size)
     extra = (mappability >= min_mappability) if mappability is not None else None
     cor = _apply_stage(
-        reads, gc, gc_lo, gc_hi, grid_01, seed=42, extra_ideal_mask=extra
+        reads, gc, gc_lo, gc_hi, grid_01, seed=seed, extra_ideal_mask=extra
     )
 
     if mappability is not None:
         logging.info("  MAP stage:")
         map_lo = np.nanquantile(mappability, doutlier)
         map_hi = np.nanquantile(mappability, 1.0 - doutlier)
-        cor = _apply_stage(cor, mappability, map_lo, map_hi, grid_01, seed=43)
+        cor = _apply_stage(cor, mappability, map_lo, map_hi, grid_01, seed=seed + 1)
 
     if repliseq is not None:
         logging.info("  REPLI stage:")
         repli_finite = np.isfinite(repliseq)
         repli_lo = np.nanquantile(repliseq[repli_finite], doutlier)
         repli_hi = np.nanquantile(repliseq[repli_finite], 1.0 - doutlier)
-        grid_repli = np.linspace(repli_lo, repli_hi, 1001)
-        cor = _apply_stage(cor, repliseq, repli_lo, repli_hi, grid_repli, seed=44)
+        grid_repli = np.linspace(repli_lo, repli_hi, grid_size)
+        cor = _apply_stage(cor, repliseq, repli_lo, repli_hi, grid_repli, seed=seed + 2)
 
     return cor.astype(np.float32)
 

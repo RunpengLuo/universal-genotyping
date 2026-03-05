@@ -61,7 +61,7 @@ To build from scratch, see `resources/scripts/build_gc_bed.hg38.py` and `resourc
 
 ## Blacklist BED
 
-Set via `blacklist_bed` in config. Pre-built: `resources/data/hg38-blacklist.v2.bed.gz` (ENCODE blacklist v2).
+Set via `blacklist_bed` in config. Pre-built: `resources/data/hg38-blacklist.v2.bed.gz` ([ENCODE blacklist v2](https://github.com/Boyle-Lab/Blacklist)).
 
 ---
 
