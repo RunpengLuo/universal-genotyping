@@ -108,7 +108,7 @@ python resources/scripts/build_blacklist.hg38.py \
 
 **Choosing `--read_length`:** Default is **150** for standard short-read WGS/WES. GEM-mappability supports arbitrary k-mer lengths. The blacklist also includes UCSC segdups and simple repeats regardless of read length.
 
-**Pre-computed mappability BigWigs:** If you prefer to skip the GEM pipeline, [pre-built hg38 mappability files](https://zenodo.org/records/5521424) (generated with GEM) are available for read lengths 35–250 bp. Place the `.bw` file in your `--work_dir` as `mappability.bw` and the script will skip step 1.
+**Pre-computed mappability BigWigs:** If you prefer to skip the GEM pipeline, [pre-built hg38 mappability files](https://zenodo.org/records/5521424) (generated with GEM) are available for read lengths 35–250 bp. Place the `.bw` file in your `--work_dir` as `mappability.bw` and the script will skip step 1. Additional single-read and multi-read mappability tracks (BED/BigWig) for various k-mer lengths are available from [Bismap](https://bismap.hoffmanlab.org). Note that 0-values (unmappable regions) are currently omitted from Bismap files; the pipeline fills missing windows with 0.0.
 
 Run `python resources/scripts/build_blacklist.hg38.py --help` for full usage.
 
