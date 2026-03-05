@@ -87,7 +87,9 @@ if workflow_mode == "bulk_genotyping":
             bb_out = bb[mask].copy().reset_index(drop=True)
 
             # reassign bin boundaries to fill regions (avoid gaps from removed bins)
-            from scripts.io_utils import read_region_file
+            import sys, os
+            sys.path.insert(0, os.path.join(workflow.basedir, "scripts"))
+            from io_utils import read_region_file
 
             regions = read_region_file(input.region_bed)
             bin_pos = (bb_out["START0"].to_numpy(dtype=np.float64)
