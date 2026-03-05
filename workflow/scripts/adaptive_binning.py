@@ -285,4 +285,5 @@ else:
 if all_barcodes is not None:
     barcodes_out = os.path.join(os.path.dirname(sm.output["bb_file"]), "barcodes.tsv.gz")
     shutil.copy2(all_barcodes, barcodes_out)
+shutil.copy2(sm.input["sample_file"], sm.output["sample_file"])
 logging.info(f"finished.")

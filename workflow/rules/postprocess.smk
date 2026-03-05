@@ -38,7 +38,7 @@ if workflow_mode == "bulk_genotyping":
             tot_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Tallele.npz",
             a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
             b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
-            sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
+            sample_file=config["allele_dir"] + "/{assay_type}/sample_ids.tsv",
             qc_dir=directory(config["qc_dir"] + "/{assay_type}/phase_and_concat/"),
         wildcard_constraints:
             assay_type="(bulkDNA|bulkWGS|bulkWES)",
@@ -171,7 +171,7 @@ if workflow_mode in ["single_cell_genotyping", "copytyping_preprocess"]:
             tot_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Tallele.npz",
             a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
             b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
-            sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
+            sample_file=config["allele_dir"] + "/{assay_type}/sample_ids.tsv",
             qc_dir=directory(config["qc_dir"] + "/{assay_type}/phase_and_concat/"),
             unique_snp_ids=config["allele_dir"] + "/{assay_type}/unique_snp_ids.npy",
             cell_snp_Aallele=config["allele_dir"] + "/{assay_type}/cell_snp_Aallele.npz",
@@ -199,7 +199,7 @@ rule adaptive_binning:
         + f"/{wc.assay_type}/snp.Tallele.npz",
         a_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Aallele.npz",
         b_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Ballele.npz",
-        sample_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
+        sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
         all_barcodes=lambda wc: branch(
             wc.assay_type in nonbulk_assays,
             then=config["allele_dir"] + f"/{wc.assay_type}/barcodes.tsv.gz",
@@ -222,6 +222,7 @@ rule adaptive_binning:
         b_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Ballele.npz",
         baf_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.baf.npz",
         bed_file=config["bb_dir"] + "/{assay_type}/bb.bed.gz",
+        sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
         qc_dir=directory(config["qc_dir"] + "/{assay_type}/adaptive_binning/"),
     params:
         sample_name=SAMPLE_ID,
@@ -250,7 +251,7 @@ rule cnv_segmentation:
         + f"/{wc.assay_type}/snp.Tallele.npz",
         a_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Aallele.npz",
         b_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Ballele.npz",
-        sample_file=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
+        sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
         all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
         h5ad_file=config["bb_dir"] + "/{assay_type}/{assay_type}.h5ad",
         region_bed=lambda wc: config["region_bed"],
@@ -265,6 +266,7 @@ rule cnv_segmentation:
         y_count=config["bb_dir"] + "/{assay_type}/Y_count.npz",
         d_count=config["bb_dir"] + "/{assay_type}/D_count.npz",
         barcodes_out=config["bb_dir"] + "/{assay_type}/barcodes.tsv.gz",
+        sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
         qc_dir=directory(config["qc_dir"] + "/{assay_type}/cnv_segmentation/"),
     wildcard_constraints:
         assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",

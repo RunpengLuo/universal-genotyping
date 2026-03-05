@@ -149,4 +149,5 @@ else:
 
 segs_df.to_csv(sm.output["cnv_segments"], header=True, sep="\t", index=False)
 shutil.copy2(all_barcodes, sm.output["barcodes_out"])
+shutil.copy2(sm.input["sample_file"], sm.output["sample_file"])
 logging.info(f"finished.")
