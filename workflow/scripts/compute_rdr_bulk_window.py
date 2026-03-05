@@ -18,6 +18,7 @@ from utils import *
 from postprocess_utils import plot_1d_sample
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -39,6 +40,7 @@ sample_name = sm.params["sample_name"]
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 mosdepth_dir = sm.params["mosdepth_dir"]
+chromosomes = sm.params["chromosomes"]
 
 # params
 samplesize = int(sm.params["samplesize"])
@@ -94,10 +96,12 @@ def correct_readcount(
     read_hi = np.nanquantile(reads[valid], 1.0 - routlier)
     ideal = valid & (reads <= read_hi) & (gc >= gc_lo) & (gc <= gc_hi)
     if mappability is not None:
-        ideal &= (mappability >= min_mappability)
+        ideal &= mappability >= min_mappability
 
     ideal_idx = np.where(ideal)[0]
-    logging.info(f"  GC stage: {ideal_idx.size} ideal bins out of {int(valid.sum())} valid")
+    logging.info(
+        f"  GC stage: {ideal_idx.size} ideal bins out of {int(valid.sum())} valid"
+    )
 
     if ideal_idx.size > samplesize:
         rng = np.random.default_rng(42)
@@ -111,14 +115,20 @@ def correct_readcount(
     # Stage 1b: smooth on fine grid
     grid = np.linspace(0, 1, 1001)
     stage1_interp = interp1d(
-        stage1[:, 0], stage1[:, 1],
-        kind="linear", bounds_error=False, fill_value="extrapolate",
+        stage1[:, 0],
+        stage1[:, 1],
+        kind="linear",
+        bounds_error=False,
+        fill_value="extrapolate",
     )
     grid_pred = stage1_interp(grid)
     stage2_smooth = lowess(grid_pred, grid, frac=0.3, return_sorted=True)
     final_gc_interp = interp1d(
-        stage2_smooth[:, 0], stage2_smooth[:, 1],
-        kind="linear", bounds_error=False, fill_value="extrapolate",
+        stage2_smooth[:, 0],
+        stage2_smooth[:, 1],
+        kind="linear",
+        bounds_error=False,
+        fill_value="extrapolate",
     )
 
     gc_predicted = final_gc_interp(gc)
@@ -143,10 +153,17 @@ def correct_readcount(
 
     valid2 = (cor_gc > 0) & np.isfinite(mappability)
     read_hi2 = np.nanquantile(cor_gc[valid2], 1.0 - routlier)
-    ideal2 = valid2 & (cor_gc <= read_hi2) & (mappability >= map_lo) & (mappability <= map_hi)
+    ideal2 = (
+        valid2
+        & (cor_gc <= read_hi2)
+        & (mappability >= map_lo)
+        & (mappability <= map_hi)
+    )
 
     ideal_idx2 = np.where(ideal2)[0]
-    logging.info(f"  MAP stage: {ideal_idx2.size} ideal bins out of {int(valid2.sum())} valid")
+    logging.info(
+        f"  MAP stage: {ideal_idx2.size} ideal bins out of {int(valid2.sum())} valid"
+    )
 
     if ideal_idx2.size > samplesize:
         rng = np.random.default_rng(43)
@@ -158,14 +175,20 @@ def correct_readcount(
     s1_map = lowess(cor_gc_ideal, map_ideal, frac=0.03, return_sorted=True)
     grid_map = np.linspace(0, 1, 1001)
     s1_map_interp = interp1d(
-        s1_map[:, 0], s1_map[:, 1],
-        kind="linear", bounds_error=False, fill_value="extrapolate",
+        s1_map[:, 0],
+        s1_map[:, 1],
+        kind="linear",
+        bounds_error=False,
+        fill_value="extrapolate",
     )
     grid_map_pred = s1_map_interp(grid_map)
     s2_map = lowess(grid_map_pred, grid_map, frac=0.3, return_sorted=True)
     final_map_interp = interp1d(
-        s2_map[:, 0], s2_map[:, 1],
-        kind="linear", bounds_error=False, fill_value="extrapolate",
+        s2_map[:, 0],
+        s2_map[:, 1],
+        kind="linear",
+        bounds_error=False,
+        fill_value="extrapolate",
     )
 
     map_predicted = final_map_interp(mappability)
@@ -205,18 +228,27 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
     nsamples = len(rep_ids)
     panel_w = max(5, 5 * nsamples)
 
-    for title, dp_mat in [("Before GC Correction", dp_before),
-                          ("After GC Correction", dp_after)]:
+    for title, dp_mat in [
+        ("Before GC Correction", dp_before),
+        ("After GC Correction", dp_after),
+    ]:
         fig, axes = plt.subplots(
-            1, nsamples, figsize=(panel_w, 5), squeeze=False,
+            1,
+            nsamples,
+            figsize=(panel_w, 5),
+            squeeze=False,
         )
         for si, rep_id in enumerate(rep_ids):
             ax = axes[0, si]
             reads = dp_mat[:, si]
             valid = (reads > 0) & np.isfinite(gc)
             ax.scatter(
-                gc[valid], reads[valid], s=1, alpha=0.05,
-                rasterized=True, color="steelblue",
+                gc[valid],
+                reads[valid],
+                s=1,
+                alpha=0.05,
+                rasterized=True,
+                color="steelblue",
             )
             mad = np.median(np.abs(reads[valid] - np.median(reads[valid])))
             r, _ = pearsonr(gc[valid], reads[valid])
@@ -233,44 +265,55 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
 
 ##################################################
 logging.info("load GC BED")
-gc_bed = pd.read_table(gc_bed_file, sep="\t")
-assert "#CHR" in gc_bed.columns and "GC" in gc_bed.columns, (
-    f"gc_bed must have #CHR, START, END, GC columns; got {gc_bed.columns.tolist()}"
+gc_bed_full = pd.read_table(gc_bed_file, sep="\t")
+assert "#CHR" in gc_bed_full.columns and "GC" in gc_bed_full.columns, (
+    f"gc_bed must have #CHR, START, END, GC columns; got {gc_bed_full.columns.tolist()}"
 )
-gc_vals = gc_bed["GC"].to_numpy()
-map_vals = gc_bed["MAP"].to_numpy() if "MAP" in gc_bed.columns else None
-
-n_windows = len(gc_bed)
-logging.info(f"GC BED: {n_windows} windows")
 
 ##################################################
-logging.info("concat mosdepth per-sample depth data")
+logging.info("load mosdepth depth data")
 sample_df = pd.read_table(sample_file, sep="\t")
 rep_ids = sample_df["REP_ID"].astype(str).tolist()
 sample_types = sample_df["sample_type"].tolist()
 nsamples = len(sample_df)
+target_chroms = {f"chr{c}" for c in chromosomes}
+join_keys = ["#CHR", "START", "END"]
 
-dp_mat = np.zeros((n_windows, nsamples), dtype=np.float32)
-for i, rep_id in enumerate(rep_ids):
+mos_dfs = []
+for rep_id in rep_ids:
     mos_file = os.path.join(mosdepth_dir, f"{rep_id}.regions.bed.gz")
     mos_df = pd.read_table(
         mos_file, sep="\t", header=None, names=["#CHR", "START", "END", "DEPTH"]
     )
+    mos_df = mos_df[mos_df["#CHR"].isin(target_chroms)].reset_index(drop=True)
+    mos_dfs.append(mos_df)
+
+coords = mos_dfs[0][join_keys].copy()
+n_windows = len(coords)
+logging.info(f"{n_windows} windows across {len(target_chroms)} chromosomes")
+
+gc_bed = pd.merge(left=coords, right=gc_bed_full, on=join_keys, how="left", sort=False)
+n_matched = int(gc_bed["GC"].notna().sum())
+logging.info(f"GC BED matched {n_matched}/{n_windows} windows")
+gc_vals = gc_bed["GC"].to_numpy()
+map_vals = gc_bed["MAP"].to_numpy() if "MAP" in gc_bed.columns else None
+
+dp_mat = np.zeros((n_windows, nsamples), dtype=np.float32)
+for i, mos_df in enumerate(mos_dfs):
     assert len(mos_df) == n_windows, (
-        f"{mos_file} rowcount={len(mos_df)} != gc_bed rowcount={n_windows}"
+        f"{rep_ids[i]} rowcount={len(mos_df)} != {n_windows}"
     )
     dp_mat[:, i] = mos_df["DEPTH"].to_numpy(dtype=np.float32)
-
 logging.info(f"depth matrix shape: {dp_mat.shape}")
 
 ##################################################
-# Apply HMMcopy correctReadcount per sample
 logging.info("applying correct_readcount per sample")
 dp_corrected = np.zeros_like(dp_mat, dtype=np.float32)
 for i, rep_id in enumerate(rep_ids):
     logging.info(f"correcting {rep_id}")
     dp_corrected[:, i] = correct_readcount(
-        dp_mat[:, i], gc_vals,
+        dp_mat[:, i],
+        gc_vals,
         mappability=map_vals,
         samplesize=samplesize,
         routlier=routlier,
@@ -278,7 +321,6 @@ for i, rep_id in enumerate(rep_ids):
         min_mappability=min_mappability,
     )
 
-# QC: before/after GC correction (page 1 = before, page 2 = after)
 pdf = PdfPages(os.path.join(qc_dir, "window_depth_correction.pdf"))
 plot_gc_correction_pdf(gc_vals, dp_mat, dp_corrected, rep_ids, pdf)
 pdf.close()
@@ -286,11 +328,10 @@ pdf.close()
 np.savez_compressed(sm.output["dp_mtx"], mat=dp_corrected)
 
 ##################################################
-# Compute RDR: tumor/normal ratio with library-size normalization
 has_normal = "normal" in sample_types
 logging.info(f"compute RDRs, has_normal={has_normal}")
 assert has_normal, "no normal sample for RDR computation"
-tumor_sidx = 1  # normal is index 0
+tumor_sidx = {False: 0, True: 1}[has_normal]
 
 window_sizes = (gc_bed["END"] - gc_bed["START"]).to_numpy(dtype=np.float64)
 
@@ -300,23 +341,17 @@ library_correction = total_bases[0] / total_bases[1:]
 logging.info(f"RDR library normalization factor: {library_correction}")
 
 normal_dp = dp_corrected[:, 0].copy()
-mask = np.isfinite(normal_dp) & (normal_dp > 0)
-num_valid = int(mask.sum())
-if num_valid < n_windows:
-    logging.warning(f"#invalid normal bins={n_windows - num_valid}/{n_windows}")
-    if num_valid == 0:
-        raise ValueError("All normal bins invalid; cannot compute RDR.")
-    fill = float(np.nanmedian(normal_dp[mask]))
-    logging.warning(f"impute normal depth via nanmedian: {fill}")
-    normal_dp[~mask] = fill
+valid = np.isfinite(normal_dp) & (normal_dp > 0)
+logging.info(f"normal: {int(valid.sum())}/{n_windows} valid bins")
 
-rdr_mat = dp_corrected[:, 1:] / normal_dp[:, None]
-rdr_mat *= library_correction[None, :]
+with np.errstate(invalid="ignore", divide="ignore"):
+    rdr_mat = dp_corrected[:, 1:] / normal_dp[:, None]
+    rdr_mat *= library_correction[None, :]
+rdr_mat[~valid, :] = np.nan
 
 rdr_ylim = np.round(np.nanquantile(rdr_mat, 0.99)).astype(int) + 1
 logging.info(f"RDR y-lim={rdr_ylim}")
 
-# QC plots: per-sample RDR
 for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
     plot_file = os.path.join(qc_dir, f"rdr_window.{rep_id}.pdf")
     plot_1d_sample(
@@ -331,22 +366,23 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
 
 np.savez_compressed(sm.output["rdr_mtx"], mat=rdr_mat)
 
-# Write bin info
 out_cols = ["#CHR", "START", "END", "GC"]
 if "MAP" in gc_bed.columns:
     out_cols.append("MAP")
 gc_bed[out_cols].to_csv(
-    sm.output["bins_tsv"], sep="\t", header=True, index=False,
+    sm.output["bins_tsv"],
+    sep="\t",
+    header=True,
+    index=False,
     compression="gzip",
 )
 
 ##################################################
-# Aggregate window-level RDR into adaptive allele bins (bb)
 logging.info("aggregating window RDR into adaptive bins")
 bbs = pd.read_table(bb_file, sep="\t")
 n_bb = len(bbs)
 n_tumors = rdr_mat.shape[1]
-bb_rdr = np.full((n_bb, n_tumors), np.nan, dtype=np.float32)
+bb_rdr = np.full((n_bb, n_tumors), 1.0, dtype=np.float32)
 
 win_chr = gc_bed["#CHR"].to_numpy()
 win_start = gc_bed["START"].to_numpy(dtype=np.int64)
@@ -362,12 +398,14 @@ for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
     bb_global_idx = bb_grp.index.to_numpy()
     n_bb_chr = len(bb_grp)
 
-    # Assign each window to a bin via vectorised searchsorted
     win_starts_chr = win_start[win_idx_chr]
     bin_idx = np.searchsorted(bb_starts, win_starts_chr, side="right") - 1
     valid_assign = (bin_idx >= 0) & (bin_idx < n_bb_chr)
-    valid_assign[valid_assign] &= win_starts_chr[valid_assign] < bb_ends[bin_idx[valid_assign]]
+    valid_assign[valid_assign] &= (
+        win_starts_chr[valid_assign] < bb_ends[bin_idx[valid_assign]]
+    )
 
+    n_defaulted = 0
     for t in range(n_tumors):
         rdr_chr = rdr_mat[win_idx_chr, t]
         finite = valid_assign & np.isfinite(rdr_chr)
@@ -375,8 +413,14 @@ for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
         vals = rdr_chr[finite]
         sums = np.bincount(bi, weights=vals, minlength=n_bb_chr)
         counts = np.bincount(bi, minlength=n_bb_chr)
-        means = np.where(counts > 0, sums / counts, np.nan)
+        means = np.where(counts > 0, sums / counts, 1.0)
         bb_rdr[bb_global_idx, t] = means
+        if t == 0:
+            n_defaulted = int((counts == 0).sum())
+    logging.info(
+        f"  {chrom}: {n_bb_chr} bins, {int(valid_assign.sum())} windows assigned, "
+        f"{n_defaulted} bins defaulted to 1.0"
+    )
 
 n_filled = int(np.isfinite(bb_rdr[:, 0]).sum())
 logging.info(f"bb RDR: {n_filled}/{n_bb} bins filled from window RDR")

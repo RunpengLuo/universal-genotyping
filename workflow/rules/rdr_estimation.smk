@@ -157,6 +157,7 @@ if workflow_mode == "bulk_genotyping":
                 sample_name=SAMPLE_ID,
                 mosdepth_dir=lambda wc: config["bb_dir"]
                 + f"/{wc.assay_type}/out_mosdepth_window",
+                chromosomes=config["chromosomes"],
                 samplesize=_rdr_cfg.get("samplesize", 50000),
                 routlier=_rdr_cfg.get("routlier", 0.01),
                 doutlier=_rdr_cfg.get("doutlier", 0.001),
