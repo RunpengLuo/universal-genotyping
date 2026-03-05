@@ -45,9 +45,11 @@ qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 mosdepth_dir = sm.params["mosdepth_dir"]
 correction_method = str(sm.params["correction_method"])
+gc_correct = bool(sm.params["gc_correct"])
+rt_correct = bool(sm.params["rt_correct"])
 chromosomes = sm.params["chromosomes"]
 
-logging.info("run compute_rdr_bulk")
+logging.info(f"run compute_rdr_bulk (gc_correct={gc_correct}, rt_correct={rt_correct})")
 
 ##################################################
 logging.info("load bias BED")
@@ -140,10 +142,10 @@ assert has_normal, "no normal sample, TODO"
 tumor_sidx = {False: 0, True: 1}[has_normal]
 
 gc_vals = corr_factors["GC"].to_numpy()
-mapp_vals = corr_factors["MAP"].to_numpy() if "MAP" in corr_factors.columns else None
+mapp_vals = corr_factors["MAP"].to_numpy() if gc_correct and "MAP" in corr_factors.columns else None
 repli_vals = (
     corr_factors["REPLI"].to_numpy(dtype=np.float64)
-    if "REPLI" in corr_factors.columns
+    if rt_correct and "REPLI" in corr_factors.columns
     else None
 )
 
@@ -167,7 +169,7 @@ for i, rep_id in enumerate(rep_ids):
 
 ##################################################
 # Loess: correct raw depth for GC bias BEFORE computing RDR
-if correction_method == "loess":
+if gc_correct and correction_method == "loess":
     logging.info("loess GC correction on raw depth (pre-RDR)")
 
     dp_mtx_bb_raw = dp_mtx_bb.copy()  # keep raw for diagnostics
@@ -241,7 +243,7 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
 
 ##################################################
 # Post-RDR GC correction (quantile / spline methods — skip if loess already applied)
-if correction_method != "loess":
+if gc_correct and correction_method != "loess":
     has_mapp = mapp_vals is not None
 
     if correction_method == "spline":

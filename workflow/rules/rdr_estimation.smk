@@ -86,6 +86,8 @@ if workflow_mode == "bulk_genotyping":
                 mosdepth_dir=lambda wc: config["bb_dir"]
                 + f"/{wc.assay_type}/out_mosdepth",
                 correction_method=_rdr_cfg_bin.get("correction_method", "quantile"),
+                gc_correct=_rdr_cfg_bin.get("gc_correct", True),
+                rt_correct=_rdr_cfg_bin.get("rt_correct", False),
                 chromosomes=config["chromosomes"],
             log:
                 config["log_dir"] + "/compute_rdr_bulk.{assay_type}.log",
@@ -171,6 +173,8 @@ if workflow_mode == "bulk_genotyping":
                 routlier=_rdr_cfg.get("routlier", 0.01),
                 doutlier=_rdr_cfg.get("doutlier", 0.001),
                 min_mappability=_rdr_cfg.get("min_mappability", 0.9),
+                gc_correct=_rdr_cfg.get("gc_correct", True),
+                rt_correct=_rdr_cfg.get("rt_correct", False),
             log:
                 config["log_dir"] + "/compute_rdr_bulk_window.{assay_type}.log",
             script:

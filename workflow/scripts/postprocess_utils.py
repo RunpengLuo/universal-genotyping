@@ -289,24 +289,20 @@ def get_mask_by_region(snps: pd.DataFrame, regions: pd.DataFrame) -> np.ndarray:
 
     Assumes SNP POS is 1-based. Converts each SNP to an interval [POS-1, POS).
     """
+    n = len(snps)
     snp_positions = snps[["#CHR", "POS"]].copy()
     snp_positions["Start"] = snp_positions["POS"].astype(np.int64) - 1
     snp_positions["End"] = snp_positions["POS"].astype(np.int64)
+    snp_positions["_idx"] = np.arange(n)
 
     pr_snps = pr.PyRanges(snp_positions.rename(columns={"#CHR": "Chromosome"}))
     pr_regions = pr.PyRanges(regions)
 
-    overlapping = pr_snps.overlap(pr_regions).df.rename(columns={"Chromosome": "#CHR"})
-
-    mask = (
-        snp_positions[["#CHR", "POS"]]
-        .merge(
-            overlapping[["#CHR", "POS"]], on=["#CHR", "POS"], how="left", indicator=True
-        )["_merge"]
-        .eq("both")
-        .to_numpy(dtype=bool)
-    )
-    return mask
+    overlapping = pr_snps.overlap(pr_regions)
+    if overlapping.empty:
+        return np.zeros(n, dtype=bool)
+    keep_idx = set(overlapping.df["_idx"].unique())
+    return np.isin(np.arange(n), list(keep_idx))
 
 
 def get_mask_by_region_intervals(
@@ -585,7 +581,7 @@ def plot_1d_sample(
     unit="SNP",
     val_type="BAF",
     s=4,
-    dpi=150,
+    dpi=72,
     alpha=0.6,
     figsize=(40, 3),
     min_ylim=0.0,

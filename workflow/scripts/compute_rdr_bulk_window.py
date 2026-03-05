@@ -284,6 +284,8 @@ samplesize = int(sm.params["samplesize"])
 routlier = float(sm.params["routlier"])
 doutlier = float(sm.params["doutlier"])
 min_mappability = float(sm.params["min_mappability"])
+gc_correct = bool(sm.params["gc_correct"])
+rt_correct = bool(sm.params["rt_correct"])
 
 # --- Load windows ---
 logging.info("load bias BED and mosdepth depth")
@@ -358,10 +360,10 @@ if blacklist_bed_file is not None:
 logging.info(f"{n_windows} windows after filtering")
 
 gc_vals = bias_bed["GC"].to_numpy()
-map_vals = bias_bed["MAP"].to_numpy() if "MAP" in bias_bed.columns else None
+map_vals = bias_bed["MAP"].to_numpy() if gc_correct and "MAP" in bias_bed.columns else None
 repli_vals = (
     bias_bed["REPLI"].to_numpy(dtype=np.float64)
-    if "REPLI" in bias_bed.columns
+    if rt_correct and "REPLI" in bias_bed.columns
     else None
 )
 if repli_vals is not None:
@@ -377,20 +379,24 @@ for i, mos_df in enumerate(mos_dfs):
 logging.info(f"depth matrix shape: {dp_mat.shape}")
 
 # --- Bias correction ---
-logging.info("applying correct_readcount per sample")
-dp_corrected = np.zeros_like(dp_mat, dtype=np.float32)
-for i, rep_id in enumerate(rep_ids):
-    logging.info(f"correcting {rep_id}")
-    dp_corrected[:, i] = correct_readcount(
-        dp_mat[:, i],
-        gc_vals,
-        mappability=map_vals,
-        repliseq=repli_vals,
-        samplesize=samplesize,
-        routlier=routlier,
-        doutlier=doutlier,
-        min_mappability=min_mappability,
-    )
+if gc_correct:
+    logging.info("applying correct_readcount per sample")
+    dp_corrected = np.zeros_like(dp_mat, dtype=np.float32)
+    for i, rep_id in enumerate(rep_ids):
+        logging.info(f"correcting {rep_id}")
+        dp_corrected[:, i] = correct_readcount(
+            dp_mat[:, i],
+            gc_vals,
+            mappability=map_vals,
+            repliseq=repli_vals,
+            samplesize=samplesize,
+            routlier=routlier,
+            doutlier=doutlier,
+            min_mappability=min_mappability,
+        )
+else:
+    logging.info("gc_correct=False; skipping bias correction")
+    dp_corrected = dp_mat.copy()
 
 log_nan_summary("corrected depth", dp_corrected, rep_ids, n_windows)
 
@@ -491,9 +497,9 @@ n_bb = len(bbs)
 bb_dp = np.full((n_bb, nsamples), np.nan, dtype=np.float32)
 
 bias_cols = ["GC"]
-if map_vals is not None:
+if "MAP" in bias_bed.columns:
     bias_cols.append("MAP")
-if repli_vals is not None:
+if "REPLI" in bias_bed.columns:
     bias_cols.append("REPLI")
 bias_arrays = {col: bias_bed[col].to_numpy(dtype=np.float64) for col in bias_cols}
 bb_bias = {col: np.full(n_bb, np.nan, dtype=np.float64) for col in bias_cols}

@@ -131,6 +131,8 @@ params_mosdepth:
 params_compute_rdr:
   # shared (required for both bin and window methods)
   bias_bed: null
+  gc_correct: true    # enable GC (+MAP) bias correction
+  rt_correct: false   # enable replication-timing correction
 
   # bin method
   correction_method: "quantile"
