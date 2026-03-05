@@ -16,6 +16,30 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 
+def _make_autosomes_mask(chrs):
+    """Boolean mask that is True for autosomal chromosomes."""
+    return np.array([c not in ("X", "Y", "chrX", "chrY") for c in chrs])
+
+
+def _select_rt_for_sample(raw_rdrs, rt_df, autosomes_mask):
+    """Pick best RT cell line for one sample; return (rt_vals, name) or (None, None)."""
+    if rt_df is None:
+        return None, None
+    name, _ = select_best_rt_cellline(raw_rdrs, rt_df, autosomes_mask)
+    if name is None:
+        return None, None
+    return rt_df[name].to_numpy(), name
+
+
+def _log_histogram(label, values):
+    """Log a compact histogram of *values*."""
+    logging.info(f"hist: {label}")
+    counts, edges = np.histogram(values)
+    logging.info("bin_left\tbin_right\tcount")
+    for l, r, c in zip(edges[:-1], edges[1:], counts):
+        logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
+
+
 def compute_gc_content(
     bin_info: pd.DataFrame, ref_file: str, mapp_file=None, genome_size=None
 ):
@@ -117,23 +141,14 @@ def bias_correction_rdr(
     gc_lo, gc_hi = np.nanquantile(gc, gc_quantile)
     logging.info(f"GC-content range for fitting: [{gc_lo}, {gc_hi}]")
     fit_mask = (gc >= gc_lo) & (gc <= gc_hi)
-
-    chrs = gc_df["#CHR"].astype(str).to_numpy()
-    autosomes_mask = np.array([c not in ("X", "Y", "chrX", "chrY") for c in chrs])
+    autosomes_mask = _make_autosomes_mask(gc_df["#CHR"].astype(str).to_numpy())
 
     pdf = PdfPages(os.path.join(out_dir, "correction_diagnostics.pdf")) if out_dir else None
 
     gccorr_rdr_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
     for si, rep_id in enumerate(rep_ids):
         raw_rdrs = raw_rdr_mat[:, si]
-
-        # Select best RT cell line (once per sample)
-        rt_vals = None
-        best_rt_name = None
-        if rt_df is not None:
-            best_rt_name, _ = select_best_rt_cellline(raw_rdrs, rt_df, autosomes_mask)
-            if best_rt_name is not None:
-                rt_vals = rt_df[best_rt_name].to_numpy()
+        rt_vals, best_rt_name = _select_rt_for_sample(raw_rdrs, rt_df, autosomes_mask)
 
         # Build formula, fit_df, pred_df dynamically
         sample_fit_mask = fit_mask.copy()
@@ -155,34 +170,18 @@ def bias_correction_rdr(
         res = smf.quantreg(formula, data=fit_df).fit(q=0.5)
         logging.info(res.summary())
         exp_rdrs = res.predict(pred_df).to_numpy()
+
         eps = np.nanquantile(exp_rdrs, eps_quantile)
         logging.info(f"inferred epsilon for exp RDR={eps}")
-        den = exp_rdrs.copy()
-        den[~np.isfinite(den)] = np.nan
-        den = np.where(np.isfinite(den), den, eps)
-        den = np.clip(den, eps, None)
+        den = np.clip(np.nan_to_num(exp_rdrs, nan=eps), eps, None)
         corr_rdrs = raw_rdrs / den
 
         corr_factor = np.mean(corr_rdrs)
         logging.info(f"GC correction factor={corr_factor}")
 
-        logging.info("hist: raw RDR")
-        counts, edges = np.histogram(raw_rdrs)
-        logging.info("bin_left\tbin_right\tcount")
-        for l, r, c in zip(edges[:-1], edges[1:], counts):
-            logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
-
-        logging.info("hist: expected RDR corr_fit")
-        counts, edges = np.histogram(exp_rdrs)
-        logging.info("bin_left\tbin_right\tcount")
-        for l, r, c in zip(edges[:-1], edges[1:], counts):
-            logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
-
-        logging.info("hist: corr_rdrs")
-        counts, edges = np.histogram(corr_rdrs)
-        logging.info("bin_left\tbin_right\tcount")
-        for l, r, c in zip(edges[:-1], edges[1:], counts):
-            logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
+        _log_histogram("raw RDR", raw_rdrs)
+        _log_histogram("expected RDR corr_fit", exp_rdrs)
+        _log_histogram("corr_rdrs", corr_rdrs)
 
         gccorr_rdr_mat[:, si] = corr_rdrs / corr_factor
         if pdf is not None:
@@ -458,12 +457,11 @@ def bias_correction_rdr_spline(
     logging.info("ASCAT-style spline RDR correction")
     gc = gc_df["GC"].to_numpy()
     mapv = gc_df["MAP"].to_numpy()
-    chrs = gc_df["#CHR"].astype(str).to_numpy()
 
     gc_lo, gc_hi = np.nanquantile(gc, gc_quantile)
     logging.info(f"GC-content range for fitting: [{gc_lo}, {gc_hi}]")
 
-    autosomes_mask = np.array([c not in ("X", "Y", "chrX", "chrY") for c in chrs])
+    autosomes_mask = _make_autosomes_mask(gc_df["#CHR"].astype(str).to_numpy())
 
     pdf = PdfPages(os.path.join(out_dir, "correction_diagnostics.pdf")) if out_dir else None
 
@@ -471,15 +469,7 @@ def bias_correction_rdr_spline(
     for si, rep_id in enumerate(rep_ids):
         raw_rdrs = raw_rdr_mat[:, si]
         log_rdr = np.log2(raw_rdrs + 1e-8)
-
-        rt_vals = None
-        best_rt_name = None
-        if rt_df is not None:
-            best_rt_name, best_rt_corr = select_best_rt_cellline(
-                raw_rdrs, rt_df, autosomes_mask
-            )
-            if best_rt_name is not None:
-                rt_vals = rt_df[best_rt_name].to_numpy()
+        rt_vals, best_rt_name = _select_rt_for_sample(raw_rdrs, rt_df, autosomes_mask)
 
         cov_df = pd.DataFrame({"log_rdr": log_rdr, "GC": gc})
         formula_parts = ["cr(GC, df=5)"]
