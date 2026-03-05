@@ -8,6 +8,12 @@ computed via ``BedTool.map()``.
 
 Output is a gzipped TSV with columns: #CHR, START, END, GC, MAP.
 
+Pre-computed mappability BED/BigWig files for hg38 (single-read and
+multi-read, various k-mer lengths) are available from Bismap:
+  https://bismap.hoffmanlab.org
+Note: 0-values are currently omitted from the BED/BigWig files, so
+missing windows are filled with 0.0 (unmappable).
+
 Dependencies:
   - pybedtools
   - pandas, numpy
@@ -107,7 +113,7 @@ def compute_mappability(windows_df, mappability_file, genome_size_file):
         disable_auto_names=True
     )
     map_cov.columns = ["#CHR", "START", "END", "MAP"]
-    map_vals = pd.to_numeric(map_cov["MAP"], errors="coerce").fillna(1.0).clip(0.0, 1.0)
+    map_vals = pd.to_numeric(map_cov["MAP"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
     return map_vals
 
 

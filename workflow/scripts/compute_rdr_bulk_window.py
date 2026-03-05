@@ -34,7 +34,6 @@ sample_file = sm.input["sample_file"]
 bb_file = sm.input["bb_file"]
 gc_bed_file = sm.input["gc_bed"]
 genome_size = sm.input["genome_size"]
-mappability_file = maybe_path(sm.input["mappability_file"])
 
 sample_name = sm.params["sample_name"]
 qc_dir = sm.output["qc_dir"]
@@ -241,21 +240,6 @@ assert "#CHR" in gc_bed.columns and "GC" in gc_bed.columns, (
 gc_vals = gc_bed["GC"].to_numpy()
 map_vals = gc_bed["MAP"].to_numpy() if "MAP" in gc_bed.columns else None
 
-# override with external mappability if provided
-if mappability_file is not None:
-    logging.info(f"loading external mappability from {mappability_file}")
-    ext_map = pd.read_table(mappability_file, sep="\t")
-    if "MAP" in ext_map.columns:
-        map_merged = gc_bed[["#CHR", "START", "END"]].merge(
-            ext_map.rename(columns={ext_map.columns[3]: "MAP"})[
-                [ext_map.columns[0], ext_map.columns[1], ext_map.columns[2], "MAP"]
-            ].rename(columns={ext_map.columns[0]: "#CHR", ext_map.columns[1]: "START", ext_map.columns[2]: "END"}),
-            on=["#CHR", "START", "END"], how="left",
-        )
-        map_vals = pd.to_numeric(map_merged["MAP"], errors="coerce").fillna(1.0).clip(0.0, 1.0).to_numpy()
-    else:
-        logging.warning("external mappability file has no MAP column; using gc_bed MAP")
-
 n_windows = len(gc_bed)
 logging.info(f"GC BED: {n_windows} windows")
 
@@ -348,7 +332,10 @@ for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
 np.savez_compressed(sm.output["rdr_mtx"], mat=rdr_mat)
 
 # Write bin info
-gc_bed[["#CHR", "START", "END", "GC", "MAP"]].to_csv(
+out_cols = ["#CHR", "START", "END", "GC"]
+if "MAP" in gc_bed.columns:
+    out_cols.append("MAP")
+gc_bed[out_cols].to_csv(
     sm.output["bins_tsv"], sep="\t", header=True, index=False,
     compression="gzip",
 )

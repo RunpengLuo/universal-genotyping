@@ -145,11 +145,6 @@ if workflow_mode == "bulk_genotyping":
                     for rep_id in assay2rep_ids[wc.assay_type]
                 ],
                 genome_size=config["genome_size"],
-                mappability_file=branch(
-                    _rdr_cfg.get("mappability_file") is None,
-                    then=[],
-                    otherwise=_rdr_cfg.get("mappability_file", ""),
-                ),
             output:
                 dp_mtx=config["bb_dir"] + "/{assay_type}/window.depth.npz",
                 rdr_mtx=config["bb_dir"] + "/{assay_type}/window.rdr.npz",
