@@ -687,7 +687,13 @@ def plot_1d_sample(
             sy = y[m]
             order = np.argsort(sx)
             sx, sy = sx[order], sy[order]
-            fit = _lowess(sy, sx, frac=smooth_frac, return_sorted=True)
+            max_pts = 10000
+            if len(sx) > max_pts:
+                idx = np.linspace(0, len(sx) - 1, max_pts, dtype=int)
+                sx_fit, sy_fit = sx[idx], sy[idx]
+            else:
+                sx_fit, sy_fit = sx, sy
+            fit = _lowess(sy_fit, sx_fit, frac=smooth_frac, return_sorted=True)
             ax.plot(
                 fit[:, 0],
                 fit[:, 1],

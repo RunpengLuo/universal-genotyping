@@ -61,18 +61,7 @@ To build from scratch, see `resources/scripts/build_gc_bed.hg38.py` and `resourc
 
 ## Blacklist BED
 
-Set via `blacklist_bed` in config. Pre-built: `resources/data/hg38-blacklist.v2.bed.gz`.
-
-To build a custom blacklist (merging mappability, segdups, simple repeats):
-
-```bash
-python resources/scripts/build_blacklist.hg38.py \
-  --reference /path/to/hg38.fa \
-  --out_file /path/to/blacklist.hg38.bed.gz \
-  --threads 8
-```
-
-Run `--help` for full usage. Dependencies: GEM library, wigToBigWig, hmmcopy_utils.
+Set via `blacklist_bed` in config. Pre-built: `resources/data/hg38-blacklist.v2.bed.gz` (ENCODE blacklist v2).
 
 ---
 
