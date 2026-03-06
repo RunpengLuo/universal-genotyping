@@ -13,14 +13,14 @@ if workflow_mode == "bulk_genotyping":
     # Derive headerless windows BED from window_bed for mosdepth
     # -----------------------------------------------------------------
 
-    rule window_bed_to_mosdepth:
+    rule window_bed_to_3bed:
         """Extract headerless 3-column BED from window_bed for mosdepth --by."""
         input:
             window_bed=config["window_bed"],
         output:
             mosdepth_bed=config["bb_dir"] + "/windows.bed.gz",
         log:
-            config["log_dir"] + "/window_bed_to_mosdepth.log",
+            config["log_dir"] + "/window_bed_to_3bed.log",
         run:
             import gzip, logging
             import pandas as pd
