@@ -119,6 +119,7 @@ params_postprocess:
   nsnp_multi: 2
   min_snp_reads: 200
   min_snp_per_block: 10
+  min_blocksize: 1000
 
 ##################################################
 # RDR estimation (bulk only)

@@ -18,17 +18,21 @@ from postprocess_utils import *
 
 
 @numba.njit
-def _bin_snps_numba(read_counts, min_snp_reads, min_snp_per_block):
+def _bin_snps_numba(read_counts, positions, min_snp_reads, min_snp_per_block, min_blocksize):
     """Greedy adaptive binning over a contiguous read-count array.
 
     Parameters
     ----------
     read_counts : (N, M) contiguous float64
         Per-SNP read counts for tumor samples.
+    positions : (N,) int64
+        Genomic positions (0-based) for each SNP, used for blocksize check.
     min_snp_reads : int
         Minimum total reads per sample for a bin to be complete.
     min_snp_per_block : int
         Minimum number of SNPs per bin.
+    min_blocksize : int
+        Minimum genomic span (bp) for a bin to be complete.
 
     Returns
     -------
@@ -48,14 +52,15 @@ def _bin_snps_numba(read_counts, min_snp_reads, min_snp_per_block):
     acc_n = 1
 
     for i in range(1, N):
-        # check if accumulator meets both thresholds
+        # check if accumulator meets all thresholds
         meets_reads = True
         if min_snp_reads > 0:
             for j in range(M):
                 if acc[j] < min_snp_reads:
                     meets_reads = False
                     break
-        if meets_reads and acc_n >= min_snp_per_block:
+        blockspan = positions[i - 1] - positions[prev_start] + 1
+        if meets_reads and acc_n >= min_snp_per_block and blockspan >= min_blocksize:
             bin_ids[prev_start:i] = bin_id
             bin_id += 1
             prev_start = i
@@ -66,14 +71,15 @@ def _bin_snps_numba(read_counts, min_snp_reads, min_snp_per_block):
                 acc[j] += read_counts[i, j]
             acc_n += 1
 
-    # last block: keep as own bin if it meets both criteria and isn't the only block
+    # last block: keep as own bin if it meets all criteria and isn't the only block
     last_meets_reads = True
     if min_snp_reads > 0:
         for j in range(M):
             if acc[j] < min_snp_reads:
                 last_meets_reads = False
                 break
-    if last_meets_reads and acc_n >= min_snp_per_block and prev_start > 0:
+    last_blockspan = positions[N - 1] - positions[prev_start] + 1
+    if last_meets_reads and acc_n >= min_snp_per_block and last_blockspan >= min_blocksize and prev_start > 0:
         bin_ids[prev_start:] = bin_id
         bin_id += 1
     else:
@@ -211,18 +217,20 @@ def adaptive_binning(
     grp_cols: list,
     colname="",
     tumor_sidx=0,
+    min_blocksize=0,
 ):
     """
     Adaptive binning over pre-defined chromosome regions.
-    Each bin satisfies both MSR (min total reads) and MSPB (min SNPs per block).
-    The last block in each group is kept as its own bin if it meets both criteria,
+    Each bin satisfies MSR (min total reads), MSPB (min SNPs per block),
+    and min_blocksize (min genomic span in bp).
+    The last block in each group is kept as its own bin if it meets all criteria,
     otherwise it is merged into the previous bin.
     In-place adds <colname> column to snps to indicate bin ids.
     """
     bin_id = 0
     snps[colname] = 0
     snp_grps = snps.groupby(by=grp_cols, sort=False)
-    logging.info(f"adaptive binning, colname={colname}, min_snp_reads={min_snp_reads}, min_snp_per_block={min_snp_per_block}")
+    logging.info(f"adaptive binning, colname={colname}, min_snp_reads={min_snp_reads}, min_snp_per_block={min_snp_per_block}, min_blocksize={min_blocksize}")
     logging.info(f"#SNP groups={len(snp_grps)}, grouper: {grp_cols}")
     for _, grp_snps in snp_grps:
         grp_idxs = grp_snps.index.to_numpy()
@@ -234,8 +242,11 @@ def adaptive_binning(
         else:
             grp_reads = np.ascontiguousarray(grp_mtx[:, tumor_sidx:], dtype=np.float64).copy()
 
+        # Extract 0-based positions for blocksize check
+        grp_pos = np.ascontiguousarray(grp_snps["POS0"].to_numpy(), dtype=np.int64)
+
         # Call the Numba kernel for greedy binning
-        local_bin_ids, n_bins = _bin_snps_numba(grp_reads, min_snp_reads, min_snp_per_block)
+        local_bin_ids, n_bins = _bin_snps_numba(grp_reads, grp_pos, min_snp_reads, min_snp_per_block, min_blocksize)
 
         # Offset local bin IDs to global bin IDs
         local_bin_ids += bin_id

@@ -20,6 +20,8 @@ from bias_correction import (
 )
 from postprocess_utils import (
     plot_1d_sample,
+    log_nan_summary,
+    log_mad_and_plot,
     compute_overlap_weights,
     weighted_bincount_mean,
 )
@@ -149,23 +151,13 @@ repli_vals = (
     else None
 )
 
-# plot per-sample read-depth
-rd_quantile = [0.01, 0.99]
-for i, rep_id in enumerate(rep_ids):
-    _, rd_ylim = np.nanquantile(dp_mtx_bb[:, i], rd_quantile)
-    logging.info(f"{rep_id} RD y-lim={rd_ylim}")
-    plot_file = os.path.join(qc_dir, f"depth_bb_before_correction.{rep_id}.pdf")
-    plot_1d_sample(
-        bbs,
-        dp_mtx_bb[:, i],
-        genome_size,
-        plot_file,
-        unit="bb",
-        val_type="RD",
-        max_ylim=rd_ylim,
-        smooth=True,
-        region_bed=region_bed_file,
-    )
+rd_raw_ylim = max(np.nanquantile(dp_mtx_bb, 0.99), 1.0)
+log_nan_summary("raw depth", dp_mtx_bb, rep_ids, nbb)
+log_mad_and_plot(
+    bbs, dp_mtx_bb, rep_ids, genome_size, qc_dir,
+    "depth_before_correction", "bb", "RD", rd_raw_ylim,
+    smooth=True, region_bed=region_bed_file,
+)
 
 ##################################################
 # Loess: correct raw depth for GC bias BEFORE computing RDR
@@ -192,6 +184,14 @@ if gc_correct and correction_method == "loess":
             pdf,
         )
     pdf.close()
+
+    log_nan_summary("corrected depth", dp_mtx_bb, rep_ids, nbb)
+    rd_corr_ylim = max(np.nanquantile(dp_mtx_bb, 0.99), 1.0)
+    log_mad_and_plot(
+        bbs, dp_mtx_bb, rep_ids, genome_size, qc_dir,
+        "depth_after_correction", "bb", "RD", rd_corr_ylim,
+        smooth=True, region_bed=region_bed_file,
+    )
 
 ##################################################
 if has_normal:
@@ -224,22 +224,14 @@ else:
     # TODO panel of normal PON, metin longread branch.
     raise ValueError("no normal sample, TODO")
 
-rdr_ylim = np.round(rdr_mtx_bb.max()).astype(int) + 1
-logging.info(f"RDR y-lim={rdr_ylim}")
-# plot per-sample RDRs (before corrections)
-for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
-    plot_file = os.path.join(qc_dir, f"rdr_bb_before_correction.{rep_id}.pdf")
-    plot_1d_sample(
-        bbs,
-        rdr_mtx_bb[:, i],
-        genome_size,
-        plot_file,
-        unit="bb",
-        val_type="RDR",
-        max_ylim=rdr_ylim,
-        smooth=True,
-        region_bed=region_bed_file,
-    )
+tumor_rep_ids = rep_ids[tumor_sidx:]
+rdr_ylim = np.round(np.nanquantile(rdr_mtx_bb, 0.99)).astype(int) + 1
+log_nan_summary("RDR (pre-corr)", rdr_mtx_bb, tumor_rep_ids, nbb)
+log_mad_and_plot(
+    bbs, rdr_mtx_bb, tumor_rep_ids, genome_size, qc_dir,
+    "rdr_before_correction", "bb", "RDR", rdr_ylim,
+    smooth=True, region_bed=region_bed_file,
+)
 
 ##################################################
 # Post-RDR GC correction (quantile / spline methods — skip if loess already applied)
@@ -265,32 +257,26 @@ if gc_correct and correction_method != "loess":
             out_dir=qc_dir,
         )
 
-plot_file = os.path.join(qc_dir, f"gc_content_bb.pdf")
-plot_1d_sample(
-    corr_factors,
-    corr_factors["GC"].to_numpy(),
-    genome_size,
-    plot_file,
-    unit="bb",
-    val_type="GC",
-    smooth=True,
-    region_bed=region_bed_file,
-)
-
-# plot per-sample RDRs (after corrections)
-for i, rep_id in enumerate(rep_ids[tumor_sidx:]):
-    plot_file = os.path.join(qc_dir, f"rdr_bb.{rep_id}.pdf")
+# bias covariate plots
+for col in bias_cols:
     plot_1d_sample(
-        bbs,
-        rdr_mtx_bb[:, i],
+        corr_factors,
+        corr_factors[col].to_numpy(),
         genome_size,
-        plot_file,
+        os.path.join(qc_dir, f"{col}.pdf"),
         unit="bb",
-        val_type="RDR",
-        max_ylim=rdr_ylim,
+        val_type=col,
         smooth=True,
         region_bed=region_bed_file,
     )
+
+# plot per-sample RDRs (after corrections)
+log_nan_summary("RDR (post-corr)", rdr_mtx_bb, tumor_rep_ids, nbb)
+log_mad_and_plot(
+    bbs, rdr_mtx_bb, tumor_rep_ids, genome_size, qc_dir,
+    "rdr", "bb", "RDR", rdr_ylim,
+    smooth=True, region_bed=region_bed_file,
+)
 
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=rdr_mtx_bb)
 logging.info(f"finished.")

@@ -63,6 +63,9 @@ To build from scratch, see `scripts/build_bias_bed.hg38.py`.
 
 Set via `blacklist_bed` in config. Pre-built: `data/hg38-blacklist.v2.bed.gz` ([ENCODE blacklist v2](https://github.com/Boyle-Lab/Blacklist)).
 
+https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bigBedToBed
+
+https://hgdownload.soe.ucsc.edu/gbdb/hg38/exomeProbesets/xgen-exome-research-panel-targets-hg38.bb
 ---
 
 ## Phasing Tools

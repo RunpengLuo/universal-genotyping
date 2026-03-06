@@ -218,6 +218,7 @@ else:
 
 ##################################################
 # MSR&MSPB block segmentation
+min_blocksize = int(sm.params.get("min_blocksize", 0))
 if is_bulk_assay:
     bbs = adaptive_binning(
         snps,
@@ -227,6 +228,7 @@ if is_bulk_assay:
         grp_cols,
         colname="bb_id",
         tumor_sidx=tumor_sidx,
+        min_blocksize=min_blocksize,
     )
 else:
     bbs = adaptive_binning(
@@ -236,6 +238,7 @@ else:
         tot_vec[:, None],
         grp_cols,
         colname="bb_id",
+        min_blocksize=min_blocksize,
     )
 
 bb_ids = snps["bb_id"].to_numpy()

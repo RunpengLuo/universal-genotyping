@@ -574,6 +574,47 @@ def plot_allele_freqs(
     return
 
 
+def log_nan_summary(name, mat, labels, n_total):
+    """Log per-column NaN counts for a matrix."""
+    for i, label in enumerate(labels):
+        col = mat[:, i] if mat.ndim == 2 else mat
+        n_nan = int(np.isnan(col).sum())
+        pct = n_nan / max(n_total, 1) * 100
+        logging.info(f"  {name:<16s} {label:<8s}: {n_nan:>8d}/{n_total} ({pct:5.1f}%) NaN")
+
+
+def log_mad_and_plot(
+    pos_df,
+    mat,
+    labels,
+    genome_size,
+    qc_dir,
+    prefix,
+    unit,
+    val_type,
+    ylim,
+    **plot_kwargs,
+):
+    """Log MAD per column and generate 1-D chromosome scatter plots."""
+    for i, label in enumerate(labels):
+        v = mat[:, i]
+        m = np.isfinite(v)
+        if m.any():
+            mad = np.median(np.abs(v[m] - np.median(v[m])))
+            logging.info(f"  {prefix:<28s} {label:<8s}: MAD={mad:.4f}")
+        plot_file = os.path.join(qc_dir, f"{prefix}.{label}.pdf")
+        plot_1d_sample(
+            pos_df,
+            v,
+            genome_size,
+            plot_file,
+            unit=unit,
+            val_type=val_type,
+            max_ylim=ylim,
+            **plot_kwargs,
+        )
+
+
 def plot_1d_sample(
     pos_df: pd.DataFrame,
     val: np.ndarray,

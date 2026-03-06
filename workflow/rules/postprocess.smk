@@ -237,6 +237,7 @@ rule adaptive_binning:
         nsnp_multi=config["params_postprocess"]["nsnp_multi"],
         min_snp_reads=config["params_postprocess"]["min_snp_reads"],
         min_snp_per_block=config["params_postprocess"]["min_snp_per_block"],
+        min_blocksize=config["params_postprocess"].get("min_blocksize", 0),
     threads: 1
     log:
         config["log_dir"] + "/adaptive_binning.{assay_type}.log",
