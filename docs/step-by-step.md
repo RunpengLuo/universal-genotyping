@@ -20,9 +20,7 @@ For bulk WGS/WES BAMs. Genotypes SNPs via `bcftools`, phases with Eagle/SHAPEIT/
 
 1. Prepare a sample sheet with bulk samples (`assay_type` in `{bulkWGS, bulkWES}`), both normal and tumor.
 2. Set `workflow_mode: bulk_genotyping` and `assay_types: ["bulkWGS"]` (or `["bulkWES"]`) in config.
-3. Choose RDR method:
-   - `rdr_method: "window"` (default) — fixed-window mosdepth + HMMcopy-style LOWESS correction (GC, mappability, replication timing).
-   - `rdr_method: "bin"` — adaptive-bin mosdepth + quantile/spline/LOESS correction using a pre-built `bias_bed`.
+3. Set `window_bed` to a pre-filtered window BED with GC/mappability/replication-timing covariates (e.g., produced by `resources/scripts/build_window_bed.py`). For WES, the BED should include an `is_target` column (also produced by `build_window_bed.py --wes_targets_bed`).
 4. Run the pipeline. Primary outputs in `bb_dir/{assay_type}/`: `bb.tsv.gz`, `bb.{Tallele,Aallele,Ballele,baf,depth,rdr}.npz`.
 
 ---

@@ -15,6 +15,7 @@ ATAC_ASSAYS = {"scATAC", "multiome"}
 SPATIAL_ASSAYS = {"VISIUM", "VISIUM3prime"}
 ALL_ASSAYS = ["scRNA", "scATAC", "multiome", "VISIUM"]
 
+
 def setup_logging(log):
     """Configure root logger to write INFO-level messages with timestamps to a file.
 

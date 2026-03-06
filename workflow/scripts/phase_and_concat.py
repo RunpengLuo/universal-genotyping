@@ -14,7 +14,8 @@ from scipy.sparse import save_npz
 
 from utils import *
 from io_utils import *
-from postprocess_utils import *
+from combine_counts_utils import *
+from count_reads_utils import *
 from aggregation_utils import *
 from switchprobs import *
 
@@ -65,7 +66,7 @@ assay_type = sm.params["assay_type"]
 rep_ids = sm.params["rep_ids"]
 sample_types = sm.params["sample_types"]
 
-bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
+bulk_assays = {"bulkWGS", "bulkWES"}
 is_bulk_assay = assay_type in bulk_assays
 
 ##################################################
@@ -175,8 +176,7 @@ else:
 
 _n_exon = int((snps["feature_type"] == "exon").sum())
 _n_total = len(snps)
-logging.info(
-    f"#exonic SNPs: {_n_exon}/{_n_total} ({_n_exon / max(_n_total, 1):.3%})")
+logging.info(f"#exonic SNPs: {_n_exon}/{_n_total} ({_n_exon / max(_n_total, 1):.3%})")
 
 if sm.params["exon_only"]:
     exon_mask = (snps["feature_type"] == "exon").to_numpy()

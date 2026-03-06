@@ -28,7 +28,7 @@ assert sample_df["REP_ID"].notna().all(), "REP_ID required for all replicates"
 assert sample_df["PATH_to_bam"].notna().all(), "PATH_to_bam has missing values"
 
 nonbulk_assays = {"scATAC", "scRNA", "VISIUM", "VISIUM3prime"}
-bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
+bulk_assays = {"bulkWGS", "bulkWES"}
 allowed_assay_types = list(bulk_assays) + list(nonbulk_assays)
 
 # filter to configured assay types
@@ -50,7 +50,6 @@ rep_ids = sample_df["REP_ID"].unique().tolist()
 assay_types = sample_df["assay_type"].unique().tolist()
 assert all(dt in allowed_assay_types for dt in assay_types)
 assay_type2modality = {
-    "bulkDNA": "DNA",
     "bulkWGS": "DNA",
     "bulkWES": "DNA",
     "scATAC": "DNA",
@@ -59,7 +58,6 @@ assay_type2modality = {
     "VISIUM3prime": "RNA",
 }
 assay_type2feature_type = {
-    "bulkDNA": "unknown",
     "bulkWGS": "unknown",
     "bulkWES": "exon",
     "scATAC": "tile",
@@ -74,6 +72,10 @@ if workflow_mode == "bulk_genotyping":
         drop=True
     )
     assert len(sample_df) > 0, "no samples for bulk_genotyping mode"
+    assert sample_df["assay_type"].nunique() == 1, (
+        "bulk_genotyping mode requires all samples to have the same assay_type "
+        f"(bulkWGS or bulkWES), got: {sample_df['assay_type'].unique().tolist()}"
+    )
     assert sample_df["REP_ID"].nunique() == len(
         sample_df
     ), "bulk mode must have no duplicated replicate IDs"
@@ -218,9 +220,6 @@ else:
             final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.baf.npz")
             final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.rdr.npz")
             final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.depth.npz")
-            if config.get("rdr_method", "bin") == "window":
-                final_targets.append(config["bb_dir"] + f"/{assay_type}/window.depth.npz")
-                final_targets.append(config["bb_dir"] + f"/{assay_type}/window.rdr.npz")
         else:
             final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.raw.tsv.gz")
             final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.raw.Tallele.npz")
@@ -236,9 +235,10 @@ else:
 include: "rules/genotype_snps.smk"
 include: "rules/phase_snps.smk"
 include: "rules/pileup_snps.smk"
-include: "rules/postprocess.smk"
-include: "rules/rdr_estimation.smk"
-include: "rules/quality_control.smk"
+include: "rules/process_anndata.smk"
+include: "rules/phase_and_concat.smk"
+include: "rules/count_reads.smk"
+include: "rules/combine_counts.smk"
 
 
 rule all:

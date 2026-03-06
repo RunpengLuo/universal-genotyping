@@ -29,7 +29,6 @@ def interp_cM_blocks(
     blocks = blocks.copy(deep=True)
     blocks["dist_cM"] = 0.0
 
-    # blocks SNP-start and SNP-end
     hb_pos = snp_info.groupby("bbc_id", sort=False)["POS"].agg(
         snp_start="min", snp_end="max"
     )

@@ -70,8 +70,12 @@ for idx, rep_id in enumerate(rep_ids):
     adata.obs_names = adata.obs_names.astype(str)
     if rep_id in rep2ref_annotation:
         ref_annotations = read_ref_annotation(rep2ref_annotation[rep_id], ref_label)
-        num_annotated_barcodes = len(set(adata.obs_names) & set(ref_annotations["BARCODE"]))
-        logging.info(f"#barcodes with ref_annotation annotation: {num_annotated_barcodes}")
+        num_annotated_barcodes = len(
+            set(adata.obs_names) & set(ref_annotations["BARCODE"])
+        )
+        logging.info(
+            f"#barcodes with ref_annotation annotation: {num_annotated_barcodes}"
+        )
         adata.obs[ref_label] = (
             ref_annotations.set_index("BARCODE")
             .reindex(adata.obs_names)[ref_label]
@@ -119,7 +123,13 @@ adata.var["END"] = (
 # filter tiles
 ## 1. filter files by region file, e.g., centromeric and HLA regions.
 regions = read_region_file(sm.input["region_bed"])
-regions["region_id"] = np.arange(len(regions))
+regions["region_id"] = (
+    regions["#CHR"].astype(str)
+    + ":"
+    + regions["START"].astype(str)
+    + "-"
+    + regions["END"].astype(str)
+)
 adata = feature_to_blocks(adata, regions, assay_type)
 
 ##################################################
@@ -137,7 +147,9 @@ if has_annotations:
     ct_df = adata.obs[[ref_label]].copy()
     ct_df.index.name = "BARCODE"
     ct_df.to_csv(sm.output["cell_types"], sep="\t", compression="gzip")
-    logging.info(f"wrote {len(ct_df)} rows to cell_types.tsv.gz with column {ref_label}")
+    logging.info(
+        f"wrote {len(ct_df)} rows to cell_types.tsv.gz with column {ref_label}"
+    )
 else:
     header_df = pd.DataFrame(columns=[ref_label])
     header_df.index.name = "BARCODE"

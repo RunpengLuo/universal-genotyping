@@ -46,7 +46,7 @@ feature_type = sm.params["feature_type"]
 sample_df = pd.read_table(sm.input["sample_file"])
 rep_ids = sample_df["REP_ID"].tolist()
 
-bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
+bulk_assays = {"bulkWGS", "bulkWES"}
 is_bulk_assay = assay_type in bulk_assays
 assert not is_bulk_assay, "bulk sample CNV segmentation unsupported yet"
 
@@ -56,12 +56,10 @@ logging.info(f"rep_ids={rep_ids}")
 snps = pd.read_table(snp_info, sep="\t")
 
 if is_bulk_assay:
-    # dense matrix
     tot_mtx = np.load(tot_mtx_snp)["mat"].astype(np.int32)
     a_mtx = np.load(a_mtx_snp)["mat"].astype(np.int32)
     b_mtx = np.load(b_mtx_snp)["mat"].astype(np.int32)
 else:
-    # sparse matrix
     tot_mtx = load_npz(tot_mtx_snp)
     a_mtx = load_npz(a_mtx_snp)
     b_mtx = load_npz(b_mtx_snp)
@@ -96,7 +94,6 @@ bbc_phases = pd.merge(
 )["PHASE-BBC"].to_numpy()
 
 ##################################################
-# filter mat rows with SNP not present in CNV profile
 raw_snp_ids = snps["RAW_SNP_IDX"].to_numpy()
 tot_mtx = tot_mtx[raw_snp_ids, :]
 a_mtx = a_mtx[raw_snp_ids, :]

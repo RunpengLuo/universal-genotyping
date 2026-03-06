@@ -29,7 +29,6 @@ chromosomes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
 
 # Skip genotyping & phasing when provided
 het_snp_vcf: null
-het_snp_info: null
 # HATCHet CNV profiles and block phased haplotypes
 seg_ucn: null
 bbc_ucn: null
@@ -41,6 +40,9 @@ reference_version: null
 reference: null
 genome_size: null
 region_bed: null
+window_bed: null
+blacklist_bed: null
+gene_blacklist_file: null
 gtf_file: null
 ref_label: "cell_type"
 
@@ -89,69 +91,36 @@ params_longphase:
   extra_params: "--pb"
 
 ##################################################
-gene_blacklist_file: null
-blacklist_bed: null
-
-params_postprocess:
-  # process_rna_adata
+params_process_anndata:
   gene_id_colname: gene_ids
   min_frac_barcodes: 5e-3
-
-  # process_atac_fragments
   tile_width: 200000
 
-  # SNP filtering
+params_phase_and_concat:
   min_depth: 1
   gamma: 0.05
   exon_only: false
-
-  # switchprobs
-  min_switchprob: 1e-6
-  nu: 1
-  max_switchprob: 0.1
-  switchprob_ps: 5e-2
-
-  # binom_test
-  binom_test: false
-  binom_alpha: 5e-3
-  binom_margin: 0.05
-
-  nsnp_multi: 2
-  min_snp_reads: 200
-  min_snp_per_block: 10
-  min_blocksize: 1000
-
-##################################################
-# RDR estimation (bulk only)
-rdr_method: "window"
 
 params_mosdepth:
   read_quality: 11
   extra_params: "--no-per-base --fast-mode"
 
-params_compute_rdr:
-  # shared (required for both bin and window methods)
-  bias_bed: null
-  gc_correct: true    # enable GC (+MAP) bias correction
-  rt_correct: true    # enable replication-timing correction
-
-  # bin method
-  correction_method: "quantile"
-
-  # window method
-  window_size: 1000
+params_count_reads:
+  gc_correct: true
+  rt_correct: true
   samplesize: 50000
   routlier: 0.01
   doutlier: 0.001
   min_mappability: 0.9
 
-##################################################
-# QC filter bins (bulk only)
-params_filter_bins:
-  gc_lo: 0.01
-  gc_hi: 0.99
-  map_tol: 0.2
-  rdr_hi: 0.999      # remove bins above 99.9th percentile RDR
+params_combine_counts:
+  min_switchprob: 1e-6
+  nu: 1
+  max_switchprob: 0.1
+  switchprob_ps: 5e-2
+  nsnp_multi: 2
+  min_snp_reads: 200
+  min_snp_per_block: 10
 
 ##################################################
 threads:

@@ -34,7 +34,6 @@ logging.info(f"parse genetic map files, phaser={phaser}")
 required_columns = ["#CHR", "POS", "cM"]
 if phaser == "eagle":
     if len(set(gmap_files)) == 1:
-        # commonly eagle genetic map is single file covers all chroms.
         genetic_map = pd.read_table(gmap_files[0], sep=" ", index_col=None).rename(
             columns={
                 "chr": "#CHR",

@@ -18,7 +18,7 @@ from bias_correction import (
     bias_correction_rdr_quantreg,
     bias_correction_rdr_spline,
 )
-from postprocess_utils import (
+from count_reads_utils import (
     plot_1d_sample,
     log_nan_summary,
     log_mad_and_plot,
@@ -87,7 +87,9 @@ np.savez_compressed(sm.output["dp_mtx_bb"], mat=dp_mtx_bb)
 # Aggregate bias_bed windows into adaptive bins via overlap weighting
 logging.info("aggregate bias_bed windows into adaptive bins")
 target_chroms = {f"chr{c}" for c in chromosomes}
-bias_bed_full = bias_bed_full[bias_bed_full["#CHR"].isin(target_chroms)].reset_index(drop=True)
+bias_bed_full = bias_bed_full[bias_bed_full["#CHR"].isin(target_chroms)].reset_index(
+    drop=True
+)
 
 bias_cols = ["GC"]
 if "MAP" in bias_bed_full.columns:
@@ -129,7 +131,9 @@ for chrom, bb_grp in bbs.groupby("#CHR", sort=False):
             vals, ov_bin, ov_wt, n_bb_chr
         )
 
-    logging.info(f"  {chrom}: {n_bb_chr} bins, {len(np.unique(ov_win))} windows assigned")
+    logging.info(
+        f"  {chrom}: {n_bb_chr} bins, {len(np.unique(ov_win))} windows assigned"
+    )
 
 corr_factors = bbs[["#CHR", "START", "END"]].copy()
 for col in bias_cols:
@@ -144,7 +148,11 @@ assert has_normal, "no normal sample, TODO"
 tumor_sidx = {False: 0, True: 1}[has_normal]
 
 gc_vals = corr_factors["GC"].to_numpy()
-mapp_vals = corr_factors["MAP"].to_numpy() if gc_correct and "MAP" in corr_factors.columns else None
+mapp_vals = (
+    corr_factors["MAP"].to_numpy()
+    if gc_correct and "MAP" in corr_factors.columns
+    else None
+)
 repli_vals = (
     corr_factors["REPLI"].to_numpy(dtype=np.float64)
     if rt_correct and "REPLI" in corr_factors.columns
@@ -154,9 +162,17 @@ repli_vals = (
 rd_raw_ylim = max(np.nanquantile(dp_mtx_bb, 0.99), 1.0)
 log_nan_summary("raw depth", dp_mtx_bb, rep_ids, nbb)
 log_mad_and_plot(
-    bbs, dp_mtx_bb, rep_ids, genome_size, qc_dir,
-    "depth_before_correction", "bb", "RD", rd_raw_ylim,
-    smooth=True, region_bed=region_bed_file,
+    bbs,
+    dp_mtx_bb,
+    rep_ids,
+    genome_size,
+    qc_dir,
+    "depth_before_correction",
+    "bb",
+    "RD",
+    rd_raw_ylim,
+    smooth=True,
+    region_bed=region_bed_file,
 )
 
 ##################################################
@@ -188,9 +204,17 @@ if gc_correct and correction_method == "loess":
     log_nan_summary("corrected depth", dp_mtx_bb, rep_ids, nbb)
     rd_corr_ylim = max(np.nanquantile(dp_mtx_bb, 0.99), 1.0)
     log_mad_and_plot(
-        bbs, dp_mtx_bb, rep_ids, genome_size, qc_dir,
-        "depth_after_correction", "bb", "RD", rd_corr_ylim,
-        smooth=True, region_bed=region_bed_file,
+        bbs,
+        dp_mtx_bb,
+        rep_ids,
+        genome_size,
+        qc_dir,
+        "depth_after_correction",
+        "bb",
+        "RD",
+        rd_corr_ylim,
+        smooth=True,
+        region_bed=region_bed_file,
     )
 
 ##################################################
@@ -200,7 +224,6 @@ if has_normal:
     library_correction = total_bases[0] / total_bases[1:]
     logging.info(f"RDR library normalization factor: {library_correction}")
 
-    # view
     normal_dp = dp_mtx_bb[:, 0]
 
     mask = np.isfinite(normal_dp) & (normal_dp > 0)
@@ -228,9 +251,17 @@ tumor_rep_ids = rep_ids[tumor_sidx:]
 rdr_ylim = np.round(np.nanquantile(rdr_mtx_bb, 0.99)).astype(int) + 1
 log_nan_summary("RDR (pre-corr)", rdr_mtx_bb, tumor_rep_ids, nbb)
 log_mad_and_plot(
-    bbs, rdr_mtx_bb, tumor_rep_ids, genome_size, qc_dir,
-    "rdr_before_correction", "bb", "RDR", rdr_ylim,
-    smooth=True, region_bed=region_bed_file,
+    bbs,
+    rdr_mtx_bb,
+    tumor_rep_ids,
+    genome_size,
+    qc_dir,
+    "rdr_before_correction",
+    "bb",
+    "RDR",
+    rdr_ylim,
+    smooth=True,
+    region_bed=region_bed_file,
 )
 
 ##################################################
@@ -273,9 +304,17 @@ for col in bias_cols:
 # plot per-sample RDRs (after corrections)
 log_nan_summary("RDR (post-corr)", rdr_mtx_bb, tumor_rep_ids, nbb)
 log_mad_and_plot(
-    bbs, rdr_mtx_bb, tumor_rep_ids, genome_size, qc_dir,
-    "rdr", "bb", "RDR", rdr_ylim,
-    smooth=True, region_bed=region_bed_file,
+    bbs,
+    rdr_mtx_bb,
+    tumor_rep_ids,
+    genome_size,
+    qc_dir,
+    "rdr",
+    "bb",
+    "RDR",
+    rdr_ylim,
+    smooth=True,
+    region_bed=region_bed_file,
 )
 
 np.savez_compressed(sm.output["rdr_mtx_bb"], mat=rdr_mtx_bb)

@@ -64,18 +64,23 @@ def bias_correction_rdr_quantreg(
     logging.info(f"GC-content range for fitting: [{gc_lo}, {gc_hi}]")
     fit_mask = (gc >= gc_lo) & (gc <= gc_hi)
 
-    pdf = PdfPages(os.path.join(out_dir, "correction_diagnostics.pdf")) if out_dir else None
+    pdf = (
+        PdfPages(os.path.join(out_dir, "correction_diagnostics.pdf"))
+        if out_dir
+        else None
+    )
 
     corrected_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
     for si, rep_id in enumerate(rep_ids):
         raw_rdrs = raw_rdr_mat[:, si]
 
-        # Build formula, fit_df, pred_df dynamically
         sample_fit_mask = fit_mask.copy()
         if rt_vals is not None:
             sample_fit_mask &= np.isfinite(rt_vals)
 
-        fit_df = pd.DataFrame({"RD": raw_rdrs[sample_fit_mask], "GC": gc[sample_fit_mask]})
+        fit_df = pd.DataFrame(
+            {"RD": raw_rdrs[sample_fit_mask], "GC": gc[sample_fit_mask]}
+        )
         pred_df = pd.DataFrame({"GC": gc})
         formula = "RD ~ GC + I(GC**2)"
         if has_mapp:
@@ -84,7 +89,9 @@ def bias_correction_rdr_quantreg(
             formula += " + MAP + I(MAP**2)"
         if rt_vals is not None:
             fit_df["RT"] = rt_vals[sample_fit_mask]
-            pred_df["RT"] = np.where(np.isfinite(rt_vals), rt_vals, np.nanmedian(rt_vals))
+            pred_df["RT"] = np.where(
+                np.isfinite(rt_vals), rt_vals, np.nanmedian(rt_vals)
+            )
             formula += " + RT + I(RT**2)"
 
         res = smf.quantreg(formula, data=fit_df).fit(q=0.5)
@@ -102,9 +109,14 @@ def bias_correction_rdr_quantreg(
         corrected_mat[:, si] = corr_rdrs / corr_factor
         if pdf is not None:
             plot_correction_diagnostics(
-                gc, raw_rdrs, corrected_mat[:, si],
-                fitted_rdr=exp_rdrs, rep_id=rep_id, pdf=pdf,
-                rt_vals=rt_vals, rt_name="REPLI",
+                gc,
+                raw_rdrs,
+                corrected_mat[:, si],
+                fitted_rdr=exp_rdrs,
+                rep_id=rep_id,
+                pdf=pdf,
+                rt_vals=rt_vals,
+                rt_name="REPLI",
             )
 
     if pdf is not None:
@@ -113,8 +125,14 @@ def bias_correction_rdr_quantreg(
 
 
 def plot_correction_diagnostics(
-    gc, raw_rdr, corr_rdr, fitted_rdr, rep_id, pdf,
-    rt_vals=None, rt_name=None,
+    gc,
+    raw_rdr,
+    corr_rdr,
+    fitted_rdr,
+    rep_id,
+    pdf,
+    rt_vals=None,
+    rt_name=None,
 ):
     """Produce a single-page diagnostic figure for RDR bias correction.
 
@@ -156,7 +174,9 @@ def plot_correction_diagnostics(
     mad_corr = mad(corr_rdr)
     axes[0, 0].scatter(gc, raw_rdr, s=2, alpha=0.2, rasterized=True)
     sort_idx = np.argsort(gc)
-    axes[0, 0].plot(gc[sort_idx], fitted_rdr[sort_idx], linewidth=2, color="red", label="fit")
+    axes[0, 0].plot(
+        gc[sort_idx], fitted_rdr[sort_idx], linewidth=2, color="red", label="fit"
+    )
     axes[0, 0].legend()
     axes[0, 0].set_xlabel("GC")
     axes[0, 0].set_ylabel("RDR")
@@ -171,13 +191,25 @@ def plot_correction_diagnostics(
         valid = np.isfinite(rt_vals)
         mad_raw_rt = mad(raw_rdr[valid])
         mad_corr_rt = mad(corr_rdr[valid])
-        axes[1, 0].scatter(rt_vals[valid], raw_rdr[valid], s=2, alpha=0.2, rasterized=True)
-        axes[1, 0].scatter(rt_vals[valid], fitted_rdr[valid], s=2, alpha=0.2, color="red", label="fit", rasterized=True)
+        axes[1, 0].scatter(
+            rt_vals[valid], raw_rdr[valid], s=2, alpha=0.2, rasterized=True
+        )
+        axes[1, 0].scatter(
+            rt_vals[valid],
+            fitted_rdr[valid],
+            s=2,
+            alpha=0.2,
+            color="red",
+            label="fit",
+            rasterized=True,
+        )
         axes[1, 0].legend()
         axes[1, 0].set_xlabel(f"RT ({rt_name})")
         axes[1, 0].set_ylabel("RDR")
         axes[1, 0].set_title(f"Before RT correction\nMAD={mad_raw_rt:.4f}")
-        axes[1, 1].scatter(rt_vals[valid], corr_rdr[valid], s=2, alpha=0.2, rasterized=True)
+        axes[1, 1].scatter(
+            rt_vals[valid], corr_rdr[valid], s=2, alpha=0.2, rasterized=True
+        )
         axes[1, 1].set_xlabel(f"RT ({rt_name})")
         axes[1, 1].set_ylabel("RDR")
         axes[1, 1].set_title(f"After RT correction\nMAD={mad_corr_rt:.4f}")
@@ -235,21 +267,18 @@ def gc_correct_depth_loess(
     for si in range(n_samples):
         reads = dp_mat[:, si].astype(np.float64)
 
-        # Step 1: valid bins (positive reads, valid GC)
         valid = (reads > 0) & np.isfinite(gc) & (gc >= 0)
 
-        # Step 2: ideal bins for fitting
         read_hi = np.nanquantile(reads[valid], 1.0 - routlier)
         ideal = valid & (reads <= read_hi) & (gc >= gc_lo) & (gc <= gc_hi)
         if mappability is not None:
-            ideal &= (mappability >= min_mappability)
+            ideal &= mappability >= min_mappability
 
         ideal_idx = np.where(ideal)[0]
         logging.info(
             f"sample {si}: {ideal_idx.size} ideal bins out of {int(valid.sum())} valid"
         )
 
-        # Step 3: subsample
         if ideal_idx.size > samplesize:
             rng = np.random.default_rng(42 + si)
             ideal_idx = rng.choice(ideal_idx, size=samplesize, replace=False)
@@ -257,24 +286,26 @@ def gc_correct_depth_loess(
         gc_ideal = gc[ideal_idx]
         reads_ideal = reads[ideal_idx]
 
-        # Step 4a: stage 1 — tight loess on ideal bins
         stage1 = lowess(reads_ideal, gc_ideal, frac=0.03, return_sorted=True)
-        # stage1 is (N, 2) sorted by gc; columns are (gc, fitted)
 
-        # Step 4b: stage 2 — evaluate stage-1 on fine grid, then smooth
         grid = np.linspace(0, 1, 1001)
         stage1_interp = interp1d(
-            stage1[:, 0], stage1[:, 1],
-            kind="linear", bounds_error=False, fill_value="extrapolate",
+            stage1[:, 0],
+            stage1[:, 1],
+            kind="linear",
+            bounds_error=False,
+            fill_value="extrapolate",
         )
         grid_pred = stage1_interp(grid)
         stage2 = lowess(grid_pred, grid, frac=0.3, return_sorted=True)
         final_interp = interp1d(
-            stage2[:, 0], stage2[:, 1],
-            kind="linear", bounds_error=False, fill_value="extrapolate",
+            stage2[:, 0],
+            stage2[:, 1],
+            kind="linear",
+            bounds_error=False,
+            fill_value="extrapolate",
         )
 
-        # Step 5: correct all bins
         predicted = final_interp(gc)
         with np.errstate(invalid="ignore", divide="ignore"):
             corr = np.where(
@@ -294,7 +325,11 @@ def gc_correct_depth_loess(
 
 
 def plot_depth_gc_correction(
-    gc, dp_before, dp_after, rep_id, pdf,
+    gc,
+    dp_before,
+    dp_after,
+    rep_id,
+    pdf,
 ):
     """One-page diagnostic: depth vs GC before and after loess correction."""
     mad = lambda x: np.median(np.abs(x - np.median(x)))
@@ -306,7 +341,9 @@ def plot_depth_gc_correction(
     axes[0].scatter(gc[valid], dp_before[valid], s=2, alpha=0.2, rasterized=True)
     axes[0].set_xlabel("GC")
     axes[0].set_ylabel("Read depth")
-    axes[0].set_title(f"Before GC correction\nMAD={mad_before:.4f}  r(GC,depth)={r_before:.4f}")
+    axes[0].set_title(
+        f"Before GC correction\nMAD={mad_before:.4f}  r(GC,depth)={r_before:.4f}"
+    )
 
     valid2 = (dp_after > 0) & np.isfinite(gc)
     mad_after = mad(dp_after[valid2])
@@ -314,7 +351,9 @@ def plot_depth_gc_correction(
     axes[1].scatter(gc[valid2], dp_after[valid2], s=2, alpha=0.2, rasterized=True)
     axes[1].set_xlabel("GC")
     axes[1].set_ylabel("Read depth")
-    axes[1].set_title(f"After GC correction\nMAD={mad_after:.4f}  r(GC,depth)={r_after:.4f}")
+    axes[1].set_title(
+        f"After GC correction\nMAD={mad_after:.4f}  r(GC,depth)={r_after:.4f}"
+    )
 
     fig.suptitle(f"{rep_id} — loess depth correction", fontsize=14)
     plt.tight_layout()
@@ -374,7 +413,11 @@ def bias_correction_rdr_spline(
     gc_lo, gc_hi = np.nanquantile(gc, gc_quantile)
     logging.info(f"GC-content range for fitting: [{gc_lo}, {gc_hi}]")
 
-    pdf = PdfPages(os.path.join(out_dir, "correction_diagnostics.pdf")) if out_dir else None
+    pdf = (
+        PdfPages(os.path.join(out_dir, "correction_diagnostics.pdf"))
+        if out_dir
+        else None
+    )
 
     corrected_mat = np.zeros_like(raw_rdr_mat, dtype=np.float32)
     for si, rep_id in enumerate(rep_ids):
@@ -392,20 +435,21 @@ def bias_correction_rdr_spline(
 
         formula_rhs = " + ".join(formula_parts)
 
-        fit_mask = (
-            (gc >= gc_lo) & (gc <= gc_hi) &
-            np.isfinite(log_rdr)
-        )
+        fit_mask = (gc >= gc_lo) & (gc <= gc_hi) & np.isfinite(log_rdr)
         if has_mapp:
             fit_mask &= np.isfinite(mapv)
         if rt_vals is not None:
             fit_mask &= np.isfinite(rt_vals)
 
-        logging.info(f"{rep_id}: fitting spline on {fit_mask.sum()}/{len(fit_mask)} bins")
+        logging.info(
+            f"{rep_id}: fitting spline on {fit_mask.sum()}/{len(fit_mask)} bins"
+        )
 
         fit_df = cov_df.loc[fit_mask].copy()
         y_fit = fit_df["log_rdr"].values
-        X_fit = patsy.dmatrix(f"{formula_rhs} - 1", data=fit_df, return_type="dataframe")
+        X_fit = patsy.dmatrix(
+            f"{formula_rhs} - 1", data=fit_df, return_type="dataframe"
+        )
 
         ols_model = sm_ols.OLS(y_fit, X_fit).fit()
         logging.info(f"{rep_id}: spline OLS R²={ols_model.rsquared:.4f}")
@@ -444,9 +488,14 @@ def bias_correction_rdr_spline(
         if pdf is not None:
             fitted_rdr = np.exp2(predicted)
             plot_correction_diagnostics(
-                gc, raw_rdrs, corrected_mat[:, si],
-                fitted_rdr=fitted_rdr, rep_id=rep_id, pdf=pdf,
-                rt_vals=rt_vals, rt_name="REPLI",
+                gc,
+                raw_rdrs,
+                corrected_mat[:, si],
+                fitted_rdr=fitted_rdr,
+                rep_id=rep_id,
+                pdf=pdf,
+                rt_vals=rt_vals,
+                rt_name="REPLI",
             )
 
     if pdf is not None:

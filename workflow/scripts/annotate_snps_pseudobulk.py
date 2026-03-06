@@ -75,12 +75,10 @@ for idx, modality in enumerate(modalities):
     for cnt in CNT:
         raw_snps[f"{cnt}{idx}"] = raw_snps[cnt].astype(np.int64)
 
-    # filter SNPs by chrnames and duplicated entries.
     raw_snps = raw_snps[
         raw_snps["#CHROM"].astype(str).isin([f"chr{chrname}" for chrname in chroms])
     ]
 
-    # filter rows with duplicated snp ids
     n_dup_rows = raw_snps.duplicated(subset="KEY", keep=False).sum()
     if n_dup_rows > 0:
         n_dup_keys = raw_snps.loc[
@@ -95,13 +93,11 @@ for idx, modality in enumerate(modalities):
         )
     raw_snps_list.append(raw_snps)
 
-## union over all replicates
 base_snps = pd.concat(
     [raw_snps[["KEY", "#CHROM", "POS", "REF", "ALT"]] for raw_snps in raw_snps_list],
     ignore_index=True,
 ).drop_duplicates(subset=["#CHROM", "POS", "REF", "ALT"], keep="first")
 
-## filter any SNP rows that present in multiple modalities but has different allele pair.
 dup_mask = base_snps.duplicated(subset="KEY", keep=False)
 n_dup_rows = int(dup_mask.sum())
 if n_dup_rows > 0:
@@ -115,7 +111,6 @@ base_snps = base_snps.reset_index(drop=True)
 nsnps_before_genotyping = len(base_snps)
 
 base_snps = base_snps.sort_values(["#CHROM", "POS"], kind="mergesort")
-## aggregate DP/AD/OTH counts across modalities
 for cnt in CNT:
     base_snps[cnt] = 0
 for idx, raw_snps in enumerate(raw_snps_list):

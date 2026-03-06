@@ -27,3 +27,9 @@ dependencies:
   - scanpy
   - snapatac2
   - numba
+  - anndata
+  # Optional: only needed for resources/scripts/convert_bam_visium3prime.py
+  # - pysam
+  # Optional: only needed for resources/scripts/build_window_bed.py --repliseq
+  # - ucsc-liftover
+  # - ucsc-bigwigtobedgraph

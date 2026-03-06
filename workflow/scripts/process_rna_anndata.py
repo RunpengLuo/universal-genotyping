@@ -56,8 +56,12 @@ for idx, rep_id in enumerate(rep_ids):
         # squidpy doesn't support load images from 3' data yet.
         load_images = True if assay_type == "VISIUM" else False
         if load_images:
-            assert os.path.isdir(os.path.join(ranger_dir, "spatial/")), f"missing spatial/ for {assay_type}"
-        adata: sc.AnnData = sq.read.visium(ranger_dir, load_images=load_images, library_id=rep_id)
+            assert os.path.isdir(os.path.join(ranger_dir, "spatial/")), (
+                f"missing spatial/ for {assay_type}"
+            )
+        adata: sc.AnnData = sq.read.visium(
+            ranger_dir, load_images=load_images, library_id=rep_id
+        )
         adata.var_names_make_unique()
     else:
         adata: sc.AnnData = sc.read_10x_h5(h5ad_file, gex_only=True)
@@ -66,8 +70,12 @@ for idx, rep_id in enumerate(rep_ids):
     adata.obs_names = adata.obs_names.astype(str)
     if rep_id in rep2ref_annotation:
         ref_annotations = read_ref_annotation(rep2ref_annotation[rep_id], ref_label)
-        num_annotated_barcodes = len(set(adata.obs_names) & set(ref_annotations["BARCODE"]))
-        logging.info(f"#barcodes with ref_annotation annotation: {num_annotated_barcodes}")
+        num_annotated_barcodes = len(
+            set(adata.obs_names) & set(ref_annotations["BARCODE"])
+        )
+        logging.info(
+            f"#barcodes with ref_annotation annotation: {num_annotated_barcodes}"
+        )
         adata.obs[ref_label] = (
             ref_annotations.set_index("BARCODE")
             .reindex(adata.obs_names)[ref_label]
@@ -75,9 +83,7 @@ for idx, rep_id in enumerate(rep_ids):
             .values.astype(str)
         )
 
-    # filter by barcodes (must match current adata.obs_names)
     adata = adata[adata.obs_names.isin(barcodes), :].copy()
-    # add replicate suffix to barcode
     adata.obs_names = adata.obs_names.astype(str) + f"_{rep_id}"
     adatas[rep_id] = adata
     logging.info(f"#barcodes={adata.n_obs}, #features={adata.n_vars}")
@@ -165,7 +171,13 @@ if assay_type in SPATIAL_ASSAYS:
 ## 3. filter genes by region file, e.g., centromeric and HLA regions.
 ## each gene gets a feature_idx
 regions = read_region_file(sm.input["region_bed"])[["#CHR", "START", "END"]]
-regions["region_id"] = np.arange(len(regions))
+regions["region_id"] = (
+    regions["#CHR"].astype(str)
+    + ":"
+    + regions["START"].astype(str)
+    + "-"
+    + regions["END"].astype(str)
+)
 adata = feature_to_blocks(adata, regions, assay_type)
 
 ## 4. filter outlier genes by outlier detection algorithm TODO
@@ -185,7 +197,9 @@ if has_annotations:
     ct_df = adata.obs[[ref_label]].copy()
     ct_df.index.name = "BARCODE"
     ct_df.to_csv(sm.output["cell_types"], sep="\t", compression="gzip")
-    logging.info(f"wrote {len(ct_df)} rows to cell_types.tsv.gz with column {ref_label}")
+    logging.info(
+        f"wrote {len(ct_df)} rows to cell_types.tsv.gz with column {ref_label}"
+    )
 else:
     header_df = pd.DataFrame(columns=[ref_label])
     header_df.index.name = "BARCODE"

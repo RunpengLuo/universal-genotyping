@@ -9,6 +9,7 @@ Take a barcode/label visium annotation file, convert to correct format.
 
 _, ann_file, out_file = sys.argv
 
+
 def simplify_label(v):
     """Simplify a Visium annotation label string.
 
@@ -33,6 +34,7 @@ def simplify_label(v):
             return v[str(v).find("_") + 1 :]
     else:
         return v
+
 
 # change accordingly
 barcode_col = "Barcode"

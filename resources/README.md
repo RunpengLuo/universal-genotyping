@@ -55,7 +55,7 @@ Set via `gtf_file` in config.
 
 Set via `params_compute_rdr.bias_bed` in config. A pre-built file is at `data/gc_map_repli.1kbp.hg38.bed.gz` with columns for GC content, mappability, and replication timing per 1 kb window.
 
-To build from scratch, see `scripts/build_bias_bed.hg38.py`.
+To build from scratch, see `scripts/build_window_bed.py`.
 
 ---
 

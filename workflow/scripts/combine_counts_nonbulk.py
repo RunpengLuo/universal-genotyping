@@ -18,7 +18,8 @@ from scipy.sparse import save_npz, load_npz, csr_matrix
 from utils import *
 from io_utils import *
 from aggregation_utils import *
-from postprocess_utils import *
+from combine_counts_utils import *
+from count_reads_utils import *
 
 from switchprobs import *
 
@@ -49,7 +50,7 @@ rep_ids = sample_df["REP_ID"].tolist()
 sample_types = sample_df["sample_type"].tolist()
 assay_type = sm.params["assay_type"]
 
-bulk_assays = {"bulkDNA", "bulkWGS", "bulkWES"}
+bulk_assays = {"bulkWGS", "bulkWES"}
 is_bulk_assay = assay_type in bulk_assays
 has_normal = "normal" in sample_types
 tumor_sidx = {False: 0, True: 1}[has_normal]
@@ -63,12 +64,10 @@ snps = pd.read_table(snp_info, sep="\t")
 # barcodes = pd.read_table(all_barcodes, sep="\t", header=None, names=["BARCODE"])
 
 if is_bulk_assay:
-    # dense matrix
     tot_mtx = np.load(tot_mtx_snp)["mat"].astype(np.int32)
     a_mtx = np.load(a_mtx_snp)["mat"].astype(np.int32)
     b_mtx = np.load(b_mtx_snp)["mat"].astype(np.int32)
 else:
-    # sparse matrix
     tot_mtx = load_npz(tot_mtx_snp)
     a_mtx = load_npz(a_mtx_snp)
     b_mtx = load_npz(b_mtx_snp)
@@ -107,67 +106,6 @@ else:
 num_phaseset = snps["PS"].nunique()
 logging.info(f"#phaseset={num_phaseset}")
 grp_cols.append("PS")
-
-# 2. estimate phase error bounderies
-binom_test = bool(sm.params["binom_test"])
-b_vec = np.asarray(b_mtx.sum(axis=1)).ravel()
-tot_vec = np.asarray(tot_mtx.sum(axis=1)).ravel()
-if binom_test:
-    if is_bulk_assay:
-        baf_mtx = b_mtx / tot_mtx
-        # 2-prop binom test on BAF mats
-        switches_2d = np.zeros((nsnps, nsamples), dtype=bool)
-        for si in range(tumor_sidx, nsamples):  # tumor samples
-            switches_2d[:, si] = binom_2prop_test(
-                b_mtx[:, si],
-                tot_mtx[:, si],
-                baf_mtx[:, si],
-                alpha=float(sm.params["binom_alpha"]),
-                margin=float(sm.params["binom_margin"]),
-            )
-        switches = np.any(switches_2d, axis=1)
-
-        num_switches = np.sum(switches)
-        logging.info(f"#binom_test switches={num_switches}/{len(switches) - 1}")
-        if num_switches > 0:
-            pair_mask = switches[1:]  # N-1
-            prev_bafs = baf_mtx[:, tumor_sidx:][:-1, :][pair_mask, :]
-            next_bafs = baf_mtx[:, tumor_sidx:][1:, :][pair_mask, :]
-            avg_abs_bafdevs = np.mean(np.abs(next_bafs - prev_bafs), axis=1)
-            edges = np.linspace(0.0, 1.0, 21)
-            counts, _ = np.histogram(avg_abs_bafdevs, bins=edges)
-            logging.info("pairwise SNP average BAF absolute deviations")
-            logging.info("bin_left\tbin_right\tcount")
-            for l, r, c in zip(edges[:-1], edges[1:], counts):
-                logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
-            snps["binom_id"] = np.cumsum(switches)
-            grp_cols.append("binom_id")
-    else:
-        # binomial test on pseudobulk sample,
-        # TODO use spatial information to use tumor-like spots?
-        baf_vec = compute_af_pseudobulk(tot_mtx, b_mtx)
-        switches = binom_2prop_test(
-            b_vec,
-            tot_vec,
-            baf_vec,
-            alpha=float(sm.params["binom_alpha"]),
-            margin=float(sm.params["binom_margin"]),
-        )
-        num_switches = np.sum(switches)
-        logging.info(f"#binom_test switches={num_switches}/{len(switches) - 1}")
-        if num_switches > 0:
-            pair_mask = switches[1:]  # N-1
-            prev_bafs = baf_vec[:-1][pair_mask]
-            next_bafs = baf_vec[1:][pair_mask]
-            avg_abs_bafdevs = np.abs(next_bafs - prev_bafs)
-            edges = np.linspace(0.0, 1.0, 21)
-            counts, _ = np.histogram(avg_abs_bafdevs, bins=edges)
-            logging.info("pairwise SNP average BAF absolute deviations")
-            logging.info("bin_left\tbin_right\tcount")
-            for l, r, c in zip(edges[:-1], edges[1:], counts):
-                logging.info(f"{l:0.2f}\t{r:0.2f}\t{int(c)}")
-            snps["binom_id"] = np.cumsum(switches)
-            grp_cols.append("binom_id")
 
 ##################################################
 # multi-snp segmentation
@@ -218,7 +156,6 @@ else:
 
 ##################################################
 # MSR&MSPB block segmentation
-min_blocksize = int(sm.params.get("min_blocksize", 0))
 if is_bulk_assay:
     bbs = adaptive_binning(
         snps,
@@ -228,7 +165,6 @@ if is_bulk_assay:
         grp_cols,
         colname="bb_id",
         tumor_sidx=tumor_sidx,
-        min_blocksize=min_blocksize,
     )
 else:
     bbs = adaptive_binning(
@@ -238,7 +174,6 @@ else:
         tot_vec[:, None],
         grp_cols,
         colname="bb_id",
-        min_blocksize=min_blocksize,
     )
 
 bb_ids = snps["bb_id"].to_numpy()
@@ -274,7 +209,8 @@ if is_bulk_assay:
     np.savez_compressed(sm.output["b_mtx_bb"], mat=b_mtx_bb)
     # BAF matrix (bins × samples) for downstream diploid-bin identification
     baf_mtx_bb = np.divide(
-        b_mtx_bb, tot_mtx_bb,
+        b_mtx_bb,
+        tot_mtx_bb,
         where=tot_mtx_bb > 0,
         out=np.full_like(b_mtx_bb, np.nan, dtype=np.float32),
     )
@@ -286,7 +222,9 @@ else:
     # placeholder BAF for non-bulk (compute_rdr_bulk is bulk-only)
     save_npz(sm.output["baf_mtx_bb"], csr_matrix((0, 0), dtype=np.float32))
 if all_barcodes is not None:
-    barcodes_out = os.path.join(os.path.dirname(sm.output["bb_file"]), "barcodes.tsv.gz")
+    barcodes_out = os.path.join(
+        os.path.dirname(sm.output["bb_file"]), "barcodes.tsv.gz"
+    )
     shutil.copy2(all_barcodes, barcodes_out)
 shutil.copy2(sm.input["sample_file"], sm.output["sample_file"])
 logging.info(f"finished.")

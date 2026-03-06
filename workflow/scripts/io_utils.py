@@ -62,7 +62,6 @@ def read_VCF(
     if addchr and not str(snps["#CHROM"].iloc[0]).startswith("chr"):
         snps["#CHROM"] = "chr" + snps["#CHROM"].astype(str)
 
-    # sort snps by #CHROM and POS
     chrom_order = [f"chr{i}" for i in range(1, 23)] + ["chrX", "chrY", "chrM", "chrMT"]
     snps["#CHROM"] = snps["#CHROM"].str.replace("^chrMT$", "chrM", regex=True)
     snps["#CHROM"] = pd.Categorical(
@@ -71,7 +70,6 @@ def read_VCF(
     if not snps_presorted:
         snps = snps.sort_values(["#CHROM", "POS"], kind="mergesort")
 
-    # copy #CHR field
     snps["#CHR"] = snps["#CHROM"]
 
     # parse INFO column
@@ -212,7 +210,9 @@ def read_ref_annotation(ref_annotation_file: str, ref_label):
     pd.DataFrame
         Two-column DataFrame with ``BARCODE`` and *ref_label*.
     """
-    ref_annotations = pd.read_table(ref_annotation_file, sep="\t")[["BARCODE", ref_label]].reset_index(drop=True)
+    ref_annotations = pd.read_table(ref_annotation_file, sep="\t")[
+        ["BARCODE", ref_label]
+    ].reset_index(drop=True)
     return ref_annotations
 
 
@@ -269,15 +269,14 @@ def read_exons_gtf_file(gtf_file: str):
         DataFrame with ``#CHR``, ``START`` (0-based), ``END``, and ``gene_id``.
     """
     gr = pr.read_gtf(gtf_file, rename_attr=True)
-    exons = (
-        gr.df.query("Feature == 'exon'")[["Chromosome", "Start", "End", "gene_id"]]
-        .rename(
-            columns={
-                "Chromosome": "#CHR",
-                "Start": "START1",
-                "End": "END",
-            }
-        )
+    exons = gr.df.query("Feature == 'exon'")[
+        ["Chromosome", "Start", "End", "gene_id"]
+    ].rename(
+        columns={
+            "Chromosome": "#CHR",
+            "Start": "START1",
+            "End": "END",
+        }
     )
     exons["START"] = exons["START1"] - 1
     return exons[["#CHR", "START", "END", "gene_id"]]

@@ -54,7 +54,7 @@ Intermediate allele-count matrices before binning.
 
 ### 5. Final Bins (`bb_dir/{assay_type}/`)
 
-Primary pipeline outputs. Bulk outputs are QC-filtered; single-cell outputs have the `bb.raw.*` prefix.
+Primary pipeline outputs.
 
 **Bulk (`bulk_genotyping`):**
 
@@ -62,16 +62,17 @@ Primary pipeline outputs. Bulk outputs are QC-filtered; single-cell outputs have
 |------|-------------|
 | `bb.tsv.gz` | Genomic bin annotation (chr, start, end, SNP count, features). |
 | `bb.{Tallele,Aallele,Ballele,baf}.npz` | Allele count and BAF matrices (bins x samples). |
-| `bb.depth.npz` | Read depth matrix (bins x samples) from `mosdepth`. |
-| `bb.rdr.npz` | Read depth ratio matrix, bias-corrected and normalized. |
+| `bb.depth.npz` | Read depth matrix (bins x samples), aggregated from corrected windows. |
+| `bb.rdr.npz` | Read depth ratio matrix (tumor/normal or median-centered). |
+| `bb.bed.gz` | BED3 file of bin intervals. |
 | `sample_ids.tsv` | Sample metadata. |
 
-When `rdr_method: "window"`, additionally:
+Window-level intermediates:
 
 | File | Description |
 |------|-------------|
-| `window.depth.npz` | Fixed-window read depth matrix. |
-| `window.rdr.npz` | Fixed-window RDR matrix (HMMcopy-style LOWESS correction). |
+| `window.depth_corrected.npz` | Bias-corrected per-window depth matrix. |
+| `window.df.tsv.gz` | Window annotation with GC/mappability/replication-timing columns. |
 
 **Single-cell (`single_cell_genotyping`):**
 
@@ -89,7 +90,7 @@ When `rdr_method: "window"`, additionally:
 
 ### 6. QC (`qc_dir/`)
 
-QC filtering applies to bulk bins only. Bins with NaN RDR, extreme GC, or low mappability are removed. Controlled by `params_filter_bins` in config.
+QC plots are produced during `rd_correct` (bias correction QC), `combine_counts` (bulk), and `combine_counts_nonbulk` (single-cell). Output directories: `qc_dir/{assay_type}/rd_correction/` (bulk bias correction), `qc_dir/{assay_type}/segmentation/` (bulk), and `qc_dir/{assay_type}/combine_counts/` (single-cell).
 
 ---
 
@@ -97,11 +98,11 @@ QC filtering applies to bulk bins only. Bins with NaN RDR, extreme GC, or low ma
 
 ### `snps.tsv.gz`
 
-`#CHR`, `POS`, `POS0`, `START`, `END`, `GT`, `PHASE` (1 = A-allele is ALT, -1 = A-allele is REF), `region_id`, `feature_id`, `feature_type` (exon/intron/intergenic).
+`#CHR`, `POS`, `POS0`, `START`, `END`, `GT`, `PHASE` (0 = B-allele is ALT, 1 = B-allele is REF), `region_id` (string, `CHR:START-END` of enclosing region), `feature_id`, `feature_type` (exon/intron/intergenic).
 
 ### `bb.tsv.gz` / `bb.raw.tsv.gz`
 
-`#CHR`, `START`, `END`, `START0`, `END0`, `switchprobs`, `region_id`, `PS`, `binom_id`, `#SNPS`, `BLOCKSIZE`, `feature_id`, `feature_type`, `bb_id`.
+`#CHR`, `START`, `END`, `START0`, `END0`, `switchprobs`, `region_id`, `PS`, `#SNPS`, `BLOCKSIZE`, `feature_id`, `feature_type`, `bb_id`.
 
 ### `sample_ids.tsv`
 
