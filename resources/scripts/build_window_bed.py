@@ -182,6 +182,14 @@ def generate_wes_targets(wes_targets_bed, target_avg_size):
         comment="#",
     )
     df = df[df["END"] > df["START"]].copy()
+    # Merge overlapping/duplicate intervals to avoid duplicate coordinate rows.
+    # Sort by chr+start first so BedTool.merge() works correctly.
+    df = df.sort_values(["#CHR", "START"]).reset_index(drop=True)
+    df = (
+        BedTool.from_dataframe(df)
+        .merge()
+        .to_dataframe(names=["#CHR", "START", "END"])
+    )
     rows = _subdivide_intervals(df, "#CHR", "START", "END", target_avg_size, min_size=1)
     return (
         pd.DataFrame(rows, columns=["#CHR", "START", "END"])
