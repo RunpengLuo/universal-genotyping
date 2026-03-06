@@ -24,8 +24,8 @@ if workflow_mode == "bulk_genotyping":
         run:
             import gzip, logging
             import pandas as pd
-            from utils import setup_logging
-            setup_logging(str(log[0]))
+            logging.basicConfig(filename=str(log[0]), level=logging.INFO,
+                                format="%(asctime)s %(levelname)s %(message)s")
 
             df = pd.read_table(str(input.window_bed), sep="\t", usecols=["#CHR", "START", "END"])
             logging.info(f"Extracted {len(df)} windows from {input.window_bed}")

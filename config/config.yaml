@@ -18,7 +18,9 @@ bb_dir: "bb"
 qc_dir: "qc"
 log_dir: "logs"
 
+# bulk_genotyping | single_cell_genotyping | copytyping_preprocess
 workflow_mode: "bulk_genotyping"
+# bulkWGS | bulkWES | scRNA | scATAC | VISIUM | VISIUM3prime
 assay_types: ["bulkWGS"]
 
 ##################################################
@@ -36,6 +38,7 @@ bbc_phases: null
 
 ##################################################
 # Reference
+# hg19 | hg38 | chm13v2
 reference_version: null
 reference: null
 genome_size: null
@@ -57,6 +60,7 @@ phasing_panel: null
 ##################################################
 # Genotype and pileup (single_cell_genotyping)
 params_cellsnp_lite:
+  # Auto | None | <tag>
   UMItag: "Auto"
   cellTAG: "CB"
   minMAF_genotype: 0
@@ -76,11 +80,14 @@ params_annotate_snps:
   min_het_reads: 2
   min_hom_dp: 10
   min_vaf_thres: 0.1
+  # true | false
   filter_nz_OTH: false
+  # true | false
   filter_hom_ALT: false
 
 ##################################################
 # Phasing
+# eagle | shapeit | longphase
 phaser: "eagle"
 eagle_dir:
 shapeit_dir:
@@ -99,6 +106,7 @@ params_process_anndata:
 params_phase_and_concat:
   min_depth: 1
   gamma: 0.05
+  # true | false
   exon_only: false
 
 params_mosdepth:
@@ -106,7 +114,9 @@ params_mosdepth:
   extra_params: "--no-per-base --fast-mode"
 
 params_count_reads:
+  # true | false
   gc_correct: true
+  # true | false
   rt_correct: true
   samplesize: 50000
   routlier: 0.01
