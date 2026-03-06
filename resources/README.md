@@ -25,6 +25,16 @@ VCF format. Set via `snp_panel` or `snp_targets` in config.
 | 1kGP phase3 AF>=5e-4 (~568 MB) | [download](https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e4.chr1toX.hg38.vcf.gz) |
 | 1kGP n=3,202 (high-coverage) | [FTP](https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/) — use [`scripts/process_1kGP_3202_panel.sh`](scripts/process_1kGP_3202_panel.sh) to prepare |
 
+### Building `snp_targets` from any panel VCF
+
+The `genotype_snps_bulk` rule requires `config["snp_targets"]` — a directory of per-chromosome position files. To build these from any SNP panel VCF:
+
+```bash
+bash resources/scripts/build_snp_targets.sh /path/to/snp_panel.vcf.gz /path/to/snp_targets
+```
+
+This produces `target.chr{1..22,X}.pos.gz` + `.tbi` index files. Existing chromosomes are skipped (idempotent). Requires `bcftools`, `bgzip`, `tabix`.
+
 ---
 
 ## Phasing Panels
