@@ -1,6 +1,6 @@
 """Utility functions for window/bin depth processing and QC plotting.
 
-Used by rd_correct.py, combine_counts.py, and compute_rdr_bulk_bin.py.
+Used by rd_correct.py and combine_counts.py.
 """
 
 import os

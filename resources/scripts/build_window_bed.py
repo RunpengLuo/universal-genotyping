@@ -31,6 +31,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 
 import numpy as np
 import pandas as pd
@@ -549,6 +550,7 @@ def main():
 
     wes_mode = args.wes_targets_bed is not None
 
+    t0 = time.time()
     print("=== build_window_bed.py ===")
     print(f"  Ref version: {args.reference_version}")
     print(f"  Reference:   {args.reference}")
@@ -668,6 +670,57 @@ def main():
     if "is_target" in windows.columns:
         out_cols.append("is_target")
 
+    # --- Summary stats ---
+    sizes = windows["END"] - windows["START"]
+    n_regions = windows["region_id"].nunique()
+    n_chroms = windows["#CHR"].nunique()
+    print()
+    print("  Summary:")
+    print(f"    {len(windows)} windows across {n_chroms} chromosomes")
+    print(f"    {n_regions} distinct regions")
+    print(
+        f"    window size: min={sizes.min()}, median={int(sizes.median())}, "
+        f"max={sizes.max()}, mean={sizes.mean():.0f}"
+    )
+    total_bp = int(sizes.sum())
+    print(f"    total coverage: {total_bp:,} bp ({total_bp / 1e9:.2f} Gb)")
+    if "is_target" in windows.columns:
+        tgt_sizes = sizes[windows["is_target"].astype(bool)]
+        anti_sizes = sizes[~windows["is_target"].astype(bool)]
+        print(
+            f"    target size:     min={tgt_sizes.min()}, median={int(tgt_sizes.median())}, "
+            f"max={tgt_sizes.max()}"
+        )
+        print(
+            f"    antitarget size: min={anti_sizes.min()}, median={int(anti_sizes.median())}, "
+            f"max={anti_sizes.max()}"
+        )
+
+    # Per-chromosome stats
+    has_target = "is_target" in windows.columns
+    header = f"    {'chrom':<8} {'windows':>8} {'regions':>8} {'coverage_Mb':>12} {'median_size':>12}"
+    if has_target:
+        header += f" {'target':>8} {'antitarget':>10}"
+    print(header)
+    # Sort chromosomes naturally (chr1, chr2, ..., chr22, chrX, chrY)
+    chrom_order = [f"chr{c}" for c in list(range(1, 23)) + ["X", "Y"]]
+    for chrom in chrom_order:
+        if chrom not in windows["#CHR"].values:
+            continue
+        mask = windows["#CHR"] == chrom
+        ch_sizes = sizes[mask]
+        ch_regions = windows.loc[mask, "region_id"].nunique()
+        row = (
+            f"    {chrom:<8} {int(mask.sum()):>8} {ch_regions:>8} "
+            f"{ch_sizes.sum() / 1e6:>12.2f} {int(ch_sizes.median()):>12}"
+        )
+        if has_target:
+            n_tgt = int(windows.loc[mask, "is_target"].astype(bool).sum())
+            n_anti = int(mask.sum()) - n_tgt
+            row += f" {n_tgt:>8} {n_anti:>10}"
+        print(row)
+    print()
+
     # --- Step 6: Write output ---
     os.makedirs(os.path.dirname(os.path.abspath(args.out_file)), exist_ok=True)
     windows[out_cols].to_csv(
@@ -677,7 +730,9 @@ def main():
         index=False,
         compression="gzip" if args.out_file.endswith(".gz") else None,
     )
+    elapsed = time.time() - t0
     print(f"[6/6] Wrote {len(windows)} rows to {args.out_file}")
+    print(f"  Total elapsed: {elapsed:.1f}s")
 
 
 if __name__ == "__main__":

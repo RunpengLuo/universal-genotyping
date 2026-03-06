@@ -51,11 +51,17 @@ Set via `gtf_file` in config.
 
 ---
 
-## Bias Correction BED
+## Window BED (Bias Correction)
 
-Set via `params_compute_rdr.bias_bed` in config. A pre-built file is at `data/gc_map_repli.1kbp.hg38.bed.gz` with columns for GC content, mappability, and replication timing per 1 kb window.
+Set via `window_bed` in config. A pre-built file is at `data/gc_map_repli.1kbp.hg38.bed.gz` with columns for GC content, mappability, and replication timing per 1 kb window.
 
-To build from scratch, see `scripts/build_window_bed.py`.
+To build from scratch, see [`scripts/build_window_bed.py`](scripts/build_window_bed.py). Supports WGS (fixed-size tiling with region/blacklist filtering) and WES (target+antitarget splitting via `--wes_targets_bed`).
+
+### WES exon capture targets
+
+For WES mode, `build_window_bed.py --wes_targets_bed` requires a vendor exon capture BED. Example (IDT xGen):
+
+- [xgen-exome-research-panel-targets-hg38.bb](https://hgdownload.soe.ucsc.edu/gbdb/hg38/exomeProbesets/xgen-exome-research-panel-targets-hg38.bb) — bigBed format, convert to BED with `bigBedToBed` (UCSC tools).
 
 ---
 
@@ -63,9 +69,6 @@ To build from scratch, see `scripts/build_window_bed.py`.
 
 Set via `blacklist_bed` in config. Pre-built: `data/hg38-blacklist.v2.bed.gz` ([ENCODE blacklist v2](https://github.com/Boyle-Lab/Blacklist)).
 
-https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bigBedToBed
-
-https://hgdownload.soe.ucsc.edu/gbdb/hg38/exomeProbesets/xgen-exome-research-panel-targets-hg38.bb
 ---
 
 ## Phasing Tools

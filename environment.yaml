@@ -33,3 +33,5 @@ dependencies:
   # Optional: only needed for resources/scripts/build_window_bed.py --repliseq
   # - ucsc-liftover
   # - ucsc-bigwigtobedgraph
+  # Optional: convert WES target bigBed to BED
+  # - ucsc-bigbedtobed
