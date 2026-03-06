@@ -57,6 +57,16 @@ Set via `window_bed` in config. A pre-built file is at `data/gc_map_repli.1kbp.h
 
 To build from scratch, see [`scripts/build_window_bed.py`](scripts/build_window_bed.py). Supports WGS (fixed-size tiling with region/blacklist filtering) and WES (target+antitarget splitting via `--wes_targets_bed`).
 
+### Mappability track
+
+Optional, used by `build_window_bed.py --mappability_bed` to add the `MAP` column.
+
+- [k100.Umap.MultiTrackMappability.bw](http://hgdownload.soe.ucsc.edu/gbdb/hg38/hoffmanMappability/k100.Umap.MultiTrackMappability.bw) — bigWig format, convert to BED with `bigWigToBedGraph` (UCSC tools).
+
+### Replication timing (Repli-seq)
+
+Optional, used by `build_window_bed.py --repliseq` to add the `REPLI` column. The script automatically downloads 16 ENCODE Repli-seq WaveSignal bigWig files from [UCSC](http://hgdownload.cse.ucsc.edu/goldenpath/hg19/encodeDCC/wgEncodeUwRepliSeq/) (hg19), converts via `bigWigToBedGraph`, and lifts to hg38 using [hg19ToHg38.over.chain.gz](https://hgdownload.cse.ucsc.edu/goldenpath/hg19/liftOver/hg19ToHg38.over.chain.gz). Requires `bigWigToBedGraph` and `liftOver` (UCSC tools).
+
 ### WES exon capture targets
 
 For WES mode, `build_window_bed.py --wes_targets_bed` requires a vendor exon capture BED. Example (IDT xGen):
