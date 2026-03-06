@@ -18,7 +18,7 @@ if workflow_mode == "bulk_genotyping":
         input:
             window_bed=config["window_bed"],
         output:
-            mosdepth_bed=config["bb_dir"] + "/windows.bed.gz",
+            mosdepth_bed=temp(config["bb_dir"] + "/windows.bed.gz"),
         log:
             config["log_dir"] + "/window_bed_to_3bed.log",
         run:
