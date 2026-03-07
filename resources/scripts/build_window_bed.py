@@ -188,7 +188,12 @@ def generate_wgs_windows(genome_size_file, window_size, standard_chroms,
         rows.extend(_tile_region(r["Chromosome"], r["Start"], r["End"], window_size))
 
     windows = pd.DataFrame(rows, columns=["#CHR", "START", "END"])
+    sizes = windows["END"] - windows["START"]
     print(f"  {len(windows)} windows across {windows['#CHR'].nunique()} chromosomes")
+    print(
+        f"  window size: min={sizes.min()}, mean={sizes.mean():.0f}, "
+        f"median={int(sizes.median())}, max={sizes.max()}"
+    )
     return windows
 
 
@@ -402,22 +407,19 @@ def compute_mappability(windows_df, mappability_file, genome_size_file):
     win_bed["_idx"] = np.arange(n_windows)
     bt = BedTool.from_dataframe(win_bed).sort(g=genome_size_file)
     map_bt = BedTool(mappability_file).sort(g=genome_size_file)
-    map_cov = bt.map(b=map_bt, c=4, o="mean", g=genome_size_file).to_dataframe(
-        disable_auto_names=True
+    result_bt = bt.map(b=map_bt, c=4, o="mean", g=genome_size_file)
+    # Read raw TSV instead of to_dataframe() which can silently drop rows
+    map_cov = pd.read_csv(
+        result_bt.fn, sep="\t", header=None,
+        names=["#CHR", "START", "END", "_idx", "MAP"],
+        dtype={"#CHR": str, "START": int, "END": int, "_idx": int, "MAP": str},
     )
-    map_cov.columns = ["#CHR", "START", "END", "_idx", "MAP"]
-    map_cov["_idx"] = map_cov["_idx"].astype(int)
     map_cov["MAP"] = pd.to_numeric(map_cov["MAP"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
-    n_out = len(map_cov)
-    if n_out != n_windows:
-        print(
-            f"  WARNING: bedtools map returned {n_out}/{n_windows} rows "
-            f"(some windows may exceed chromosome bounds in genome size file)"
-        )
-    # Join back by _idx to handle possible row count mismatch
-    result = np.zeros(n_windows, dtype=np.float64)
-    result[map_cov["_idx"].values] = map_cov["MAP"].values
-    return result
+    assert len(map_cov) == n_windows, (
+        f"bedtools map returned {len(map_cov)} rows, expected {n_windows}"
+    )
+    map_cov = map_cov.sort_values("_idx")
+    return map_cov["MAP"].values
 
 
 # ---------------------------------------------------------------------------
