@@ -15,8 +15,8 @@ from scipy.stats import beta
 
 import pyranges as pr
 
-from io_utils import read_VCF, read_region_file
-from count_reads_utils import plot_1d_sample
+from io_utils import read_VCF
+from count_reads_utils import plot_1d_sample, plot_1d_multi_sample
 
 
 def canon_mat_one_replicate(
@@ -462,20 +462,19 @@ def plot_allele_freqs(
     else:
         _tot_mtx = tot_mtx.tocsc() if issparse(tot_mtx) else tot_mtx
         _b_mtx = b_mtx.tocsc() if issparse(b_mtx) else b_mtx
-        for i, rep_id in enumerate(rep_ids):
-            plot_file = os.path.join(
-                plot_dir, f"af_{allele}_{unit}.{rep_id}{suffix}.pdf"
-            )
-            af = compute_af_per_sample(_tot_mtx, _b_mtx, i)
-            plot_1d_sample(
-                pos_df,
-                af,
-                genome_size,
-                plot_file,
-                unit=unit,
-                val_type="AF",
-                mask=snp_mask,
-                region_bed=region_bed,
-                blacklist_bed=blacklist_bed,
-            )
+        af_mat = np.column_stack(
+            [compute_af_per_sample(_tot_mtx, _b_mtx, i) for i in range(len(rep_ids))]
+        )
+        plot_file = os.path.join(plot_dir, f"af_{allele}_{unit}{suffix}.pdf")
+        plot_1d_multi_sample(
+            pos_df,
+            af_mat,
+            list(rep_ids),
+            genome_size,
+            plot_file,
+            unit=unit,
+            val_type="AF",
+            region_bed=region_bed,
+            blacklist_bed=blacklist_bed,
+        )
     return

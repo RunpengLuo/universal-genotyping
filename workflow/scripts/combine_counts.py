@@ -6,7 +6,9 @@ Combines:
 3. RDR computation (tumor/normal ratio or median-centering)
 """
 
-import os, sys, shutil, logging
+import os
+import shutil
+import logging
 from snakemake.script import snakemake as sm
 
 t = int(getattr(sm, "threads", 1))
@@ -18,7 +20,6 @@ os.environ["NUMEXPR_NUM_THREADS"] = str(t)
 
 import numpy as np
 import pandas as pd
-from scipy.sparse import save_npz, load_npz, csr_matrix
 
 from utils import setup_logging, maybe_path
 from aggregation_utils import (
@@ -27,7 +28,7 @@ from aggregation_utils import (
     matrix_segmentation,
 )
 from combine_counts_utils import plot_allele_freqs
-from count_reads_utils import log_nan_summary, plot_1d_sample
+from count_reads_utils import log_nan_summary, plot_1d_multi_sample
 from switchprobs import (
     interp_cM_blocks,
     estimate_switchprobs_cM,
@@ -98,7 +99,7 @@ if "PS" not in snps.columns:
     logging.info("PS not in SNP columns, setting PS=1 for all SNPs")
     snps["PS"] = 1
 else:
-    logging.info(f"PS is provided")
+    logging.info("PS is provided")
 num_phaseset = snps["PS"].nunique()
 logging.info(f"#phaseset={num_phaseset}")
 grp_cols.append("PS")
@@ -109,9 +110,7 @@ grp_cols.append("PS")
 window_df["win_idx"] = np.arange(len(window_df))
 # Assign PS to window_df from SNPs: each window gets the majority-vote PS
 _snps_tmp = snps[["#CHR", "POS0", "PS"]].copy()
-_snps_tmp = assign_pos_to_range(
-    _snps_tmp, window_df, ref_id="win_idx", pos_col="POS0"
-)
+_snps_tmp = assign_pos_to_range(_snps_tmp, window_df, ref_id="win_idx", pos_col="POS0")
 _snps_tmp = _snps_tmp.dropna(subset=["win_idx"])
 _snps_tmp["win_idx"] = _snps_tmp["win_idx"].astype(np.int64)
 win_ps = _snps_tmp.groupby("win_idx")["PS"].agg(lambda x: x.mode().iloc[0])
@@ -218,19 +217,19 @@ logging.info(
 
 tumor_rep_ids = rep_ids[tumor_sidx:]
 rdr_ylim = (np.round(np.nanquantile(bb_rdr, 0.99)).astype(int) + 1) * 1.1
-for i, label in enumerate(tumor_rep_ids):
-    plot_1d_sample(
-        bbs,
-        bb_rdr[:, i],
-        genome_size,
-        os.path.join(qc_dir, f"rdr_bb.{label}.pdf"),
-        unit="bb",
-        val_type="RDR",
-        max_ylim=rdr_ylim,
-        smooth=True,
-        region_bed=region_bed,
-        blacklist_bed=blacklist_bed,
-    )
+plot_1d_multi_sample(
+    bbs,
+    bb_rdr[:, tumor_sidx:],
+    list(tumor_rep_ids),
+    genome_size,
+    os.path.join(qc_dir, "rdr_bb.pdf"),
+    unit="bb",
+    val_type="RDR",
+    max_ylim=rdr_ylim,
+    smooth=True,
+    region_bed=region_bed,
+    blacklist_bed=blacklist_bed,
+)
 
 # ---------------------------------------------------------------------------
 # 6. Filter bins with any NaN across all bb matrices

@@ -172,7 +172,11 @@ def plot_rd_gc(
     gc_bin_median_std=None,
     **plot_kwargs,
 ):
-    """Log GC-correlation stats per column and generate 1-D chromosome scatter plots.
+    """Log GC-correlation stats per column and generate a combined multi-sample
+    1-D chromosome scatter PDF.
+
+    Produces a single ``{prefix}.pdf`` with one page per chromosome.  Each page
+    contains vertically stacked subplots (one row per sample, shared x-axis).
 
     Parameters
     ----------
@@ -182,7 +186,6 @@ def plot_rd_gc(
         {label: std of per-GC-bin median RD} from ``compute_gc_rd_stats``.
     """
     for i, label in enumerate(labels):
-        v = mat[:, i]
         if gc_corr is not None and label in gc_corr:
             pr_val, sr_val = gc_corr[label]
             logging.info(
@@ -191,20 +194,162 @@ def plot_rd_gc(
             )
         if gc_bin_median_std is not None and label in gc_bin_median_std:
             logging.info(
-                f"  {prefix:<28s} {label:<8s}: "
-                f"A_GC std={gc_bin_median_std[label]:.4f}"
+                f"  {prefix:<28s} {label:<8s}: A_GC std={gc_bin_median_std[label]:.4f}"
             )
-        plot_file = os.path.join(qc_dir, f"{prefix}.{label}.pdf")
-        plot_1d_sample(
-            pos_df,
-            v,
-            genome_size,
-            plot_file,
-            unit=unit,
-            val_type=val_type,
-            max_ylim=ylim,
-            **plot_kwargs,
+    plot_file = os.path.join(qc_dir, f"{prefix}.pdf")
+    plot_1d_multi_sample(
+        pos_df,
+        mat,
+        labels,
+        genome_size,
+        plot_file,
+        unit=unit,
+        val_type=val_type,
+        max_ylim=ylim,
+        **plot_kwargs,
+    )
+
+
+def plot_1d_multi_sample(
+    pos_df: pd.DataFrame,
+    mat: np.ndarray,
+    labels: list,
+    genome_size: str,
+    out_file: str,
+    unit="window",
+    val_type="RD",
+    s=4,
+    dpi=72,
+    alpha=0.6,
+    min_ylim=0.0,
+    max_ylim=None,
+    smooth: bool = False,
+    smooth_frac: float = 0.05,
+    smooth_color: str = "orange",
+    smooth_linewidth: float = 1.5,
+    region_bed: str | None = None,
+    blacklist_bed: str | None = None,
+):
+    """Multi-sample 1-D chromosome scatter plot: one page per chromosome,
+    vertically stacked subplots (one row per sample, shared x-axis).
+
+    Parameters
+    ----------
+    mat : np.ndarray
+        (n_windows, n_samples) value matrix.
+    labels : list[str]
+        Sample labels, length == mat.shape[1].
+    """
+    n_samples = len(labels)
+    logging.info(
+        f"chromosome wide {unit}-level {val_type} multi-sample plot "
+        f"({n_samples} samples), out_file={out_file}"
+    )
+    chrom_sizes = get_chr_sizes(genome_size)
+
+    _region_by_chr = {}
+    if region_bed is not None:
+        _region_df = read_region_file(region_bed)
+        for _ch, _grp in _region_df.groupby("#CHR", sort=False):
+            _region_by_chr[_ch] = list(zip(_grp["START"], _grp["END"]))
+
+    _blacklist_by_chr = {}
+    if blacklist_bed is not None:
+        _bl_df = read_region_file(blacklist_bed)
+        for _ch, _grp in _bl_df.groupby("#CHR", sort=False):
+            _blacklist_by_chr[_ch] = list(zip(_grp["START"], _grp["END"]))
+
+    ch = pos_df["#CHR"].to_numpy()
+    if "POS" in pos_df.columns:
+        pos = pos_df["POS"].to_numpy()
+    else:
+        pos = ((pos_df["START"].to_numpy() + pos_df["END"].to_numpy()) // 2).astype(
+            np.int64
         )
+    num_bins = len(pos_df)
+    change = np.flatnonzero(ch[1:] != ch[:-1]) + 1
+    starts = np.r_[0, change]
+    ends = np.r_[change, num_bins]
+    chroms = ch[starts]
+
+    pdf_fd = PdfPages(out_file)
+    for chrom, lo, hi in zip(chroms, starts, ends):
+        chr_end = chrom_sizes.get(chrom)
+        if chr_end is None:
+            logging.warning(f"{chrom}: not found in {genome_size}")
+            continue
+
+        x = pos[lo:hi]
+
+        fig, axes = plt.subplots(
+            nrows=n_samples,
+            ncols=1,
+            figsize=(40, 3 * n_samples),
+            sharex=True,
+            squeeze=False,
+        )
+        axes = axes[:, 0]
+
+        for si, (ax, label) in enumerate(zip(axes, labels)):
+            y = mat[lo:hi, si] if mat.ndim == 2 else mat[lo:hi]
+            m = np.isfinite(y)
+
+            if chrom in _region_by_chr:
+                for reg_start, reg_end in _region_by_chr[chrom]:
+                    ax.axvspan(
+                        reg_start, reg_end, color="lightblue", alpha=0.15, zorder=0
+                    )
+            if chrom in _blacklist_by_chr:
+                for bl_start, bl_end in _blacklist_by_chr[chrom]:
+                    ax.axvspan(
+                        bl_start, bl_end, color="lightcoral", alpha=0.2, zorder=0
+                    )
+
+            if m.any():
+                ax.scatter(x[m], y[m], s=s, alpha=alpha, rasterized=True)
+
+            if smooth and m.sum() > 10:
+                from statsmodels.nonparametric.smoothers_lowess import (
+                    lowess as _lowess,
+                )
+
+                sx = x[m]
+                sy = y[m]
+                order = np.argsort(sx)
+                sx, sy = sx[order], sy[order]
+                max_pts = 10000
+                if len(sx) > max_pts:
+                    idx = np.linspace(0, len(sx) - 1, max_pts, dtype=int)
+                    sx_fit, sy_fit = sx[idx], sy[idx]
+                else:
+                    sx_fit, sy_fit = sx, sy
+                fit = _lowess(sy_fit, sx_fit, frac=smooth_frac, return_sorted=True)
+                ax.plot(
+                    fit[:, 0],
+                    fit[:, 1],
+                    color=smooth_color,
+                    linewidth=smooth_linewidth,
+                    zorder=5,
+                )
+
+            if val_type in ["AF", "BAF"]:
+                ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
+                ax.set_ylim(-0.05, 1.05)
+            elif max_ylim is not None:
+                ax.set_ylim(min_ylim, max_ylim)
+
+            ax.set_ylabel(label, fontsize=10)
+            ax.set_xlim(0, chr_end)
+            ax.grid(alpha=0.2)
+
+            if si == 0:
+                ax.set_title(f"{val_type} plot - {chrom}")
+
+        axes[-1].set_xlabel(f"Position ({unit})")
+        fig.tight_layout()
+        pdf_fd.savefig(fig, dpi=dpi)
+        plt.close(fig)
+    pdf_fd.close()
 
 
 def plot_1d_sample(
