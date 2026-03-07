@@ -206,8 +206,8 @@ def generate_wes_windows(wes_targets_bed, region_bed, blacklist_bed,
                          target_avg_size, antitarget_avg_size, pad_size,
                          standard_chroms):
     """Generate target + antitarget windows for WES mode."""
-    # --- Targets: subdivide vendor exon capture intervals ---
-    targets = _read_and_subdivide_targets(wes_targets_bed, target_avg_size)
+    # --- Targets: clip to regions, deduplicate, subdivide ---
+    targets = _read_and_subdivide_targets(wes_targets_bed, target_avg_size, region_bed)
     targets["is_target"] = 1
 
     # --- Antitargets: off-target bins in accessible non-exon regions ---
@@ -286,17 +286,36 @@ def _dedup_targets(df):
     return pd.DataFrame(rows, columns=["#CHR", "START", "END"])
 
 
-def _read_and_subdivide_targets(wes_targets_bed, target_avg_size):
-    """Read vendor exon targets, deduplicate CNVkit-style, subdivide."""
+def _read_and_subdivide_targets(wes_targets_bed, target_avg_size, region_bed):
+    """Read vendor exon targets, clip to regions, deduplicate, subdivide."""
     df = pd.read_csv(
         wes_targets_bed, sep="\t", header=None,
         usecols=[0, 1, 2], names=["#CHR", "START", "END"], comment="#",
     )
     df = df[df["END"] > df["START"]].copy()
     n_raw = len(df)
-    df = _dedup_targets(df)
-    print(f"  {n_raw} raw targets, {len(df)} after dedup")
-    rows = _subdivide_intervals(df, "#CHR", "START", "END", target_avg_size, min_size=1)
+    # Clip targets to accessible regions
+    tgt_pr = pr.PyRanges(
+        df.rename(columns={"#CHR": "Chromosome", "START": "Start", "END": "End"})
+    )
+    clipped = tgt_pr.intersect(pr.read_bed(region_bed)).df
+    clipped = clipped.rename(
+        columns={"Chromosome": "#CHR", "Start": "START", "End": "END"}
+    )[["#CHR", "START", "END"]]
+    clipped = clipped[clipped["END"] > clipped["START"]].reset_index(drop=True)
+    n_clipped = n_raw - len(clipped)
+    if n_clipped > 0:
+        print(f"  {n_clipped} targets removed by region intersection")
+    # Union overlapping targets (matching CNVkit's merge inside _split_targets)
+    clipped = clipped.sort_values(["#CHR", "START"]).reset_index(drop=True)
+    df = (
+        BedTool.from_dataframe(clipped)
+        .merge()
+        .to_dataframe(names=["#CHR", "START", "END"])
+    )
+    n_merged = len(clipped) - len(df)
+    print(f"  {n_raw} raw targets, {len(df)} after clip+merge ({n_merged} overlapping)")
+    rows = _subdivide_intervals(df, "#CHR", "START", "END", target_avg_size, min_size=0)
     return pd.DataFrame(rows, columns=["#CHR", "START", "END"])
 
 
