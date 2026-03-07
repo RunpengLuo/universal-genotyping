@@ -88,8 +88,8 @@ if workflow_mode == "bulk_genotyping":
             region_bed=config["region_bed"],
             blacklist_bed=config.get("blacklist_bed", []),
         output:
-            dp_corrected=config["bb_dir"] + "/{assay_type}/window.depth_corrected.npz",
-            window_df=config["bb_dir"] + "/{assay_type}/window.df.tsv.gz",
+            dp_corrected=config["bb_dir"] + "/{assay_type}/window.dp.npz",
+            window_df=config["bb_dir"] + "/{assay_type}/window.tsv.gz",
             qc_dir=directory(config["qc_dir"] + "/{assay_type}/rd_correction/"),
         wildcard_constraints:
             assay_type="(bulkWGS|bulkWES)",

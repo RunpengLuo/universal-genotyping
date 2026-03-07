@@ -1,6 +1,5 @@
 import os
 import sys
-import numpy as np
 import pandas as pd
 
 ##################################################
@@ -48,7 +47,6 @@ assert all(st in ["normal", "tumor"] for st in uniq_sample_types)
 
 rep_ids = sample_df["REP_ID"].unique().tolist()
 assay_types = sample_df["assay_type"].unique().tolist()
-assert all(dt in allowed_assay_types for dt in assay_types)
 assay_type2modality = {
     "bulkWGS": "DNA",
     "bulkWES": "DNA",
@@ -79,7 +77,6 @@ if workflow_mode == "bulk_genotyping":
     assert sample_df["REP_ID"].nunique() == len(
         sample_df
     ), "bulk mode must have no duplicated replicate IDs"
-    assert sample_df["PATH_to_bam"].notna().all(), "PATH_to_bam has missing values"
     run_genotype_snps = True
 elif workflow_mode == "single_cell_genotyping":
     sample_df = sample_df.loc[
@@ -140,8 +137,7 @@ for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
     ref_annotation_file = rep_df["PATH_to_ref_annotations"].tolist()[0]
     if not pd.isna(ref_annotation_file):
         rep2ref_annotation[rep_id] = str(ref_annotation_file)
-    is_multiome = len(rep_df) > 1
-    rep2isMultiome[rep_id] = is_multiome
+    rep2isMultiome[rep_id] = len(rep_df) > 1
     for _, row in rep_df.iterrows():
         assay_type = row["assay_type"]
         get_data[(assay_type, rep_id)] = [
@@ -150,14 +146,13 @@ for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
             row["PATH_to_10x_ranger"],
         ]
 
-if any(is_multiome for is_multiome in rep2isMultiome.values()) and len(rep_ids) > 1:
+if len(rep_ids) > 1 and any(rep2isMultiome.values()):
     print("genotyping >1 replicates involving multiome data, warning")
 
 ##################################################
 # parse phase_snps inputs
 refvers = config["reference_version"]
 allowed_refvers = ["hg19", "hg38", "chm13v2"]
-get_refvers2 = {"hg19": "b37", "hg38": "b38"}
 assert refvers in allowed_refvers, "unsupported reference version"
 
 phaser = config.get("phaser", "undefined")
@@ -165,7 +160,6 @@ phaser = config.get("phaser", "undefined")
 # population-based phasing required to estimate switchprobs
 require_genetic_map = run_genotype_snps and phaser not in ["longphase"]
 if run_genotype_snps:
-    # locate genetic map files, different phaser option
     if phaser == "eagle":
         assert config.get("eagle_dir") is not None
         gmap_dir = os.path.join(config["eagle_dir"], "tables")
@@ -177,12 +171,16 @@ if run_genotype_snps:
         assert config.get("shapeit_dir") is not None
         gmap_dir = os.path.join(config["shapeit_dir"], f"resources/maps")
         assert os.path.isdir(gmap_dir), "failed to locate gmap directory"
+        get_refvers2 = {"hg19": "b37", "hg38": "b38"}
         refvers2 = get_refvers2[refvers]
         get_genetic_map = lambda chrname: os.path.join(
             gmap_dir, f"{refvers2}/chr{chrname}.{refvers2}.gmap.gz"
         )
+    elif phaser == "longphase":
+        pass  # no genetic map needed
     else:
-        assert phaser in ["longphase"], f"unknown phaser: {phaser}"
+        raise ValueError(f"unknown phaser: {phaser}")
+
     if phaser in ["eagle", "shapeit"]:
         assert all(
             os.path.exists(get_genetic_map(chrname))
@@ -200,34 +198,27 @@ if run_genotype_snps:
 
 ##################################################
 # final target files
-pre_qc = False  # TODO add more files
+
+
+def _bb_targets(assay_type, suffixes):
+    """Generate target paths under bb_dir for a given assay type."""
+    return [config["bb_dir"] + f"/{assay_type}/{s}" for s in suffixes]
+
+
 final_targets = []
 if workflow_mode == "copytyping_preprocess":
     for assay_type in assay_types:
-        final_targets.append(config["bb_dir"] + f"/{assay_type}/cnv_segments.tsv")
-        final_targets.append(config["bb_dir"] + f"/{assay_type}/X_count.npz")
-        final_targets.append(config["bb_dir"] + f"/{assay_type}/Y_count.npz")
-        final_targets.append(config["bb_dir"] + f"/{assay_type}/D_count.npz")
-
+        final_targets += _bb_targets(
+            assay_type, ["cnv_segments.tsv", "X_count.npz", "Y_count.npz", "D_count.npz"]
+        )
 else:
+    common_suffixes = ["bb.tsv.gz", "bb.Tallele.npz", "bb.Aallele.npz", "bb.Ballele.npz"]
     for assay_type in assay_types:
-        final_targets.append(config["bb_dir"] + f"/{assay_type}/sample_ids.tsv")
+        final_targets += _bb_targets(assay_type, ["sample_ids.tsv"] + common_suffixes)
         if assay_type in bulk_assays:
-            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.tsv.gz")
-            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Tallele.npz")
-            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Aallele.npz")
-            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.Ballele.npz")
-            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.baf.npz")
-            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.rdr.npz")
-            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.depth.npz")
+            final_targets += _bb_targets(assay_type, ["bb.baf.npz", "bb.rdr.npz", "bb.depth.npz"])
         else:
-            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.raw.tsv.gz")
-            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.raw.Tallele.npz")
-            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.raw.Aallele.npz")
-            final_targets.append(config["bb_dir"] + f"/{assay_type}/bb.raw.Ballele.npz")
-            final_targets.append(
-                config["allele_dir"] + f"/{assay_type}/barcodes.tsv.gz"
-            )
+            final_targets.append(config["allele_dir"] + f"/{assay_type}/barcodes.tsv.gz")
 
 
 ##################################################

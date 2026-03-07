@@ -10,9 +10,9 @@ if workflow_mode == "bulk_genotyping":
         input:
             # Corrected window depth (from rd_correct)
             dp_corrected=lambda wc: config["bb_dir"]
-            + f"/{wc.assay_type}/window.depth_corrected.npz",
+            + f"/{wc.assay_type}/window.dp.npz",
             window_df=lambda wc: config["bb_dir"]
-            + f"/{wc.assay_type}/window.df.tsv.gz",
+            + f"/{wc.assay_type}/window.tsv.gz",
             # SNP data (from phase_and_concat_bulk)
             snp_info=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snps.tsv.gz",
             tot_mtx_snp=lambda wc: config["allele_dir"]
@@ -90,12 +90,12 @@ if workflow_mode == "single_cell_genotyping":
             tot_mtx_multi=config["bb_dir"] + "/{assay_type}/multi_snp.Tallele.npz",
             a_mtx_multi=config["bb_dir"] + "/{assay_type}/multi_snp.Aallele.npz",
             b_mtx_multi=config["bb_dir"] + "/{assay_type}/multi_snp.Ballele.npz",
-            bb_file=config["bb_dir"] + "/{assay_type}/raw/bb.raw.tsv.gz",
-            tot_mtx_bb=config["bb_dir"] + "/{assay_type}/raw/bb.raw.Tallele.npz",
-            a_mtx_bb=config["bb_dir"] + "/{assay_type}/raw/bb.raw.Aallele.npz",
-            b_mtx_bb=config["bb_dir"] + "/{assay_type}/raw/bb.raw.Ballele.npz",
-            baf_mtx_bb=config["bb_dir"] + "/{assay_type}/raw/bb.raw.baf.npz",
-            bed_file=config["bb_dir"] + "/{assay_type}/raw/bb.raw.bed.gz",
+            bb_file=config["bb_dir"] + "/{assay_type}/bb.tsv.gz",
+            tot_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Tallele.npz",
+            a_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Aallele.npz",
+            b_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Ballele.npz",
+            baf_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.baf.npz",
+            bed_file=config["bb_dir"] + "/{assay_type}/bb.bed.gz",
             sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
             qc_dir=directory(config["qc_dir"] + "/{assay_type}/combine_counts/"),
         wildcard_constraints:
