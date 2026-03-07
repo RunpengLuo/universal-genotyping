@@ -9,7 +9,8 @@ The window BED is expected to be pre-filtered by region and blacklist
 columns already present.
 """
 
-import os, logging
+import os
+import logging
 from snakemake.script import snakemake as sm
 
 t = int(getattr(sm, "threads", 1))
@@ -221,7 +222,6 @@ plot_rd_gc(
     rd_ylim,
     gc_corr=gc_corr_after,
     gc_bin_median_std=gc_std_after,
-    smooth=True,
     region_bed=region_bed,
     blacklist_bed=blacklist_bed,
 )

@@ -6,7 +6,8 @@ from .targetcoverage.cnn / .antitargetcoverage.cnn is loaded for before/after
 comparison when available.
 """
 
-import os, logging
+import os
+import logging
 from snakemake.script import snakemake as sm
 
 t = int(getattr(sm, "threads", 1))
@@ -183,7 +184,6 @@ if has_gc:
         rd_ylim,
         gc_corr=gc_corr_after,
         gc_bin_median_std=gc_std_after,
-        smooth=True,
         region_bed=region_bed,
         blacklist_bed=blacklist_bed,
     )

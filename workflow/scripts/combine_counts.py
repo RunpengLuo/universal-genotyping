@@ -226,7 +226,6 @@ plot_1d_multi_sample(
     unit="bb",
     val_type="RDR",
     max_ylim=rdr_ylim,
-    smooth=True,
     region_bed=region_bed,
     blacklist_bed=blacklist_bed,
 )

@@ -223,10 +223,6 @@ def plot_1d_multi_sample(
     alpha=0.6,
     min_ylim=0.0,
     max_ylim=None,
-    smooth: bool = False,
-    smooth_frac: float = 0.05,
-    smooth_color: str = "orange",
-    smooth_linewidth: float = 1.5,
     region_bed: str | None = None,
     blacklist_bed: str | None = None,
 ):
@@ -308,30 +304,6 @@ def plot_1d_multi_sample(
             if m.any():
                 ax.scatter(x[m], y[m], s=s, alpha=alpha, rasterized=True)
 
-            if smooth and m.sum() > 10:
-                from statsmodels.nonparametric.smoothers_lowess import (
-                    lowess as _lowess,
-                )
-
-                sx = x[m]
-                sy = y[m]
-                order = np.argsort(sx)
-                sx, sy = sx[order], sy[order]
-                max_pts = 10000
-                if len(sx) > max_pts:
-                    idx = np.linspace(0, len(sx) - 1, max_pts, dtype=int)
-                    sx_fit, sy_fit = sx[idx], sy[idx]
-                else:
-                    sx_fit, sy_fit = sx, sy
-                fit = _lowess(sy_fit, sx_fit, frac=smooth_frac, return_sorted=True)
-                ax.plot(
-                    fit[:, 0],
-                    fit[:, 1],
-                    color=smooth_color,
-                    linewidth=smooth_linewidth,
-                    zorder=5,
-                )
-
             if val_type in ["AF", "BAF"]:
                 ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
                 ax.set_ylim(-0.05, 1.05)
@@ -366,10 +338,6 @@ def plot_1d_sample(
     min_ylim=0.0,
     max_ylim=None,
     mask: np.ndarray | None = None,
-    smooth: bool = False,
-    smooth_frac: float = 0.05,
-    smooth_color: str = "orange",
-    smooth_linewidth: float = 1.5,
     region_bed: str | None = None,
     blacklist_bed: str | None = None,
 ):
@@ -453,27 +421,6 @@ def plot_1d_sample(
             ax.legend(loc="upper right", fontsize=8, markerscale=2)
         else:
             ax.scatter(x[m], y[m], s=s, alpha=alpha, rasterized=True)
-        if smooth and m.sum() > 10:
-            from statsmodels.nonparametric.smoothers_lowess import lowess as _lowess
-
-            sx = x[m]
-            sy = y[m]
-            order = np.argsort(sx)
-            sx, sy = sx[order], sy[order]
-            max_pts = 10000
-            if len(sx) > max_pts:
-                idx = np.linspace(0, len(sx) - 1, max_pts, dtype=int)
-                sx_fit, sy_fit = sx[idx], sy[idx]
-            else:
-                sx_fit, sy_fit = sx, sy
-            fit = _lowess(sy_fit, sx_fit, frac=smooth_frac, return_sorted=True)
-            ax.plot(
-                fit[:, 0],
-                fit[:, 1],
-                color=smooth_color,
-                linewidth=smooth_linewidth,
-                zorder=5,
-            )
         if val_type in ["AF", "BAF"]:
             ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
             ax.set_ylim(-0.05, 1.05)
