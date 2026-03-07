@@ -39,6 +39,16 @@ snakemake --profile profile/ --conda-create-envs-only --cores 1 \
 
 No `--configfile` is needed — the Snakefile detects the absence of config and exposes dummy rules referencing all four env files so Snakemake can discover and create them.
 
+By default, environments are installed under the path set by `conda-prefix` in `profile/config.yaml` (`.snakemake/conda/`, relative to the working directory). To use a custom location (e.g., a shared filesystem on a cluster), pass `--conda-prefix` on the command line:
+
+```sh
+snakemake --profile profile/ --conda-create-envs-only --cores 1 \
+    -s workflow/Snakefile \
+    --conda-prefix /path/to/shared/conda-envs
+```
+
+CLI flags always take precedence over the profile.
+
 ## Manual single-environment install (development)
 
 For development, install everything into one environment via `environment.yaml`:
