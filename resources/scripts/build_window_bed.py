@@ -6,9 +6,9 @@ accessible regions and blacklist, then computes per-window GC content with
 optional mappability and replication timing columns.
 
 WGS mode (default):
-  1. Tile genome into fixed-size windows
-  2. Keep windows overlapping --region_bed
-  3. Subtract --blacklist_bed if provided
+  1. Subtract --blacklist_bed from --region_bed (if provided)
+  2. Tile directly within each remaining interval (every window fully contained)
+  3. Merge undersized trailing windows into the previous window
 
 WES mode (--wes_targets_bed):
   1. Split vendor exon targets into ~target_avg_size pieces
@@ -148,28 +148,47 @@ def get_standard_chroms(reference_version, genome_size_file):
 # ---------------------------------------------------------------------------
 
 
-def generate_wgs_windows(genome_size_file, window_size, standard_chroms, region_bed):
-    """Generate fixed-size windows, filtered to accessible regions."""
-    sizes = _read_chrom_sizes(genome_size_file)
-    sizes = sizes[sizes["chrom"].isin(standard_chroms)]
+def _tile_region(chrom, start, end, window_size):
+    """Tile a single region into fixed-size windows, merging last short bin.
+
+    If the last window is shorter than window_size // 2 and there is a previous
+    window, it is merged into the previous window (extending its END).  Regions
+    smaller than window_size // 2 still emit one window.
+    """
+    rows = []
+    pos = start
+    while pos < end:
+        w_end = min(pos + window_size, end)
+        rows.append([chrom, pos, w_end])
+        pos = w_end
+    # Merge last bin into previous if undersized
+    if len(rows) > 1 and (rows[-1][2] - rows[-1][1]) < window_size // 2:
+        rows[-2][2] = rows[-1][2]
+        rows.pop()
+    return rows
+
+
+def generate_wgs_windows(genome_size_file, window_size, standard_chroms,
+                         region_bed, blacklist_bed):
+    """Tile windows directly within accessible regions.
+
+    Reads the region BED, subtracts the blacklist, then tiles each remaining
+    interval into fixed-size windows (merging undersized trailing windows).
+    Every output window is fully contained in a blacklist-subtracted region.
+    """
+    regions = pr.read_bed(region_bed)
+    if blacklist_bed:
+        regions = regions.subtract(pr.read_bed(blacklist_bed))
+
+    reg_df = regions.df
+    reg_df = reg_df[reg_df["Chromosome"].isin(standard_chroms)].reset_index(drop=True)
 
     rows = []
-    for _, row in sizes.iterrows():
-        for start in range(0, row["size"], window_size):
-            rows.append((row["chrom"], start, min(start + window_size, row["size"])))
+    for _, r in reg_df.iterrows():
+        rows.extend(_tile_region(r["Chromosome"], r["Start"], r["End"], window_size))
 
     windows = pd.DataFrame(rows, columns=["#CHR", "START", "END"])
     print(f"  {len(windows)} windows across {windows['#CHR'].nunique()} chromosomes")
-
-    # Keep only windows overlapping accessible regions
-    keep_idx = (
-        _df_to_pyranges(windows)
-        .overlap(pr.read_bed(region_bed))
-        .df["_idx"]
-        .unique()
-    )
-    windows = windows.iloc[keep_idx].reset_index(drop=True)
-    print(f"  {len(windows)} after region filter")
     return windows
 
 
@@ -651,27 +670,27 @@ def main():
             standard_chroms,
         )
     else:
-        print("[1/6] WGS: generating fixed windows ...")
+        print("[1/6] WGS: tiling windows within regions ...")
         windows = generate_wgs_windows(
             args.genome_size, args.window, standard_chroms, args.region_bed,
+            args.blacklist_bed,
         )
 
-    if args.blacklist_bed:
+    # WES: subtract blacklist from combined target+antitarget windows
+    # (antitargets already subtract blacklist internally, but targets do not)
+    # WGS: blacklist already handled inside generate_wgs_windows
+    if args.blacklist_bed and wes_mode:
         n_before = len(windows)
-        if wes_mode:
-            n_tgt_before = int(windows["is_target"].sum())
+        n_tgt_before = int(windows["is_target"].sum())
         windows = subtract_blacklist(windows, args.blacklist_bed)
         n_removed = n_before - len(windows)
-        if wes_mode:
-            n_tgt_after = int(windows["is_target"].sum())
-            n_tgt_rm = n_tgt_before - n_tgt_after
-            n_anti_rm = n_removed - n_tgt_rm
-            print(
-                f"  {len(windows)} after blacklist subtraction "
-                f"(removed {n_tgt_rm} target, {n_anti_rm} antitarget)"
-            )
-        else:
-            print(f"  {len(windows)} after blacklist subtraction")
+        n_tgt_after = int(windows["is_target"].sum())
+        n_tgt_rm = n_tgt_before - n_tgt_after
+        n_anti_rm = n_removed - n_tgt_rm
+        print(
+            f"  {len(windows)} after blacklist subtraction "
+            f"(removed {n_tgt_rm} target, {n_anti_rm} antitarget)"
+        )
 
     # --- Step 2: Assign region_id, drop windows outside regions ---
     print("[2/6] Assigning region_id ...")
