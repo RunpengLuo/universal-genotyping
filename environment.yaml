@@ -10,6 +10,7 @@ dependencies:
   - bcftools>=1.19
   - samtools>=1.19
   - mosdepth
+  - cnvkit
   - hmmcopy
   - bowtie
   - scipy

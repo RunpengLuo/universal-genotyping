@@ -76,11 +76,13 @@ for i, df in enumerate(cnr_dfs[1:], 1):
         f"start coordinate mismatch between {rep_ids[i]} and {rep_ids[0]}"
     )
 
-win_df = pd.DataFrame({
-    "#CHR": ref_cnr["chromosome"].values,
-    "START": ref_cnr["start"].values,
-    "END": ref_cnr["end"].values,
-})
+win_df = pd.DataFrame(
+    {
+        "#CHR": ref_cnr["chromosome"].values,
+        "START": ref_cnr["start"].values,
+        "END": ref_cnr["end"].values,
+    }
+)
 
 if "gc" in ref_cnr.columns:
     win_df["GC"] = ref_cnr["gc"].values
@@ -136,32 +138,54 @@ try:
             dp_raw[:, i] = rdf["depth"].to_numpy(dtype=np.float32)
         logging.info("loaded raw coverage from .cnn files for QC comparison")
     else:
-        logging.warning("raw .cnn bin count differs from .cnr; skipping before/after comparison")
+        logging.warning(
+            "raw .cnn bin count differs from .cnr; skipping before/after comparison"
+        )
 except Exception as e:
-    logging.warning(f"could not load raw .cnn files: {e}; skipping before/after comparison")
+    logging.warning(
+        f"could not load raw .cnn files: {e}; skipping before/after comparison"
+    )
 
 gc_vals = win_df["GC"].to_numpy()
 has_gc = np.isfinite(gc_vals).any()
 
 if has_gc:
     if dp_raw is not None:
-        rd_raw_ylim = max(np.nanquantile(dp_raw, 0.99), 1.0)
+        rd_raw_ylim = max(np.nanquantile(dp_raw, 0.99), 1.0) * 1.1
         gc_corr_before, gc_std_before = compute_gc_rd_stats(dp_raw, gc_vals, rep_ids)
         plot_rd_gc(
-            win_df, dp_raw, rep_ids, genome_size, qc_dir,
-            "depth_before_correction", "window", "RD", rd_raw_ylim,
-            gc_corr=gc_corr_before, gc_bin_median_std=gc_std_before,
-            region_bed=region_bed, blacklist_bed=blacklist_bed,
+            win_df,
+            dp_raw,
+            rep_ids,
+            genome_size,
+            qc_dir,
+            "depth_before_correction",
+            "window",
+            "RD",
+            rd_raw_ylim,
+            gc_corr=gc_corr_before,
+            gc_bin_median_std=gc_std_before,
+            region_bed=region_bed,
+            blacklist_bed=blacklist_bed,
         )
 
-    rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0)
+    rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0) * 1.1
     gc_corr_after, gc_std_after = compute_gc_rd_stats(dp_corrected, gc_vals, rep_ids)
     plot_rd_gc(
-        win_df, dp_corrected, rep_ids, genome_size, qc_dir,
-        "depth_cnvkit_corrected", "window", "RD", rd_ylim,
-        gc_corr=gc_corr_after, gc_bin_median_std=gc_std_after,
+        win_df,
+        dp_corrected,
+        rep_ids,
+        genome_size,
+        qc_dir,
+        "depth_cnvkit_corrected",
+        "window",
+        "RD",
+        rd_ylim,
+        gc_corr=gc_corr_after,
+        gc_bin_median_std=gc_std_after,
         smooth=True,
-        region_bed=region_bed, blacklist_bed=blacklist_bed,
+        region_bed=region_bed,
+        blacklist_bed=blacklist_bed,
     )
 
     pdf = PdfPages(os.path.join(qc_dir, "rd_correct.pdf"))
@@ -172,11 +196,19 @@ if has_gc:
     pdf.close()
 else:
     logging.info("no GC data available; skipping GC-related QC plots")
-    rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0)
+    rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0) * 1.1
     plot_rd_gc(
-        win_df, dp_corrected, rep_ids, genome_size, qc_dir,
-        "depth_cnvkit_corrected", "window", "RD", rd_ylim,
-        region_bed=region_bed, blacklist_bed=blacklist_bed,
+        win_df,
+        dp_corrected,
+        rep_ids,
+        genome_size,
+        qc_dir,
+        "depth_cnvkit_corrected",
+        "window",
+        "RD",
+        rd_ylim,
+        region_bed=region_bed,
+        blacklist_bed=blacklist_bed,
     )
 
 nan_mask = np.isnan(dp_corrected).any(axis=1)

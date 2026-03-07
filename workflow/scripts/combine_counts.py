@@ -28,7 +28,12 @@ from aggregation_utils import (
 )
 from combine_counts_utils import plot_allele_freqs
 from count_reads_utils import log_nan_summary, plot_1d_sample
-from switchprobs import interp_cM_snps, estimate_switchprobs_cM, estimate_switchprobs_PS
+from switchprobs import (
+    interp_cM_snps,
+    interp_cM_blocks,
+    estimate_switchprobs_cM,
+    estimate_switchprobs_PS,
+)
 
 setup_logging(sm.log[0])
 
@@ -233,13 +238,19 @@ logging.info(
 )
 
 tumor_rep_ids = rep_ids[tumor_sidx:]
-rdr_ylim = np.round(np.nanquantile(bb_rdr, 0.99)).astype(int) + 1
+rdr_ylim = (np.round(np.nanquantile(bb_rdr, 0.99)).astype(int) + 1) * 1.1
 for i, label in enumerate(tumor_rep_ids):
     plot_1d_sample(
-        bbs, bb_rdr[:, i], genome_size,
+        bbs,
+        bb_rdr[:, i],
+        genome_size,
         os.path.join(qc_dir, f"rdr_bb.{label}.pdf"),
-        unit="bb", val_type="RDR", max_ylim=rdr_ylim,
-        smooth=True, region_bed=region_bed, blacklist_bed=blacklist_bed,
+        unit="bb",
+        val_type="RDR",
+        max_ylim=rdr_ylim,
+        smooth=True,
+        region_bed=region_bed,
+        blacklist_bed=blacklist_bed,
     )
 
 # ---------------------------------------------------------------------------
@@ -266,6 +277,28 @@ if n_nan_rows > 0:
     baf_mtx_bb = baf_mtx_bb[valid]
     bb_dp = bb_dp[valid]
     bb_rdr = bb_rdr[valid]
+
+# ---------------------------------------------------------------------------
+# 7b. Recompute bin-level switchprobs (last SNP of bin i → first SNP of bin i+1)
+# ---------------------------------------------------------------------------
+# After NaN filtering + reset_index, bbs.index is 0..n_valid-1 but snps["bb_id"]
+# still has the original bin indices. Remap snps["bb_id"] to the new contiguous IDs.
+surviving_old_ids = np.where(~nan_mask)[0] if n_nan_rows > 0 else np.arange(num_bbs)
+old_to_new = {old: new for new, old in enumerate(surviving_old_ids)}
+snps_valid = snps[snps["bb_id"].isin(old_to_new)].copy()
+snps_valid["bb_id"] = snps_valid["bb_id"].map(old_to_new)
+bbs["bb_id"] = np.arange(len(bbs))
+
+if gmap_file is not None:
+    dist_cms = interp_cM_blocks(bbs, snps_valid, genetic_map, block_id_col="bb_id")
+    bbs["switchprobs"] = estimate_switchprobs_cM(
+        dist_cms,
+        nu=float(sm.params["nu"]),
+        min_switchprob=float(sm.params["min_switchprob"]),
+    )
+else:
+    bbs["switchprobs"] = estimate_switchprobs_PS(bbs, switchprob_ps)
+logging.info("recomputed bin-level switchprobs after NaN filtering")
 
 # ---------------------------------------------------------------------------
 # 8. Save outputs

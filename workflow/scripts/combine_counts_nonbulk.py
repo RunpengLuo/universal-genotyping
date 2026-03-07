@@ -204,6 +204,7 @@ if is_bulk_assay:
 
 ##################################################
 # Filter bins with any NaN across all bb matrices
+_nan_filtered = False
 if is_bulk_assay:
     nan_mask = np.isnan(baf_mtx_bb).any(axis=1)
     n_nan_rows = int(nan_mask.sum())
@@ -213,12 +214,36 @@ if is_bulk_assay:
         f"keeping {n_valid} ({n_valid / max(num_bbs, 1) * 100:.1f}%)"
     )
     if n_nan_rows > 0:
+        _nan_filtered = True
         valid = ~nan_mask
         bbs = bbs.loc[valid].reset_index(drop=True)
         tot_mtx_bb = tot_mtx_bb[valid]
         a_mtx_bb = a_mtx_bb[valid]
         b_mtx_bb = b_mtx_bb[valid]
         baf_mtx_bb = baf_mtx_bb[valid]
+
+##################################################
+# Recompute bin-level switchprobs (last SNP of bin i → first SNP of bin i+1)
+# After NaN filtering (bulk) or binning (non-bulk), remap snps["bb_id"] to contiguous IDs.
+if _nan_filtered:
+    surviving_old_ids = np.where(~nan_mask)[0]
+else:
+    surviving_old_ids = np.arange(len(bbs))
+old_to_new = {old: new for new, old in enumerate(surviving_old_ids)}
+snps_valid = snps[snps["bb_id"].isin(old_to_new)].copy()
+snps_valid["bb_id"] = snps_valid["bb_id"].map(old_to_new)
+bbs["bb_id"] = np.arange(len(bbs))
+
+if gmap_file is not None:
+    dist_cms = interp_cM_blocks(bbs, snps_valid, genetic_map, block_id_col="bb_id")
+    bbs["switchprobs"] = estimate_switchprobs_cM(
+        dist_cms,
+        nu=float(sm.params["nu"]),
+        min_switchprob=float(sm.params["min_switchprob"]),
+    )
+else:
+    bbs["switchprobs"] = estimate_switchprobs_PS(bbs, switchprob_ps)
+logging.info("recomputed bin-level switchprobs after binning")
 
 ##################################################
 # Save outputs

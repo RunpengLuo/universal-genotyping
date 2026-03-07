@@ -9,17 +9,20 @@ def interp_cM_blocks(
     blocks: pd.DataFrame,
     snp_info: pd.DataFrame,
     genetic_map: pd.DataFrame,
+    block_id_col: str = "bbc_id",
 ):
     """Interpolate centimorgan distances between consecutive blocks using a genetic map.
 
     Parameters
     ----------
     blocks : pd.DataFrame
-        Block-level DataFrame with ``bbc_id`` and ``#CHR`` columns.
+        Block-level DataFrame with a block ID column and ``#CHR`` column.
     snp_info : pd.DataFrame
-        SNP DataFrame with ``bbc_id`` and ``POS`` columns.
+        SNP DataFrame with a matching block ID column and ``POS`` column.
     genetic_map : pd.DataFrame
         Genetic map with ``#CHR``, ``POS``, and ``cM`` columns.
+    block_id_col : str
+        Name of the block ID column in both *blocks* and *snp_info*.
 
     Returns
     -------
@@ -29,10 +32,10 @@ def interp_cM_blocks(
     blocks = blocks.copy(deep=True)
     blocks["dist_cM"] = 0.0
 
-    hb_pos = snp_info.groupby("bbc_id", sort=False)["POS"].agg(
+    hb_pos = snp_info.groupby(block_id_col, sort=False)["POS"].agg(
         snp_start="min", snp_end="max"
     )
-    blocks = blocks.join(hb_pos, on="bbc_id")
+    blocks = blocks.join(hb_pos, on=block_id_col)
 
     genetic_map_chrs = genetic_map.groupby(by="#CHR", sort=False, observed=True)
     for ch, block_idx in blocks.groupby(by="#CHR", sort=False, observed=True):

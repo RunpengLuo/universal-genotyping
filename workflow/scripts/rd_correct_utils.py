@@ -254,7 +254,7 @@ def _center_by_window(log2_vals, sort_key, fraction=None, seed=0xA5EED):
         return log2_vals.copy()
 
     if fraction is None:
-        fraction = max(0.01, n ** -0.5)
+        fraction = max(0.01, n**-0.5)
 
     log2 = log2_vals.copy()
 
@@ -354,7 +354,7 @@ def correct_readcount_wes(reads, gc, is_target, mappability=None, min_mappabilit
         # Restore median level and convert back to linear
         corrected_log2 += median_log2
         out = np.full(len(idx), np.nan)
-        out[valid] = 2.0 ** corrected_log2
+        out[valid] = 2.0**corrected_log2
         corrected[idx] = out
 
         n_valid = int(valid.sum())
@@ -382,7 +382,7 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
             reads = dp_mat[:, si]
             valid = (reads > 0) & np.isfinite(gc)
             x, y = gc[valid], reads[valid]
-            ylim = np.nanquantile(y, 0.99)
+            ylim = np.nanquantile(y, 0.99) * 1.1
 
             n_pts = len(x)
             rng = np.random.default_rng(0)

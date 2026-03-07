@@ -74,6 +74,16 @@ Window-level intermediates:
 | `window.dp.npz` | Bias-corrected per-window depth matrix. |
 | `window.df.tsv.gz` | Window annotation with GC/mappability/replication-timing columns. |
 
+CNVkit intermediates (bulkWES only, in `bb_dir/{assay_type}/cnvkit/`):
+
+| File | Description |
+|------|-------------|
+| `targets.bed` / `antitargets.bed` | CNVkit autobin target/antitarget intervals. |
+| `{rep_id}.targetcoverage.cnn` | Per-sample target bin coverage. |
+| `{rep_id}.antitargetcoverage.cnn` | Per-sample antitarget bin coverage. |
+| `reference.cnn` | CNVkit pooled reference (from normal samples). |
+| `{rep_id}.cnr` | Per-sample bias-corrected copy ratios. |
+
 **Single-cell (`single_cell_genotyping`):**
 
 | File | Description |

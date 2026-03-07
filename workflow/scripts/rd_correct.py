@@ -115,7 +115,7 @@ for i, mos_df in enumerate(mos_dfs):
 
 gc_vals = win_df["GC"].to_numpy()
 
-rd_raw_ylim = max(np.nanquantile(dp_raw, 0.99), 1.0)
+rd_raw_ylim = max(np.nanquantile(dp_raw, 0.99), 1.0) * 1.1
 gc_corr_before, gc_std_before = compute_gc_rd_stats(dp_raw, gc_vals, rep_ids)
 plot_rd_gc(
     win_df,
@@ -207,7 +207,7 @@ pdf = PdfPages(os.path.join(qc_dir, "rd_correct.pdf"))
 plot_gc_correction_pdf(gc_vals, dp_raw, dp_corrected, rep_ids, pdf)
 pdf.close()
 
-rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0)
+rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0) * 1.1
 gc_corr_after, gc_std_after = compute_gc_rd_stats(dp_corrected, gc_vals, rep_ids)
 plot_rd_gc(
     win_df,
