@@ -2,7 +2,6 @@ name: genotyping-env
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - python>=3.10
   - snakemake
@@ -11,8 +10,6 @@ dependencies:
   - samtools>=1.19
   - mosdepth
   - cnvkit
-  - hmmcopy
-  - bowtie
   - scipy
   - pandas
   - numpy
