@@ -38,22 +38,22 @@ def interp_cM_blocks(
     blocks = blocks.join(hb_pos, on=block_id_col)
 
     genetic_map_chrs = genetic_map.groupby(by="#CHR", sort=False, observed=True)
-    for ch, block_idx in blocks.groupby(by="#CHR", sort=False, observed=True):
+    for ch, ch_blocks in blocks.groupby(by="#CHR", sort=False, observed=True):
         ch_map = genetic_map_chrs.get_group(ch)
         start_cMs = np.interp(
-            blocks.loc[block_idx, "snp_start"].to_numpy(),
+            ch_blocks["snp_start"].to_numpy(),
             ch_map["POS"].to_numpy(),
             ch_map["cM"].to_numpy(),
         )
         end_cMs = np.interp(
-            blocks.loc[block_idx, "snp_end"].to_numpy(),
+            ch_blocks["snp_end"].to_numpy(),
             ch_map["POS"].to_numpy(),
             ch_map["cM"].to_numpy(),
         )
 
-        dist_cM = np.zeros(len(block_idx), dtype=np.float32)
+        dist_cM = np.zeros(len(ch_blocks), dtype=np.float32)
         dist_cM[1:] = start_cMs[1:] - end_cMs[:-1]
-        blocks.loc[block_idx, "dist_cM"] = np.maximum(dist_cM, 0.0)
+        blocks.loc[ch_blocks.index, "dist_cM"] = np.maximum(dist_cM, 0.0)
     return blocks["dist_cM"].to_numpy()
 
 
