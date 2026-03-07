@@ -85,6 +85,8 @@ if workflow_mode == "bulk_genotyping":
             + f"/{wc.assay_type}/sample_ids.tsv",
             window_bed=config["window_bed"],
             genome_size=config["genome_size"],
+            region_bed=config["region_bed"],
+            blacklist_bed=config.get("blacklist_bed", []),
         output:
             dp_corrected=config["bb_dir"] + "/{assay_type}/window.depth_corrected.npz",
             window_df=config["bb_dir"] + "/{assay_type}/window.df.tsv.gz",

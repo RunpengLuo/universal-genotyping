@@ -22,7 +22,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = str(t)
 import numpy as np
 import pandas as pd
 
-from utils import setup_logging
+from utils import setup_logging, maybe_path
 from count_reads_utils import (
     log_nan_summary,
     log_mad_and_plot,
@@ -46,6 +46,8 @@ setup_logging(sm.log[0])
 sample_file = sm.input["sample_file"]
 window_bed_file = sm.input["window_bed"]
 genome_size = sm.input["genome_size"]
+region_bed = sm.input["region_bed"] or None
+blacklist_bed = maybe_path(sm.input.get("blacklist_bed", None))
 assay_type = str(sm.params["assay_type"])
 
 mosdepth_dir = sm.params["mosdepth_dir"]
@@ -121,6 +123,8 @@ log_mad_and_plot(
     "window",
     "RD",
     rd_raw_ylim,
+    region_bed=region_bed,
+    blacklist_bed=blacklist_bed,
 )
 
 logging.info(f"{n_windows} windows for bias correction")
@@ -208,6 +212,8 @@ log_mad_and_plot(
     "RD",
     rd_ylim,
     smooth=True,
+    region_bed=region_bed,
+    blacklist_bed=blacklist_bed,
 )
 
 # ---------------------------------------------------------------------------

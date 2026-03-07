@@ -30,6 +30,7 @@ if workflow_mode == "bulk_genotyping":
                 else []
             ),
             region_bed=lambda wc: config["region_bed"],
+            blacklist_bed=lambda wc: config.get("blacklist_bed", []),
             genome_size=lambda wc: config["genome_size"],
             gtf_file=lambda wc: config["gtf_file"],
         output:

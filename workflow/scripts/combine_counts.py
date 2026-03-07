@@ -44,6 +44,7 @@ window_df_file = sm.input["window_df"]
 
 gmap_file = maybe_path(sm.input["gmap_file"])
 region_bed = sm.input["region_bed"]
+blacklist_bed = maybe_path(sm.input.get("blacklist_bed", None))
 genome_size = sm.input["genome_size"]
 gtf_file = maybe_path(sm.input["gtf_file"])
 
@@ -224,6 +225,7 @@ log_mad_and_plot(
     bb_rd_ylim,
     smooth=True,
     region_bed=region_bed,
+    blacklist_bed=blacklist_bed,
 )
 
 # ---------------------------------------------------------------------------
@@ -276,6 +278,7 @@ log_mad_and_plot(
     rdr_ylim,
     smooth=True,
     region_bed=region_bed,
+    blacklist_bed=blacklist_bed,
 )
 
 # ---------------------------------------------------------------------------
