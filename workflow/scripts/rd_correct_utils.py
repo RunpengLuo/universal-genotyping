@@ -71,9 +71,18 @@ def correct_readcount(
     reads = reads.astype(np.float64)
     n = len(reads)
 
+    def _dedup_sorted(xy):
+        """Remove duplicate x-values from sorted LOWESS output to avoid
+        division-by-zero in interp1d."""
+        _, idx = np.unique(xy[:, 0], return_index=True)
+        return xy[idx]
+
     def _fit_lowess_interp(y, x, grid):
         """Tight LOWESS -> grid smooth -> final interpolator."""
         s1 = lowess(y, x, frac=lowess_frac_tight, return_sorted=True)
+        s1 = _dedup_sorted(s1)
+        if len(s1) < 2:
+            return None
         s1_fn = interp1d(
             s1[:, 0],
             s1[:, 1],
@@ -82,6 +91,9 @@ def correct_readcount(
             fill_value="extrapolate",
         )
         s2 = lowess(s1_fn(grid), grid, frac=lowess_frac_smooth, return_sorted=True)
+        s2 = _dedup_sorted(s2)
+        if len(s2) < 2:
+            return None
         return interp1d(
             s2[:, 0],
             s2[:, 1],
@@ -108,11 +120,21 @@ def correct_readcount(
             ideal &= extra_ideal_mask
 
         ideal_idx = np.where(ideal)[0]
+        if ideal_idx.size < 10:
+            logging.warning(
+                f"    {stage_name}: only {ideal_idx.size} ideal bins; skipping correction"
+            )
+            return prev.copy()
         if ideal_idx.size > samplesize:
             rng = np.random.default_rng(seed)
             ideal_idx = rng.choice(ideal_idx, size=samplesize, replace=False)
 
         interp_fn = _fit_lowess_interp(prev[ideal_idx], covariate[ideal_idx], grid)
+        if interp_fn is None:
+            logging.warning(
+                f"    {stage_name}: LOWESS fit failed (too few distinct values); skipping correction"
+            )
+            return prev.copy()
         predicted = interp_fn(covariate)
 
         with np.errstate(invalid="ignore", divide="ignore"):
