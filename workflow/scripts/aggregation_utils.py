@@ -264,11 +264,6 @@ def adaptive_binning_windows(
     bbs["BLOCKSIZE"] = bbs["END"] - bbs["START"]
     bbs["bb_id"] = bbs.index
 
-    # switchprobs: take first per bin from SNPs
-    if "switchprobs" in snps.columns:
-        sp = snps.groupby("bb_id")["switchprobs"].first()
-        bbs["switchprobs"] = bbs.index.map(sp).fillna(0.5)
-
     # PS column if present
     if "PS" in snps.columns:
         ps = snps.groupby("bb_id")["PS"].first()
@@ -466,9 +461,6 @@ def adaptive_binning(
         "START0": ("POS0", "min"),
         "END0": ("POS", "max"),
     }
-    # only include switchprobs if present (not guaranteed when called externally)
-    if "switchprobs" in snps.columns:
-        pos_dict["switchprobs"] = ("switchprobs", "first")
     for grp_col in grp_cols:
         pos_dict[grp_col] = (grp_col, "first")
 

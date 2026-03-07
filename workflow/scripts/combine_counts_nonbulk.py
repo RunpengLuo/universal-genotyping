@@ -223,13 +223,12 @@ if is_bulk_assay:
         baf_mtx_bb = baf_mtx_bb[valid]
 
 ##################################################
-# Recompute bin-level switchprobs (last SNP of bin i → first SNP of bin i+1)
-# After NaN filtering (bulk) or binning (non-bulk), remap snps["bb_id"] to contiguous IDs.
+# Compute bin-level switchprobs (last SNP of bin i → first SNP of bin i+1)
 if _nan_filtered:
-    surviving_old_ids = np.where(~nan_mask)[0]
+    kept_bb_ids = np.where(~nan_mask)[0]
 else:
-    surviving_old_ids = np.arange(len(bbs))
-old_to_new = {old: new for new, old in enumerate(surviving_old_ids)}
+    kept_bb_ids = np.arange(len(bbs))
+old_to_new = {old: new for new, old in enumerate(kept_bb_ids)}
 snps_valid = snps[snps["bb_id"].isin(old_to_new)].copy()
 snps_valid["bb_id"] = snps_valid["bb_id"].map(old_to_new)
 bbs["bb_id"] = np.arange(len(bbs))

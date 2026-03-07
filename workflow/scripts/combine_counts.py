@@ -29,7 +29,6 @@ from aggregation_utils import (
 from combine_counts_utils import plot_allele_freqs
 from count_reads_utils import log_nan_summary, plot_1d_sample
 from switchprobs import (
-    interp_cM_snps,
     interp_cM_blocks,
     estimate_switchprobs_cM,
     estimate_switchprobs_PS,
@@ -91,55 +90,35 @@ n_window_df = len(window_df)
 logging.info(f"loaded {n_window_df} corrected window_df")
 
 # ---------------------------------------------------------------------------
-# 1. Estimate switchprobs & define aggregation boundaries
+# 1. Define aggregation boundaries
 # ---------------------------------------------------------------------------
 assert "region_id" in snps.columns, "invalid SNP file"
 grp_cols = ["region_id"]
-
-if gmap_file is not None:
-    logging.info("estimate non-homogeneous switchprobs based on genetic map file")
-    genetic_map = pd.read_table(gmap_file, sep="\t")
-    dist_cms = interp_cM_snps(snps, genetic_map)
-    switchprobs = estimate_switchprobs_cM(
-        dist_cms,
-        nu=float(sm.params["nu"]),
-        min_switchprob=float(sm.params["min_switchprob"]),
-    )
-    snps["switchprobs"] = switchprobs
-    if "PS" not in snps.columns:
-        logging.info("PS not in SNP columns, setting PS=1 for all SNPs")
-        snps["PS"] = 1
+if "PS" not in snps.columns:
+    logging.info("PS not in SNP columns, setting PS=1 for all SNPs")
+    snps["PS"] = 1
 else:
-    assert "PS" in snps.columns, (
-        "either PS be provided (long-read) or genetic map should be provided"
-    )
-    switchprob_ps = float(sm.params["switchprob_ps"])
-    logging.info(f"fix intra-PS switchprobs={switchprob_ps}")
-    switchprobs = estimate_switchprobs_PS(snps, switchprob_ps)
-    snps["switchprobs"] = switchprobs
+    logging.info(f"PS is provided")
 num_phaseset = snps["PS"].nunique()
 logging.info(f"#phaseset={num_phaseset}")
 grp_cols.append("PS")
 
 # ---------------------------------------------------------------------------
-# 3. Window-based adaptive binning
+# 2. Window-based adaptive binning
 # ---------------------------------------------------------------------------
 window_df["win_idx"] = np.arange(len(window_df))
-
-# Carry PS into grp_cols for window_df if present
-if "PS" in grp_cols:
-    # Assign PS to window_df from SNPs: each window gets PS of its first SNP
-    _snps_tmp = snps[["#CHR", "POS0", "PS"]].copy()
-    _snps_tmp = assign_pos_to_range(
-        _snps_tmp, window_df, ref_id="win_idx", pos_col="POS0"
-    )
-    _snps_tmp = _snps_tmp.dropna(subset=["win_idx"])
-    _snps_tmp["win_idx"] = _snps_tmp["win_idx"].astype(np.int64)
-    win_ps = _snps_tmp.groupby("win_idx")["PS"].first()
-    window_df["PS"] = window_df["win_idx"].map(win_ps)
-    # Windows with no SNPs inherit PS from previous window (forward-fill)
-    if window_df["PS"].isna().any():
-        window_df["PS"] = window_df["PS"].ffill()
+# Assign PS to window_df from SNPs: each window gets the majority-vote PS
+_snps_tmp = snps[["#CHR", "POS0", "PS"]].copy()
+_snps_tmp = assign_pos_to_range(
+    _snps_tmp, window_df, ref_id="win_idx", pos_col="POS0"
+)
+_snps_tmp = _snps_tmp.dropna(subset=["win_idx"])
+_snps_tmp["win_idx"] = _snps_tmp["win_idx"].astype(np.int64)
+win_ps = _snps_tmp.groupby("win_idx")["PS"].agg(lambda x: x.mode().iloc[0])
+window_df["PS"] = window_df["win_idx"].map(win_ps)
+# Windows with no SNPs inherit PS from previous window (forward-fill)
+if window_df["PS"].isna().any():
+    window_df["PS"] = window_df["PS"].ffill()
 
 bbs, snps = adaptive_binning_windows(
     window_df,
@@ -160,7 +139,7 @@ a_mtx = a_mtx[snp_orig_idx]
 b_mtx = b_mtx[snp_orig_idx]
 
 # ---------------------------------------------------------------------------
-# 4. Aggregate allele counts per bin
+# 3. Aggregate allele counts per bin
 # ---------------------------------------------------------------------------
 a_mtx_bb = matrix_segmentation(a_mtx, bb_ids, num_bbs)
 b_mtx_bb = matrix_segmentation(b_mtx, bb_ids, num_bbs)
@@ -186,7 +165,7 @@ baf_mtx_bb = np.divide(
 )
 
 # ---------------------------------------------------------------------------
-# 5. Aggregate window depth per bin (length-weighted mean)
+# 4. Aggregate window depth per bin (length-weighted mean)
 # ---------------------------------------------------------------------------
 logging.info("aggregating corrected window depth into adaptive bins")
 
@@ -205,7 +184,7 @@ for s in range(nsamples):
 log_nan_summary("bb depth", bb_dp, rep_ids, num_bbs)
 
 # ---------------------------------------------------------------------------
-# 6. RDR computation
+# 5. RDR computation
 # ---------------------------------------------------------------------------
 logging.info(f"compute bb RDR, has_normal={has_normal}")
 
@@ -254,7 +233,7 @@ for i, label in enumerate(tumor_rep_ids):
     )
 
 # ---------------------------------------------------------------------------
-# 7. Filter bins with any NaN across all bb matrices
+# 6. Filter bins with any NaN across all bb matrices
 # ---------------------------------------------------------------------------
 nan_mask = (
     np.isnan(baf_mtx_bb).any(axis=1)
@@ -279,17 +258,17 @@ if n_nan_rows > 0:
     bb_rdr = bb_rdr[valid]
 
 # ---------------------------------------------------------------------------
-# 7b. Recompute bin-level switchprobs (last SNP of bin i → first SNP of bin i+1)
+# 7. Compute bin-level switchprobs (last SNP of bin i → first SNP of bin i+1)
 # ---------------------------------------------------------------------------
-# After NaN filtering + reset_index, bbs.index is 0..n_valid-1 but snps["bb_id"]
-# still has the original bin indices. Remap snps["bb_id"] to the new contiguous IDs.
-surviving_old_ids = np.where(~nan_mask)[0] if n_nan_rows > 0 else np.arange(num_bbs)
-old_to_new = {old: new for new, old in enumerate(surviving_old_ids)}
+kept_bb_ids = np.where(~nan_mask)[0] if n_nan_rows > 0 else np.arange(num_bbs)
+old_to_new = {old: new for new, old in enumerate(kept_bb_ids)}
 snps_valid = snps[snps["bb_id"].isin(old_to_new)].copy()
 snps_valid["bb_id"] = snps_valid["bb_id"].map(old_to_new)
 bbs["bb_id"] = np.arange(len(bbs))
 
+logging.info("estimate bin-level switchprobs")
 if gmap_file is not None:
+    genetic_map = pd.read_table(gmap_file, sep="\t")
     dist_cms = interp_cM_blocks(bbs, snps_valid, genetic_map, block_id_col="bb_id")
     bbs["switchprobs"] = estimate_switchprobs_cM(
         dist_cms,
@@ -297,11 +276,11 @@ if gmap_file is not None:
         min_switchprob=float(sm.params["min_switchprob"]),
     )
 else:
+    switchprob_ps = float(sm.params["switchprob_ps"])
     bbs["switchprobs"] = estimate_switchprobs_PS(bbs, switchprob_ps)
-logging.info("recomputed bin-level switchprobs after NaN filtering")
 
 # ---------------------------------------------------------------------------
-# 8. Save outputs
+# 8. Save
 # ---------------------------------------------------------------------------
 bbs.to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
 bbs.to_csv(
