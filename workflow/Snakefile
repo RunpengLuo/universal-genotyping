@@ -238,23 +238,32 @@ if _has_config:
         default_target: True
 
 else:
-    # No config provided — expose conda envs for --conda-create-envs-only
+    # No config provided — expose conda envs for --conda-create-envs-only.
+    # Dummy rules must have outputs requested by rule all so they appear in the DAG.
     rule _conda_env_base:
+        output: temp(".conda_env_base")
         conda: "envs/base.yaml"
-        shell: "true"
+        shell: "touch {output}"
 
     rule _conda_env_tools:
+        output: temp(".conda_env_tools")
         conda: "envs/tools.yaml"
-        shell: "true"
+        shell: "touch {output}"
 
     rule _conda_env_cnvkit:
+        output: temp(".conda_env_cnvkit")
         conda: "envs/cnvkit.yaml"
-        shell: "true"
+        shell: "touch {output}"
 
     rule _conda_env_snapatac2:
+        output: temp(".conda_env_snapatac2")
         conda: "envs/snapatac2.yaml"
-        shell: "true"
+        shell: "touch {output}"
 
     rule all:
-        input: []
+        input:
+            ".conda_env_base",
+            ".conda_env_tools",
+            ".conda_env_cnvkit",
+            ".conda_env_snapatac2",
         default_target: True
