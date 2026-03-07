@@ -34,9 +34,10 @@ To create all environments upfront without running the pipeline:
 
 ```sh
 snakemake --profile profile/ --conda-create-envs-only --cores 1 \
-    -s workflow/Snakefile \
-    --configfile config/config.yaml
+    -s workflow/Snakefile
 ```
+
+No `--configfile` is needed — the Snakefile detects the absence of config and exposes dummy rules referencing all four env files so Snakemake can discover and create them.
 
 ## Manual single-environment install (development)
 

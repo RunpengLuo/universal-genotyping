@@ -82,6 +82,7 @@ if config["phaser"] == "longphase":
             min_mapq=config["params_longphase"]["min_mapq"],
             extra_params=config["params_longphase"].get("extra_params", ""),
             bcftools=config["bcftools"],
+            out_prefix=config["phase_dir"] + "/chr{chrname}",
         threads: config["threads"]["phase"]
         log:
             config["log_dir"] + "/phase_snps_longphase/phase_snps.chr{chrname}.log",
@@ -94,7 +95,7 @@ if config["phaser"] == "longphase":
                 --reference={input.reference} \
                 --snp-file={input.snp_vcf} \
                 --mappingQuality={params.min_mapq} \
-                --out-prefix=config["phase_dir"] + "/{params.chrom}" \
+                --out-prefix={params.out_prefix} \
                 --threads={threads} \
                 {params.extra_params} > {log} 2>&1
             tabix -f -p vcf "{output.phased_file}"
