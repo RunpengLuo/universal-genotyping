@@ -204,10 +204,12 @@ def generate_wgs_windows(genome_size_file, window_size, standard_chroms,
 
 def generate_wes_windows(wes_targets_bed, region_bed, blacklist_bed,
                          target_avg_size, antitarget_avg_size, pad_size,
-                         standard_chroms):
+                         standard_chroms, target_min_size=20):
     """Generate target + antitarget windows for WES mode."""
-    # --- Targets: clip to regions, deduplicate, subdivide ---
-    targets = _read_and_subdivide_targets(wes_targets_bed, target_avg_size, region_bed)
+    # --- Targets: clip to regions, merge overlaps, subdivide ---
+    targets = _read_and_subdivide_targets(
+        wes_targets_bed, target_avg_size, region_bed, target_min_size,
+    )
     targets["is_target"] = 1
 
     # --- Antitargets: off-target bins in accessible non-exon regions ---
@@ -286,8 +288,9 @@ def _dedup_targets(df):
     return pd.DataFrame(rows, columns=["#CHR", "START", "END"])
 
 
-def _read_and_subdivide_targets(wes_targets_bed, target_avg_size, region_bed):
-    """Read vendor exon targets, clip to regions, deduplicate, subdivide."""
+def _read_and_subdivide_targets(wes_targets_bed, target_avg_size, region_bed,
+                                min_size=20):
+    """Read vendor exon targets, clip to regions, merge, subdivide."""
     df = pd.read_csv(
         wes_targets_bed, sep="\t", header=None,
         usecols=[0, 1, 2], names=["#CHR", "START", "END"], comment="#",
@@ -315,7 +318,7 @@ def _read_and_subdivide_targets(wes_targets_bed, target_avg_size, region_bed):
     )
     n_merged = len(clipped) - len(df)
     print(f"  {n_raw} raw targets, {len(df)} after clip+merge ({n_merged} overlapping)")
-    rows = _subdivide_intervals(df, "#CHR", "START", "END", target_avg_size, min_size=0)
+    rows = _subdivide_intervals(df, "#CHR", "START", "END", target_avg_size, min_size=min_size)
     return pd.DataFrame(rows, columns=["#CHR", "START", "END"])
 
 
@@ -691,6 +694,8 @@ def parse_args():
                         help="Average off-target bin size (WES only, default: 150000).")
     parser.add_argument("--pad_size", type=int, default=500,
                         help="Padding around targets for antitarget generation (WES only, default: 500).")
+    parser.add_argument("--target_min_size", type=int, default=20,
+                        help="Drop target bins smaller than this (WES only, default: 20).")
     # Covariate options
     parser.add_argument("--mappability_bed", default=None,
                         help="Optional BED-format mappability track (4th column = score).")
@@ -756,7 +761,7 @@ def main():
         windows = generate_wes_windows(
             args.wes_targets_bed, args.region_bed, args.blacklist_bed,
             args.target_avg_size, args.antitarget_avg_size, args.pad_size,
-            standard_chroms,
+            standard_chroms, args.target_min_size,
         )
     else:
         print("[1/6] WGS: tiling windows within regions ...")
