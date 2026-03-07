@@ -385,9 +385,9 @@ def compute_gc(windows_df, reference):
 
 def compute_mappability(windows_df, mappability_file, genome_size_file):
     """Compute per-window mean mappability via pybedtools map."""
-    # Add _idx so we can restore original row order after bedtools sort
+    n_windows = len(windows_df)
     win_bed = windows_df[["#CHR", "START", "END"]].copy()
-    win_bed["_idx"] = np.arange(len(win_bed))
+    win_bed["_idx"] = np.arange(n_windows)
     bt = BedTool.from_dataframe(win_bed).sort(g=genome_size_file)
     map_bt = BedTool(mappability_file).sort(g=genome_size_file)
     map_cov = bt.map(b=map_bt, c=4, o="mean", g=genome_size_file).to_dataframe(
@@ -395,8 +395,17 @@ def compute_mappability(windows_df, mappability_file, genome_size_file):
     )
     map_cov.columns = ["#CHR", "START", "END", "_idx", "MAP"]
     map_cov["_idx"] = map_cov["_idx"].astype(int)
-    map_cov = map_cov.sort_values("_idx")
-    return pd.to_numeric(map_cov["MAP"], errors="coerce").fillna(0.0).clip(0.0, 1.0).values
+    map_cov["MAP"] = pd.to_numeric(map_cov["MAP"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
+    n_out = len(map_cov)
+    if n_out != n_windows:
+        print(
+            f"  WARNING: bedtools map returned {n_out}/{n_windows} rows "
+            f"(some windows may exceed chromosome bounds in genome size file)"
+        )
+    # Join back by _idx to handle possible row count mismatch
+    result = np.zeros(n_windows, dtype=np.float64)
+    result[map_cov["_idx"].values] = map_cov["MAP"].values
+    return result
 
 
 # ---------------------------------------------------------------------------
