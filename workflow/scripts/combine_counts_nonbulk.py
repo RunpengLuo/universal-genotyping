@@ -25,7 +25,7 @@ from switchprobs import *
 
 ##################################################
 """
-Adaptive binning by MSR and MSPB.
+Adaptive binning by MSR and MSPB for non-bulk assays.
 Input for HATCHet3 and CalicoST.
 """
 setup_logging(sm.log[0])
@@ -47,87 +47,43 @@ gtf_file = maybe_path(sm.input["gtf_file"])
 sample_df = pd.read_table(sm.input["sample_file"])
 sample_name = sample_df["SAMPLE"].iloc[0]
 rep_ids = sample_df["REP_ID"].tolist()
-sample_types = sample_df["sample_type"].tolist()
 assay_type = sm.params["assay_type"]
-
-bulk_assays = {"bulkWGS", "bulkWES"}
-is_bulk_assay = assay_type in bulk_assays
-has_normal = "normal" in sample_types
-tumor_sidx = {False: 0, True: 1}[has_normal]
 
 ##################################################
 logging.info(
-    f"adaptive binning, sample name={sample_name}, assay_type={assay_type}, is_bulk_assay={is_bulk_assay}"
+    f"adaptive binning, sample name={sample_name}, assay_type={assay_type}"
 )
 logging.info(f"rep_ids={rep_ids}")
 snps = pd.read_table(snp_info, sep="\t")
-# barcodes = pd.read_table(all_barcodes, sep="\t", header=None, names=["BARCODE"])
 
-if is_bulk_assay:
-    tot_mtx = np.load(tot_mtx_snp)["mat"].astype(np.int32)
-    a_mtx = np.load(a_mtx_snp)["mat"].astype(np.int32)
-    b_mtx = np.load(b_mtx_snp)["mat"].astype(np.int32)
-else:
-    tot_mtx = load_npz(tot_mtx_snp)
-    a_mtx = load_npz(a_mtx_snp)
-    b_mtx = load_npz(b_mtx_snp)
+tot_mtx = load_npz(tot_mtx_snp)
+a_mtx = load_npz(a_mtx_snp)
+b_mtx = load_npz(b_mtx_snp)
 (nsnps, nsamples) = tot_mtx.shape
 
 ##################################################
-# decide aggregation bounderies & estimate switchprobs
+# 1. Define aggregation boundaries
 assert "region_id" in snps.columns, "invalid SNP file"
 grp_cols = ["region_id"]
-
-# 1. estimate phaseset if N/A
-if gmap_file is not None:
-    logging.info("estimate non-homogeneous switchprobs based on genetic map file")
-    genetic_map = pd.read_table(gmap_file, sep="\t")
-    dist_cms = interp_cM_snps(snps, genetic_map)
-    switchprobs = estimate_switchprobs_cM(
-        dist_cms,
-        nu=float(sm.params["nu"]),
-        min_switchprob=float(sm.params["min_switchprob"]),
-    )
-    snps["switchprobs"] = switchprobs
-    if "PS" not in snps.columns:
-        # max_switchprob = float(sm.params["max_switchprob"])
-        # logging.info(f"decide phaseset PS with max_switchprob={max_switchprob}")
-        # snps["PS"] = (switchprobs > max_switchprob).cumsum()
-        logging.info("PS not in SNP columns, setting PS=1 for all SNPs")
-        snps["PS"] = 1
+if "PS" not in snps.columns:
+    logging.info("PS not in SNP columns, setting PS=1 for all SNPs")
+    snps["PS"] = 1
 else:
-    assert "PS" in snps.columns, (
-        "either PS be provided (long-read) or genetic map should be preovided"
-    )
-    switchprob_ps = float(sm.params["switchprob_ps"])
-    logging.info(f"fix intra-PS switchprobs={switchprob_ps}")
-    switchprobs = estimate_switchprobs_PS(snps, switchprob_ps)
-    snps["switchprobs"] = switchprobs
+    logging.info("PS is provided")
 num_phaseset = snps["PS"].nunique()
 logging.info(f"#phaseset={num_phaseset}")
 grp_cols.append("PS")
 
 ##################################################
-# multi-snp segmentation
-if is_bulk_assay:
-    multi_snps = adaptive_binning(
-        snps,
-        0,
-        int(sm.params["nsnp_multi"]),
-        tot_mtx,
-        ["region_id"],
-        colname="multi_id",
-        tumor_sidx=tumor_sidx,
-    )
-else:
-    multi_snps = adaptive_binning(
-        snps,
-        0,
-        int(sm.params["nsnp_multi"]),
-        tot_vec[:, None],
-        ["region_id"],
-        colname="multi_id",
-    )
+# 2. Multi-SNP segmentation
+multi_snps = adaptive_binning(
+    snps,
+    0,
+    int(sm.params["nsnp_multi"]),
+    tot_vec[:, None],
+    ["region_id"],
+    colname="multi_id",
+)
 multi_ids = snps["multi_id"].to_numpy()
 a_mtx_multi = matrix_segmentation(a_mtx, multi_ids, len(multi_snps))
 b_mtx_multi = matrix_segmentation(b_mtx, multi_ids, len(multi_snps))
@@ -140,41 +96,39 @@ plot_allele_freqs(
     b_mtx_multi,
     genome_size,
     qc_dir,
-    apply_pseudobulk=not is_bulk_assay,
+    apply_pseudobulk=True,
     allele="B",
     unit="multi-snp",
 )
-multi_snps.to_csv(sm.output["multi_snp_file"], sep="\t", header=True, index=False)
-if is_bulk_assay:
-    np.savez_compressed(sm.output["tot_mtx_multi"], mat=tot_mtx_multi)
-    np.savez_compressed(sm.output["a_mtx_multi"], mat=a_mtx_multi)
-    np.savez_compressed(sm.output["b_mtx_multi"], mat=b_mtx_multi)
+multi_snps["multi_id"] = np.arange(len(multi_snps))
+if gmap_file is not None:
+    genetic_map = pd.read_table(gmap_file, sep="\t")
+    dist_cms_multi = interp_cM_blocks(
+        multi_snps, snps, genetic_map, block_id_col="multi_id"
+    )
+    multi_snps["switchprobs"] = estimate_switchprobs_cM(
+        dist_cms_multi,
+        nu=float(sm.params["nu"]),
+        min_switchprob=float(sm.params["min_switchprob"]),
+    )
 else:
-    save_npz(sm.output["tot_mtx_multi"], tot_mtx_multi)
-    save_npz(sm.output["a_mtx_multi"], a_mtx_multi)
-    save_npz(sm.output["b_mtx_multi"], b_mtx_multi)
+    switchprob_ps = float(sm.params["switchprob_ps"])
+    multi_snps["switchprobs"] = estimate_switchprobs_PS(multi_snps, switchprob_ps)
+multi_snps.to_csv(sm.output["multi_snp_file"], sep="\t", header=True, index=False)
+save_npz(sm.output["tot_mtx_multi"], tot_mtx_multi)
+save_npz(sm.output["a_mtx_multi"], a_mtx_multi)
+save_npz(sm.output["b_mtx_multi"], b_mtx_multi)
 
 ##################################################
-# MSR&MSPB block segmentation
-if is_bulk_assay:
-    bbs = adaptive_binning(
-        snps,
-        int(sm.params["min_snp_reads"]),
-        int(sm.params["min_snp_per_block"]),
-        tot_mtx,
-        grp_cols,
-        colname="bb_id",
-        tumor_sidx=tumor_sidx,
-    )
-else:
-    bbs = adaptive_binning(
-        snps,
-        int(sm.params["min_snp_reads"]),
-        int(sm.params["min_snp_per_block"]),
-        tot_vec[:, None],
-        grp_cols,
-        colname="bb_id",
-    )
+# 3. Adaptive binning (MSR & MSPB)
+bbs = adaptive_binning(
+    snps,
+    int(sm.params["min_snp_reads"]),
+    int(sm.params["min_snp_per_block"]),
+    tot_vec[:, None],
+    grp_cols,
+    colname="bb_id",
+)
 
 bb_ids = snps["bb_id"].to_numpy()
 num_bbs = len(bbs)
@@ -189,52 +143,18 @@ plot_allele_freqs(
     b_mtx_bb,
     genome_size,
     qc_dir,
-    apply_pseudobulk=not is_bulk_assay,
+    apply_pseudobulk=True,
     allele="B",
     unit="bb",
 )
 
-if is_bulk_assay:
-    baf_mtx_bb = np.divide(
-        b_mtx_bb,
-        tot_mtx_bb,
-        where=tot_mtx_bb > 0,
-        out=np.full_like(b_mtx_bb, np.nan, dtype=np.float32),
-    )
-
 ##################################################
-# Filter bins with any NaN across all bb matrices
-_nan_filtered = False
-if is_bulk_assay:
-    nan_mask = np.isnan(baf_mtx_bb).any(axis=1)
-    n_nan_rows = int(nan_mask.sum())
-    n_valid = num_bbs - n_nan_rows
-    logging.info(
-        f"NaN row filter: {n_nan_rows}/{num_bbs} bins have NaN, "
-        f"keeping {n_valid} ({n_valid / max(num_bbs, 1) * 100:.1f}%)"
-    )
-    if n_nan_rows > 0:
-        _nan_filtered = True
-        valid = ~nan_mask
-        bbs = bbs.loc[valid].reset_index(drop=True)
-        tot_mtx_bb = tot_mtx_bb[valid]
-        a_mtx_bb = a_mtx_bb[valid]
-        b_mtx_bb = b_mtx_bb[valid]
-        baf_mtx_bb = baf_mtx_bb[valid]
-
-##################################################
-# Compute bin-level switchprobs (last SNP of bin i → first SNP of bin i+1)
-if _nan_filtered:
-    kept_bb_ids = np.where(~nan_mask)[0]
-else:
-    kept_bb_ids = np.arange(len(bbs))
-old_to_new = {old: new for new, old in enumerate(kept_bb_ids)}
-snps_valid = snps[snps["bb_id"].isin(old_to_new)].copy()
-snps_valid["bb_id"] = snps_valid["bb_id"].map(old_to_new)
+# 4. Compute bin-level switchprobs (last SNP of bin i → first SNP of bin i+1)
 bbs["bb_id"] = np.arange(len(bbs))
 
+logging.info("estimate bin-level switchprobs")
 if gmap_file is not None:
-    dist_cms = interp_cM_blocks(bbs, snps_valid, genetic_map, block_id_col="bb_id")
+    dist_cms = interp_cM_blocks(bbs, snps, genetic_map, block_id_col="bb_id")
     bbs["switchprobs"] = estimate_switchprobs_cM(
         dist_cms,
         nu=float(sm.params["nu"]),
@@ -242,10 +162,9 @@ if gmap_file is not None:
     )
 else:
     bbs["switchprobs"] = estimate_switchprobs_PS(bbs, switchprob_ps)
-logging.info("recomputed bin-level switchprobs after binning")
 
 ##################################################
-# Save outputs
+# 5. Save
 bbs.to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
 bbs.to_csv(
     sm.output["bed_file"],
@@ -254,16 +173,10 @@ bbs.to_csv(
     header=False,
     index=False,
 )
-if is_bulk_assay:
-    np.savez_compressed(sm.output["tot_mtx_bb"], mat=tot_mtx_bb)
-    np.savez_compressed(sm.output["a_mtx_bb"], mat=a_mtx_bb)
-    np.savez_compressed(sm.output["b_mtx_bb"], mat=b_mtx_bb)
-    np.savez_compressed(sm.output["baf_mtx_bb"], mat=baf_mtx_bb)
-else:
-    save_npz(sm.output["tot_mtx_bb"], tot_mtx_bb)
-    save_npz(sm.output["a_mtx_bb"], a_mtx_bb)
-    save_npz(sm.output["b_mtx_bb"], b_mtx_bb)
-    save_npz(sm.output["baf_mtx_bb"], csr_matrix((0, 0), dtype=np.float32))
+save_npz(sm.output["tot_mtx_bb"], tot_mtx_bb)
+save_npz(sm.output["a_mtx_bb"], a_mtx_bb)
+save_npz(sm.output["b_mtx_bb"], b_mtx_bb)
+save_npz(sm.output["baf_mtx_bb"], csr_matrix((0, 0), dtype=np.float32))
 if all_barcodes is not None:
     barcodes_out = os.path.join(
         os.path.dirname(sm.output["bb_file"]), "barcodes.tsv.gz"
