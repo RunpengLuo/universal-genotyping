@@ -108,7 +108,57 @@ def log_nan_summary(name, mat, labels, n_total):
         )
 
 
-def log_mad_and_plot(
+def compute_gc_rd_stats(mat, gc_vals, labels, n_gc_bins=100):
+    """Compute per-label Pearson/Spearman corr(RD, GC) and std of binned median RD.
+
+    Parameters
+    ----------
+    mat : np.ndarray
+        (n_bins, n_samples) depth matrix.
+    gc_vals : np.ndarray
+        Per-bin GC fraction (same length as mat rows).
+    labels : list[str]
+        Column labels (sample/rep IDs).
+    n_gc_bins : int
+        Number of equal-width GC bins in [0, 1].
+
+    Returns
+    -------
+    gc_corr : dict[str, tuple[float, float]]
+        {label: (pearson_r, spearman_r)}
+    gc_bin_median_std : dict[str, float]
+        {label: std of per-GC-bin median RD (A_GC)}
+    """
+    from scipy.stats import pearsonr, spearmanr
+
+    gc_bins = np.linspace(0, 1, n_gc_bins + 1)
+    gc_corr = {}
+    gc_bin_median_std = {}
+
+    for i, label in enumerate(labels):
+        v = mat[:, i] if mat.ndim == 2 else mat
+        valid = np.isfinite(v) & np.isfinite(gc_vals)
+
+        if valid.sum() > 2:
+            pr_val, _ = pearsonr(gc_vals[valid], v[valid])
+            sr_val, _ = spearmanr(gc_vals[valid], v[valid])
+            gc_corr[label] = (pr_val, sr_val)
+        else:
+            gc_corr[label] = (np.nan, np.nan)
+
+        bin_idx = np.digitize(gc_vals, gc_bins) - 1
+        bin_idx = np.clip(bin_idx, 0, n_gc_bins - 1)
+        medians = []
+        for b in range(n_gc_bins):
+            mask = (bin_idx == b) & np.isfinite(v)
+            if mask.any():
+                medians.append(np.median(v[mask]))
+        gc_bin_median_std[label] = float(np.std(medians)) if medians else np.nan
+
+    return gc_corr, gc_bin_median_std
+
+
+def plot_rd_gc(
     pos_df,
     mat,
     labels,
@@ -118,15 +168,32 @@ def log_mad_and_plot(
     unit,
     val_type,
     ylim,
+    gc_corr=None,
+    gc_bin_median_std=None,
     **plot_kwargs,
 ):
-    """Log MAD per column and generate 1-D chromosome scatter plots."""
+    """Log GC-correlation stats per column and generate 1-D chromosome scatter plots.
+
+    Parameters
+    ----------
+    gc_corr : dict[str, tuple[float, float]] | None
+        {label: (pearson_r, spearman_r)} from ``compute_gc_rd_stats``.
+    gc_bin_median_std : dict[str, float] | None
+        {label: std of per-GC-bin median RD} from ``compute_gc_rd_stats``.
+    """
     for i, label in enumerate(labels):
         v = mat[:, i]
-        m = np.isfinite(v)
-        if m.any():
-            mad = np.median(np.abs(v[m] - np.median(v[m])))
-            logging.info(f"  {prefix:<28s} {label:<8s}: MAD={mad:.4f}")
+        if gc_corr is not None and label in gc_corr:
+            pr_val, sr_val = gc_corr[label]
+            logging.info(
+                f"  {prefix:<28s} {label:<8s}: "
+                f"Pearson={pr_val:.4f}, Spearman={sr_val:.4f}"
+            )
+        if gc_bin_median_std is not None and label in gc_bin_median_std:
+            logging.info(
+                f"  {prefix:<28s} {label:<8s}: "
+                f"A_GC std={gc_bin_median_std[label]:.4f}"
+            )
         plot_file = os.path.join(qc_dir, f"{prefix}.{label}.pdf")
         plot_1d_sample(
             pos_df,

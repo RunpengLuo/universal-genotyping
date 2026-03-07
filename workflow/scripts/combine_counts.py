@@ -27,7 +27,7 @@ from aggregation_utils import (
     matrix_segmentation,
 )
 from combine_counts_utils import plot_allele_freqs
-from count_reads_utils import log_nan_summary, log_mad_and_plot
+from count_reads_utils import log_nan_summary, plot_1d_sample
 from switchprobs import interp_cM_snps, estimate_switchprobs_cM, estimate_switchprobs_PS
 
 setup_logging(sm.log[0])
@@ -212,22 +212,6 @@ for s in range(nsamples):
 
 log_nan_summary("bb depth", bb_dp, rep_ids, num_bbs)
 
-bb_rd_ylim = max(np.nanquantile(bb_dp, 0.99), 1.0)
-log_mad_and_plot(
-    bbs,
-    bb_dp,
-    rep_ids,
-    genome_size,
-    qc_dir,
-    "depth",
-    "bb",
-    "RD",
-    bb_rd_ylim,
-    smooth=True,
-    region_bed=region_bed,
-    blacklist_bed=blacklist_bed,
-)
-
 # ---------------------------------------------------------------------------
 # 6. RDR computation
 # ---------------------------------------------------------------------------
@@ -266,20 +250,19 @@ np.savez_compressed(sm.output["dp_mtx_bb"], mat=bb_dp)
 
 tumor_rep_ids = rep_ids[tumor_sidx:]
 rdr_ylim = np.round(np.nanquantile(bb_rdr, 0.99)).astype(int) + 1
-log_mad_and_plot(
-    bbs,
-    bb_rdr,
-    tumor_rep_ids,
-    genome_size,
-    qc_dir,
-    "rdr",
-    "bb",
-    "RDR",
-    rdr_ylim,
-    smooth=True,
-    region_bed=region_bed,
-    blacklist_bed=blacklist_bed,
-)
+for i, label in enumerate(tumor_rep_ids):
+    plot_1d_sample(
+        bbs, bb_rdr[:, i], genome_size,
+        os.path.join(qc_dir, f"rdr.{label}.pdf"),
+        unit="bb", val_type="RDR", max_ylim=rdr_ylim,
+        smooth=True, region_bed=region_bed, blacklist_bed=blacklist_bed,
+    )
+    plot_1d_sample(
+        bbs, baf_mtx_bb[:, tumor_sidx + i], genome_size,
+        os.path.join(qc_dir, f"baf.{label}.pdf"),
+        unit="bb", val_type="BAF",
+        region_bed=region_bed, blacklist_bed=blacklist_bed,
+    )
 
 # ---------------------------------------------------------------------------
 # 7. Copy sample_ids
