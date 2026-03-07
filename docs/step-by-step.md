@@ -21,7 +21,7 @@ For bulk WGS/WES BAMs. Genotypes SNPs via `bcftools`, phases with Eagle/SHAPEIT/
 1. Prepare a sample sheet with bulk samples (`assay_type` in `{bulkWGS, bulkWES}`), both normal and tumor.
 2. Set `workflow_mode: bulk_genotyping` and `assay_types: ["bulkWGS"]` (or `["bulkWES"]`) in config.
 3. **WGS:** Set `window_bed` to a pre-filtered window BED with GC/mappability/replication-timing covariates (e.g., produced by `resources/scripts/build_window_bed.py`). Bias correction uses HMMcopy-style LOWESS via `rd_correct.py`.
-4. **WES:** Set `window_bed` as above (the BED should include an `is_target` column, also produced by `build_window_bed.py --wes_targets_bed`). Additionally, set `wes_targets_bed` and configure `params_cnvkit` in config. The pipeline runs CNVkit (`autobin → coverage → reference → fix`) for read depth normalization, then converts the `.cnr` output to the standard window depth format.
+4. **WES:** Set `wes_targets_bed` to the capture kit targets BED file and configure `params_cnvkit` in config. The pipeline runs CNVkit (`autobin → coverage → reference → fix`) for read depth normalization, with CNVkit handling GC-content, edge-effect, and repeat-mask corrections internally. The `.cnr` output is then converted to the standard window depth format. Note: `window_bed` and mosdepth are **not** used for WES — set `region_bed` if you need region constraints.
 5. Run the pipeline. Primary outputs in `bb_dir/{assay_type}/`: `bb.tsv.gz`, `bb.{Tallele,Aallele,Ballele,baf,depth,rdr}.npz`.
 
 ---
