@@ -219,22 +219,66 @@ def generate_wes_windows(wes_targets_bed, region_bed, blacklist_bed,
     return windows
 
 
+def _dedup_targets(df):
+    """Deduplicate overlapping targets CNVkit-style.
+
+    1. Exact duplicates: keep first.
+    2. Partial overlap [a, b]: truncate b's start to a's end.
+    3. Target a fully inside target b: skip a.
+
+    Assumes df is sorted by (#CHR, START).  Ties in START are broken by
+    descending END so the largest interval is processed first.
+    """
+    df = df.sort_values(
+        ["#CHR", "START", "END"], ascending=[True, True, False],
+    ).reset_index(drop=True)
+
+    rows = []
+    prev_chrom = None
+    prev_end = 0
+    n_dup, n_contained, n_truncated = 0, 0, 0
+
+    for _, r in df.iterrows():
+        chrom, start, end = r["#CHR"], r["START"], r["END"]
+
+        if chrom != prev_chrom:
+            rows.append((chrom, start, end))
+            prev_chrom, prev_end = chrom, end
+            continue
+
+        if start == rows[-1][1] and end == rows[-1][2]:
+            n_dup += 1
+            continue
+
+        if end <= prev_end:
+            n_contained += 1
+            continue
+
+        if start < prev_end:
+            n_truncated += 1
+            start = prev_end
+
+        if start < end:
+            rows.append((chrom, start, end))
+            prev_end = end
+
+    print(
+        f"  dedup: {n_dup} exact duplicates, {n_contained} contained, "
+        f"{n_truncated} truncated"
+    )
+    return pd.DataFrame(rows, columns=["#CHR", "START", "END"])
+
+
 def _read_and_subdivide_targets(wes_targets_bed, target_avg_size):
-    """Read vendor exon targets, merge overlaps, subdivide into ~target_avg_size."""
+    """Read vendor exon targets, deduplicate CNVkit-style, subdivide."""
     df = pd.read_csv(
         wes_targets_bed, sep="\t", header=None,
         usecols=[0, 1, 2], names=["#CHR", "START", "END"], comment="#",
     )
     df = df[df["END"] > df["START"]].copy()
-    df = df.sort_values(["#CHR", "START"]).reset_index(drop=True)
-    n_before = len(df)
-    df = (
-        BedTool.from_dataframe(df)
-        .merge()
-        .to_dataframe(names=["#CHR", "START", "END"])
-    )
-    n_after = len(df)
-    print(f"  {n_before} targets, {n_before - n_after} overlapping, {n_after} after merge")
+    n_raw = len(df)
+    df = _dedup_targets(df)
+    print(f"  {n_raw} raw targets, {len(df)} after dedup")
     rows = _subdivide_intervals(df, "#CHR", "START", "END", target_avg_size, min_size=1)
     return pd.DataFrame(rows, columns=["#CHR", "START", "END"])
 
@@ -346,7 +390,7 @@ def compute_mappability(windows_df, mappability_file, genome_size_file):
     win_bed["_idx"] = np.arange(len(win_bed))
     bt = BedTool.from_dataframe(win_bed).sort(g=genome_size_file)
     map_bt = BedTool(mappability_file).sort(g=genome_size_file)
-    map_cov = bt.map(b=map_bt, c=5, o="mean", g=genome_size_file).to_dataframe(
+    map_cov = bt.map(b=map_bt, c=4, o="mean", g=genome_size_file).to_dataframe(
         disable_auto_names=True
     )
     map_cov.columns = ["#CHR", "START", "END", "_idx", "MAP"]
