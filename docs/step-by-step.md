@@ -4,6 +4,19 @@ All modes share the same command structure. Fill in paths in `config/config.yaml
 
 ```sh
 snakemake --cores <N> \
+    --profile profile/ \
+    -s /path/to/workflow/Snakefile \
+    --configfile config/config.yaml \
+    --directory <output_dir> \
+    --config sample_file=/path/to/samples.tsv sample_id=<PATIENT_ID>
+```
+
+`--profile profile/` enables per-rule conda environments, shared env caching, and mamba (see `profile/config.yaml`). If your Snakemake is inside a conda environment, wrap with `conda run`:
+
+```sh
+conda run -p /path/to/snakemake-env --no-capture-output \
+    snakemake --cores <N> \
+    --profile profile/ \
     -s /path/to/workflow/Snakefile \
     --configfile config/config.yaml \
     --directory <output_dir> \

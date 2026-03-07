@@ -1,0 +1,11 @@
+name: genotyping-cnvkit
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python>=3.10
+  - cnvkit
+  - numpy
+  - pandas
+  - matplotlib-base
+  - scipy

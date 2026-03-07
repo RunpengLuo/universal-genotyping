@@ -1,0 +1,10 @@
+name: genotyping-snapatac2
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python>=3.10
+  - snapatac2
+  - scanpy
+  - anndata
+  - pyranges

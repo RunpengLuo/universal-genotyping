@@ -31,6 +31,8 @@ if workflow_mode == "bulk_genotyping":
             min_baseq=config["params_bcftools"]["min_baseq"],
             min_dp=config["params_bcftools"]["min_dp"],
             max_depth=config["params_bcftools"]["max_depth"],
+        conda:
+            "../envs/tools.yaml"
         shell:
             r"""
             {params.bcftools} mpileup {input.bams} \
@@ -77,6 +79,8 @@ if workflow_mode == "single_cell_genotyping":
             ),
             minMAF=config["params_cellsnp_lite"]["minMAF_genotype"],
             minCOUNT=config["params_cellsnp_lite"]["minCOUNT_genotype"],
+        conda:
+            "../envs/tools.yaml"
         shell:
             r"""
             printf "%s\n" {input.bams} > "{output.bam_lst}"
@@ -118,5 +122,7 @@ if workflow_mode == "single_cell_genotyping":
         threads: 1
         log:
             config["log_dir"] + "/annotate_snps_pseudobulk.log",
+        conda:
+            "../envs/base.yaml"
         script:
             "../scripts/annotate_snps_pseudobulk.py"

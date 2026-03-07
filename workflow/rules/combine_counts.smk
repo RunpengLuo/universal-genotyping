@@ -59,6 +59,8 @@ rule combine_counts:
     threads: 1
     log:
         config["log_dir"] + "/combine_counts.{assay_type}.log",
+    conda:
+        "../envs/base.yaml"
     script:
         """../scripts/combine_counts.py"""
 
@@ -110,6 +112,8 @@ rule combine_counts_nonbulk:
     threads: 1
     log:
         config["log_dir"] + "/combine_counts_nonbulk.{assay_type}.log",
+    conda:
+        "../envs/base.yaml"
     script:
         """../scripts/combine_counts_nonbulk.py"""
 
@@ -147,5 +151,7 @@ rule cnv_segmentation:
     threads: 1
     log:
         config["log_dir"] + "/cnv_segmentation.{assay_type}.log",
+    conda:
+        "../envs/base.yaml"
     script:
         """../scripts/cnv_segmentation.py"""

@@ -51,6 +51,8 @@ rule phase_and_concat_bulk:
         exon_only=config["params_phase_and_concat"]["exon_only"],
     log:
         config["log_dir"] + "/phase_and_concat.{assay_type}.log",
+    conda:
+        "../envs/base.yaml"
     script:
         """../scripts/phase_and_concat.py"""
 
@@ -113,5 +115,7 @@ rule phase_and_concat_single_cell:
         exon_only=config["params_phase_and_concat"]["exon_only"],
     log:
         config["log_dir"] + "/phase_and_concat.{assay_type}.log",
+    conda:
+        "../envs/base.yaml"
     script:
         """../scripts/phase_and_concat.py"""

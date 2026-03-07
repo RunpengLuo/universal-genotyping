@@ -38,6 +38,8 @@ rule process_rna_anndata:
         assay_type="(scRNA|VISIUM|VISIUM3prime)",
     log:
         config["log_dir"] + "/process_rna_anndata.{assay_type}.log",
+    conda:
+        "../envs/base.yaml"
     script:
         """../scripts/process_rna_anndata.py"""
 
@@ -74,5 +76,7 @@ rule process_atac_fragments:
         assay_type="scATAC",
     log:
         config["log_dir"] + "/process_atac_fragments.{assay_type}.log",
+    conda:
+        "../envs/snapatac2.yaml"
     script:
         """../scripts/process_atac_fragments.py"""

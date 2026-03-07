@@ -16,6 +16,8 @@ if config["phaser"] == "shapeit":
             bcftools=config["bcftools"],
         log:
             config["log_dir"] + "/phase_snps_shapeit/phase_snps.chr{chrname}.log",
+        conda:
+            "../envs/tools.yaml"
         shell:
             r"""
             {params.shapeit} \
@@ -48,6 +50,8 @@ if config["phaser"] == "eagle":
             out_prefix=config["phase_dir"] + "/chr{chrname}",
         log:
             config["log_dir"] + "/phase_snps_eagle/phase_snps.chr{chrname}.log",
+        conda:
+            "../envs/tools.yaml"
         shell:
             r"""
             {params.eagle} \
@@ -81,6 +85,8 @@ if config["phaser"] == "longphase":
         threads: config["threads"]["phase"]
         log:
             config["log_dir"] + "/phase_snps_longphase/phase_snps.chr{chrname}.log",
+        conda:
+            "../envs/tools.yaml"
         shell:
             r"""
             {params.longphase} phase \
@@ -107,6 +113,8 @@ rule concat_and_extract_phased_het_snps:
     threads: 1
     params:
         bcftools=config["bcftools"],
+    conda:
+        "../envs/tools.yaml"
     shell:
         r"""
         printf "%s\n" {input.vcf_files} > "{output.lst_file}"
@@ -128,5 +136,7 @@ rule parse_genetic_map:
         chrnames=config["chromosomes"],
         phaser=config["phaser"],
     threads: 1
+    conda:
+        "../envs/base.yaml"
     script:
         "../scripts/parse_genetic_map.py"

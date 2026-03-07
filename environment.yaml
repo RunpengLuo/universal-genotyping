@@ -1,3 +1,6 @@
+# Monolithic environment for manual/development installs.
+# For production runs, use `snakemake --use-conda` which activates
+# per-rule environments from workflow/envs/*.yaml automatically.
 name: genotyping-env
 channels:
   - conda-forge

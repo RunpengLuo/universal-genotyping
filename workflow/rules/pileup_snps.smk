@@ -21,6 +21,8 @@ rule pileup_snps_bulk_mode1b:
         minCOUNT=config["params_cellsnp_lite"]["minCOUNT_pileup"],
     log:
         config["log_dir"] + "/pileup_snps_bulk_mode1b/pileup_snps.{assay_type}_{rep_id}.log",
+    conda:
+        "../envs/tools.yaml"
     shell:
         r"""
         {params.cellsnp_lite} \
@@ -67,6 +69,8 @@ rule pileup_snps_single_cell_mode1a:
         bcftools=config["bcftools"],
     log:
         config["log_dir"] + "/pileup_snps_single_cell_mode1a/pileup_snps.{assay_type}_{rep_id}.log",
+    conda:
+        "../envs/tools.yaml"
     shell:
         r"""
         {params.cellsnp_lite} \

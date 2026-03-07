@@ -18,6 +18,8 @@ rule window_bed_to_3bed:
         mosdepth_bed=temp(config["bb_dir"] + "/windows.bed.gz"),
     log:
         config["log_dir"] + "/window_bed_to_3bed.log",
+    conda:
+        "../envs/base.yaml"
     run:
         import gzip, logging
         import pandas as pd
@@ -48,6 +50,8 @@ rule run_mosdepth:
     log:
         config["log_dir"]
         + "/run_mosdepth/run_mosdepth.{assay_type}_{rep_id}.log",
+    conda:
+        "../envs/tools.yaml"
     run:
         import subprocess
 
@@ -99,6 +103,8 @@ rule rd_correct:
         assay_type=lambda wc: wc.assay_type,
     log:
         config["log_dir"] + "/rd_correct.{assay_type}.log",
+    conda:
+        "../envs/base.yaml"
     script:
         """../scripts/rd_correct.py"""
 
@@ -127,6 +133,8 @@ rule cnvkit_autobin:
         cfg=_cnvkit_cfg,
     log:
         config["log_dir"] + "/cnvkit_autobin.{assay_type}.log",
+    conda:
+        "../envs/cnvkit.yaml"
     run:
         import subprocess
 
@@ -172,6 +180,8 @@ rule cnvkit_coverage:
     log:
         config["log_dir"]
         + "/cnvkit_coverage.{assay_type}_{rep_id}.{region_type}.log",
+    conda:
+        "../envs/cnvkit.yaml"
     run:
         import subprocess
 
@@ -211,6 +221,8 @@ rule cnvkit_reference:
         cfg=_cnvkit_cfg,
     log:
         config["log_dir"] + "/cnvkit_reference.{assay_type}.log",
+    conda:
+        "../envs/cnvkit.yaml"
     run:
         import subprocess
 
@@ -248,6 +260,8 @@ rule cnvkit_fix:
         cfg=_cnvkit_cfg,
     log:
         config["log_dir"] + "/cnvkit_fix.{assay_type}_{rep_id}.log",
+    conda:
+        "../envs/cnvkit.yaml"
     run:
         import subprocess
 
@@ -292,5 +306,7 @@ rule cnvkit_to_window_dp:
         chromosomes=config["chromosomes"],
     log:
         config["log_dir"] + "/cnvkit_to_window_dp.{assay_type}.log",
+    conda:
+        "../envs/cnvkit.yaml"
     script:
         """../scripts/cnvkit_to_window_dp.py"""

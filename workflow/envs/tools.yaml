@@ -1,0 +1,10 @@
+name: genotyping-tools
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - bcftools>=1.19
+  - samtools>=1.19
+  - cellsnp-lite
+  - mosdepth
+  - tabix
