@@ -49,8 +49,6 @@ gtf_file = maybe_path(sm.input["gtf_file"])
 
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
-bb_qc_dir = os.path.join(qc_dir, "bb")
-os.makedirs(bb_qc_dir, exist_ok=True)
 
 sample_df = pd.read_table(sm.input["sample_file"])
 sample_name = sample_df["SAMPLE"].iloc[0]
@@ -219,7 +217,7 @@ log_mad_and_plot(
     bb_dp,
     rep_ids,
     genome_size,
-    bb_qc_dir,
+    qc_dir,
     "depth",
     "bb",
     "RD",
@@ -271,7 +269,7 @@ log_mad_and_plot(
     bb_rdr,
     tumor_rep_ids,
     genome_size,
-    bb_qc_dir,
+    qc_dir,
     "rdr",
     "bb",
     "RDR",

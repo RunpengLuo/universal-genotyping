@@ -15,7 +15,7 @@ WES mode (--wes_targets_bed):
   2. Generate antitarget bins in accessible non-target regions
   3. Combine target + antitarget, mark is_target column
 
-Both modes then compute GC/MAP/REPLI and assign region_id.
+Both modes then subtract blacklist, assign region_id, and compute GC/MAP/REPLI.
 
 Output is a gzipped TSV:
   #CHR  START  END  region_id  GC  [MAP]  [REPLI]  [is_target]
@@ -38,6 +38,11 @@ import pandas as pd
 import pyranges as pr
 from pybedtools import BedTool
 
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+CHROM_ORDER = [f"chr{c}" for c in list(range(1, 23)) + ["X", "Y"]]
 
 UCSC_BASE = (
     "http://hgdownload.cse.ucsc.edu/goldenpath/hg19/encodeDCC/wgEncodeUwRepliSeq"
@@ -83,13 +88,18 @@ def _read_chrom_sizes(genome_size_file):
 
 
 def _df_to_pyranges(df):
-    """Convert a DataFrame with #CHR/START/END to PyRanges with _idx."""
-    win_pr = pr.PyRanges(
-        chromosomes=df["#CHR"],
-        starts=df["START"],
-        ends=df["END"],
-    )
-    return win_pr.insert(pd.Series(np.arange(len(df)), name="_idx"))
+    """Convert a DataFrame with #CHR/START/END to PyRanges with _idx.
+
+    Uses a DataFrame constructor so that _idx values are preserved through
+    pyranges' internal chromosome reordering (insert() renumbers them).
+    """
+    pr_df = pd.DataFrame({
+        "Chromosome": df["#CHR"].values,
+        "Start": df["START"].values,
+        "End": df["END"].values,
+        "_idx": np.arange(len(df)),
+    })
+    return pr.PyRanges(pr_df)
 
 
 def _subdivide_intervals(df, chrom_col, start_col, end_col, avg_size, min_size=0):
@@ -110,6 +120,15 @@ def _subdivide_intervals(df, chrom_col, start_col, end_col, avg_size, min_size=0
     return rows
 
 
+def _sort_windows(windows):
+    """Sort windows by natural chromosome order, then by start position."""
+    chrom_rank = {c: i for i, c in enumerate(CHROM_ORDER)}
+    windows = windows[windows["#CHR"].isin(chrom_rank)].copy()
+    windows["_chrom_rank"] = windows["#CHR"].map(chrom_rank)
+    windows = windows.sort_values(["_chrom_rank", "START"]).reset_index(drop=True)
+    return windows.drop(columns=["_chrom_rank"])
+
+
 # ---------------------------------------------------------------------------
 # Reference version helpers
 # ---------------------------------------------------------------------------
@@ -120,18 +139,17 @@ def get_standard_chroms(reference_version, genome_size_file):
     all_chroms = set(_read_chrom_sizes(genome_size_file)["chrom"])
     candidates = {f"chr{c}" for c in list(range(1, 23)) + ["X", "Y"]}
     if reference_version not in ("hg19", "hg38", "chm13v2"):
-        # Fallback: also try unprefixed
         candidates |= {str(c) for c in list(range(1, 23)) + ["X", "Y"]}
     return candidates & all_chroms
 
 
 # ---------------------------------------------------------------------------
-# Window generation
+# Window generation (WGS)
 # ---------------------------------------------------------------------------
 
 
-def generate_windows(genome_size_file, window_size, standard_chroms):
-    """Generate fixed-size windows from a chromosome sizes file."""
+def generate_wgs_windows(genome_size_file, window_size, standard_chroms, region_bed):
+    """Generate fixed-size windows, filtered to accessible regions."""
     sizes = _read_chrom_sizes(genome_size_file)
     sizes = sizes[sizes["chrom"].isin(standard_chroms)]
 
@@ -140,18 +158,93 @@ def generate_windows(genome_size_file, window_size, standard_chroms):
         for start in range(0, row["size"], window_size):
             rows.append((row["chrom"], start, min(start + window_size, row["size"])))
 
-    return pd.DataFrame(rows, columns=["#CHR", "START", "END"])
+    windows = pd.DataFrame(rows, columns=["#CHR", "START", "END"])
+    print(f"  {len(windows)} windows across {windows['#CHR'].nunique()} chromosomes")
 
-
-def filter_windows_by_region(windows, region_bed_file):
-    """Keep only windows overlapping accessible regions."""
+    # Keep only windows overlapping accessible regions
     keep_idx = (
         _df_to_pyranges(windows)
-        .overlap(pr.read_bed(region_bed_file))
+        .overlap(pr.read_bed(region_bed))
         .df["_idx"]
         .unique()
     )
-    return windows.iloc[keep_idx].sort_values(["#CHR", "START"]).reset_index(drop=True)
+    windows = windows.iloc[keep_idx].reset_index(drop=True)
+    print(f"  {len(windows)} after region filter")
+    return windows
+
+
+# ---------------------------------------------------------------------------
+# Window generation (WES)
+# ---------------------------------------------------------------------------
+
+
+def generate_wes_windows(wes_targets_bed, region_bed, blacklist_bed,
+                         target_avg_size, antitarget_avg_size, pad_size,
+                         standard_chroms):
+    """Generate target + antitarget windows for WES mode."""
+    # --- Targets: subdivide vendor exon capture intervals ---
+    targets = _read_and_subdivide_targets(wes_targets_bed, target_avg_size)
+    targets["is_target"] = 1
+
+    # --- Antitargets: off-target bins in accessible non-exon regions ---
+    antitargets = _generate_antitargets(
+        targets, region_bed, blacklist_bed, antitarget_avg_size, pad_size,
+    )
+    antitargets["is_target"] = 0
+
+    windows = pd.concat([targets, antitargets], ignore_index=True)
+    windows = windows[windows["#CHR"].isin(standard_chroms)].reset_index(drop=True)
+
+    n_tgt = int(windows["is_target"].sum())
+    print(f"  {len(windows)} windows ({n_tgt} target, {len(windows) - n_tgt} antitarget)")
+    return windows
+
+
+def _read_and_subdivide_targets(wes_targets_bed, target_avg_size):
+    """Read vendor exon targets, merge overlaps, subdivide into ~target_avg_size."""
+    df = pd.read_csv(
+        wes_targets_bed, sep="\t", header=None,
+        usecols=[0, 1, 2], names=["#CHR", "START", "END"], comment="#",
+    )
+    df = df[df["END"] > df["START"]].copy()
+    df = df.sort_values(["#CHR", "START"]).reset_index(drop=True)
+    df = (
+        BedTool.from_dataframe(df)
+        .merge()
+        .to_dataframe(names=["#CHR", "START", "END"])
+    )
+    rows = _subdivide_intervals(df, "#CHR", "START", "END", target_avg_size, min_size=1)
+    return pd.DataFrame(rows, columns=["#CHR", "START", "END"])
+
+
+def _generate_antitargets(targets, region_bed, blacklist_bed,
+                          antitarget_avg_size, pad_size):
+    """Generate off-target bins in accessible regions not covered by exon targets."""
+    access = pr.read_bed(region_bed)
+    if blacklist_bed:
+        access = access.subtract(pr.read_bed(blacklist_bed))
+
+    tgt_pr = pr.PyRanges(
+        chromosomes=targets["#CHR"], starts=targets["START"], ends=targets["END"],
+    )
+    padded = tgt_pr.copy()
+    padded.Start = (padded.Start - pad_size).clip(lower=0)
+    padded.End = padded.End + pad_size
+
+    background = access.subtract(padded)
+    bg_df = background.df
+    bg_df = bg_df[bg_df["End"] > bg_df["Start"]].copy()
+
+    min_bin_size = antitarget_avg_size // 16
+    rows = _subdivide_intervals(
+        bg_df, "Chromosome", "Start", "End", antitarget_avg_size, min_size=min_bin_size,
+    )
+    return pd.DataFrame(rows, columns=["#CHR", "START", "END"])
+
+
+# ---------------------------------------------------------------------------
+# Blacklist subtraction
+# ---------------------------------------------------------------------------
 
 
 def subtract_blacklist(windows, blacklist_bed_file):
@@ -164,72 +257,6 @@ def subtract_blacklist(windows, blacklist_bed_file):
     )
     keep_mask = ~np.isin(np.arange(len(windows)), bl_idx)
     return windows.loc[keep_mask].reset_index(drop=True)
-
-
-# ---------------------------------------------------------------------------
-# WES window generation
-# ---------------------------------------------------------------------------
-
-
-def generate_wes_targets(wes_targets_bed, target_avg_size):
-    """Subdivide large vendor exon targets into ~target_avg_size pieces."""
-    df = pd.read_csv(
-        wes_targets_bed,
-        sep="\t",
-        header=None,
-        usecols=[0, 1, 2],
-        names=["#CHR", "START", "END"],
-        comment="#",
-    )
-    df = df[df["END"] > df["START"]].copy()
-    # Merge overlapping/duplicate intervals to avoid duplicate coordinate rows.
-    # Sort by chr+start first so BedTool.merge() works correctly.
-    df = df.sort_values(["#CHR", "START"]).reset_index(drop=True)
-    df = (
-        BedTool.from_dataframe(df)
-        .merge()
-        .to_dataframe(names=["#CHR", "START", "END"])
-    )
-    rows = _subdivide_intervals(df, "#CHR", "START", "END", target_avg_size, min_size=1)
-    return (
-        pd.DataFrame(rows, columns=["#CHR", "START", "END"])
-        .sort_values(["#CHR", "START"])
-        .reset_index(drop=True)
-    )
-
-
-def generate_wes_antitargets(
-    targets, region_bed_file, blacklist_bed_file, antitarget_avg_size, pad_size
-):
-    """Generate off-target bins in accessible regions not covered by exon targets."""
-    access = pr.read_bed(region_bed_file)
-    if blacklist_bed_file:
-        access = access.subtract(pr.read_bed(blacklist_bed_file))
-
-    tgt_pr = pr.PyRanges(
-        chromosomes=targets["#CHR"],
-        starts=targets["START"],
-        ends=targets["END"],
-    )
-    padded = tgt_pr.copy()
-    padded.Start = (padded.Start - pad_size).clip(lower=0)
-    padded.End = padded.End + pad_size
-
-    background = access.subtract(padded)
-    background.Start = background.Start + pad_size
-    background.End = background.End - pad_size
-    bg_df = background.df
-    bg_df = bg_df[bg_df["End"] > bg_df["Start"]].copy()
-
-    min_bin_size = antitarget_avg_size // 16
-    rows = _subdivide_intervals(
-        bg_df, "Chromosome", "Start", "End", antitarget_avg_size, min_size=min_bin_size
-    )
-    return (
-        pd.DataFrame(rows, columns=["#CHR", "START", "END"])
-        .sort_values(["#CHR", "START"])
-        .reset_index(drop=True)
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -277,7 +304,7 @@ def assign_region_id(windows, region_bed_file):
 
 
 # ---------------------------------------------------------------------------
-# GC content
+# Per-window covariates
 # ---------------------------------------------------------------------------
 
 
@@ -290,22 +317,20 @@ def compute_gc(windows_df, reference):
     return windows_df
 
 
-# ---------------------------------------------------------------------------
-# Mappability
-# ---------------------------------------------------------------------------
-
-
 def compute_mappability(windows_df, mappability_file, genome_size_file):
     """Compute per-window mean mappability via pybedtools map."""
-    bt = BedTool.from_dataframe(windows_df[["#CHR", "START", "END"]]).sort(
-        g=genome_size_file
-    )
+    # Add _idx so we can restore original row order after bedtools sort
+    win_bed = windows_df[["#CHR", "START", "END"]].copy()
+    win_bed["_idx"] = np.arange(len(win_bed))
+    bt = BedTool.from_dataframe(win_bed).sort(g=genome_size_file)
     map_bt = BedTool(mappability_file).sort(g=genome_size_file)
-    map_cov = bt.map(b=map_bt, c=4, o="mean", g=genome_size_file).to_dataframe(
+    map_cov = bt.map(b=map_bt, c=5, o="mean", g=genome_size_file).to_dataframe(
         disable_auto_names=True
     )
-    map_cov.columns = ["#CHR", "START", "END", "MAP"]
-    return pd.to_numeric(map_cov["MAP"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
+    map_cov.columns = ["#CHR", "START", "END", "_idx", "MAP"]
+    map_cov["_idx"] = map_cov["_idx"].astype(int)
+    map_cov = map_cov.sort_values("_idx")
+    return pd.to_numeric(map_cov["MAP"], errors="coerce").fillna(0.0).clip(0.0, 1.0).values
 
 
 # ---------------------------------------------------------------------------
@@ -313,45 +338,41 @@ def compute_mappability(windows_df, mappability_file, genome_size_file):
 # ---------------------------------------------------------------------------
 
 
-def download(url, dest):
+def _download(url, dest):
     """Download a file with wget."""
     subprocess.check_call(["wget", "-q", "-O", dest, url])
 
 
-def bigwig_to_bedgraph(bigwig, bedgraph):
+def _bigwig_to_bedgraph(bigwig, bedgraph):
     """Convert bigWig to bedGraph using UCSC bigWigToBedGraph."""
     subprocess.check_call(["bigWigToBedGraph", bigwig, bedgraph])
 
 
-def liftover(input_bed, chain, output_bed, unmapped):
+def _liftover(input_bed, chain, output_bed, unmapped):
     """Run UCSC liftOver."""
     subprocess.check_call(["liftOver", input_bed, chain, output_bed, unmapped])
 
 
-def compute_repliseq(windows_df, standard_chroms, chain, bigwig_dir, work_dir):
-    """Compute per-window mean replication timing from Repli-seq bigWigs.
+def _prepare_lifted_bedgraphs(bigwig_dir, work_dir, chain):
+    """Download bigWigs if needed, convert to bedGraph, liftOver to hg38.
 
-    Downloads bigWig files if not present, converts to bedGraph, lifts from
-    hg19 to hg38, and bins into the provided windows.
+    Returns list of lifted bedGraph file paths.
     """
-    # --- Download bigWigs if needed ---
     os.makedirs(bigwig_dir, exist_ok=True)
     n_files = len(WAVE_SIGNAL_FILES)
     for i, fname in enumerate(WAVE_SIGNAL_FILES, 1):
         dest = os.path.join(bigwig_dir, fname)
         if not os.path.isfile(dest):
             print(f"\r  downloading bigWigs [{i}/{n_files}]", end="", flush=True)
-            download(f"{UCSC_BASE}/{fname}", dest)
+            _download(f"{UCSC_BASE}/{fname}", dest)
     print()
 
     bigwig_files = sorted(glob.glob(os.path.join(bigwig_dir, "*WaveSignal*.bigWig")))
     if not bigwig_files:
         sys.exit(f"Error: no WaveSignal bigWig files found in {bigwig_dir}")
 
-    # --- Convert + liftOver each bigWig ---
     lifted_dir = os.path.join(work_dir, "lifted")
     os.makedirs(lifted_dir, exist_ok=True)
-    n_bw = len(bigwig_files)
 
     lifted_files = []
     for i, bw in enumerate(bigwig_files, 1):
@@ -361,32 +382,27 @@ def compute_repliseq(windows_df, standard_chroms, chain, bigwig_dir, work_dir):
         unmapped_file = os.path.join(lifted_dir, f"{name}.unmapped")
 
         if not os.path.isfile(lifted_file):
-            print(f"\r  liftOver [{i}/{n_bw}]", end="", flush=True)
-            bigwig_to_bedgraph(bw, bg_file)
-            liftover(bg_file, chain, lifted_file, unmapped_file)
+            print(f"\r  liftOver [{i}/{len(bigwig_files)}]", end="", flush=True)
+            _bigwig_to_bedgraph(bw, bg_file)
+            _liftover(bg_file, chain, lifted_file, unmapped_file)
             os.remove(bg_file)
         lifted_files.append(lifted_file)
     print()
+    return lifted_files
 
-    # --- Bin lifted signals into windows ---
+
+def _bin_bedgraph_signals(windows_df, lifted_files, standard_chroms):
+    """Bin lifted bedGraph signals into windows. Returns per-window mean signal."""
     n_win = len(windows_df)
     signal_sum = np.zeros(n_win, dtype=np.float64)
     signal_count = np.zeros(n_win, dtype=np.int32)
-    n_lf = len(lifted_files)
 
     for i, lf in enumerate(lifted_files, 1):
-        print(f"\r  binning repli-seq [{i}/{n_lf}]", end="", flush=True)
+        print(f"\r  binning repli-seq [{i}/{len(lifted_files)}]", end="", flush=True)
         bg = pd.read_csv(
-            lf,
-            sep="\t",
-            header=None,
+            lf, sep="\t", header=None,
             names=["chrom", "start", "end", "signal"],
-            dtype={
-                "chrom": str,
-                "start": np.int64,
-                "end": np.int64,
-                "signal": np.float64,
-            },
+            dtype={"chrom": str, "start": np.int64, "end": np.int64, "signal": np.float64},
         )
         bg = bg[bg["chrom"].isin(standard_chroms)].reset_index(drop=True)
 
@@ -397,13 +413,16 @@ def compute_repliseq(windows_df, standard_chroms, chain, bigwig_dir, work_dir):
                 continue
 
             win_starts = windows_df["START"].to_numpy()[win_idx]
+            sort_order = np.argsort(win_starts)
+            win_starts = win_starts[sort_order]
+            win_idx = win_idx[sort_order]
+
             bg_mids = ((grp["start"] + grp["end"]) // 2).to_numpy()
             bin_idx = np.searchsorted(win_starts, bg_mids, side="right") - 1
             valid = (bin_idx >= 0) & (bin_idx < len(win_idx))
             global_idx = win_idx[bin_idx[valid]]
             signal_sum[global_idx] += grp["signal"].to_numpy()[valid]
             signal_count[global_idx] += 1
-
     print()
 
     with np.errstate(invalid="ignore", divide="ignore"):
@@ -411,16 +430,105 @@ def compute_repliseq(windows_df, standard_chroms, chain, bigwig_dir, work_dir):
 
     n_covered = int((signal_count > 0).sum())
     print(f"  {n_covered}/{n_win} windows have replication timing data")
-
     return np.round(mean_signal, 6)
 
 
+def compute_repliseq(windows_df, standard_chroms, args):
+    """Compute per-window mean replication timing from ENCODE Repli-seq bigWigs.
+
+    Handles work_dir/chain setup, then delegates to helpers.
+    """
+    if args.work_dir:
+        work_dir = args.work_dir
+        os.makedirs(work_dir, exist_ok=True)
+        cleanup = False
+    else:
+        work_dir = tempfile.mkdtemp(prefix="repliseq_")
+        cleanup = True
+
+    chain = args.chain
+    if chain is None:
+        chain = os.path.join(work_dir, "hg19ToHg38.over.chain.gz")
+        if not os.path.isfile(chain):
+            print("  Downloading chain file ...")
+            _download(CHAIN_URL, chain)
+    if not os.path.isfile(chain):
+        sys.exit(f"Error: chain file not found: {chain}")
+
+    bigwig_dir = args.bigwig_dir or os.path.join(work_dir, "bigwigs")
+    lifted_files = _prepare_lifted_bedgraphs(bigwig_dir, work_dir, chain)
+    result = _bin_bedgraph_signals(windows_df, lifted_files, standard_chroms)
+
+    if cleanup:
+        import shutil
+        shutil.rmtree(work_dir)
+
+    return result
+
+
 # ---------------------------------------------------------------------------
-# Main
+# Summary reporting
 # ---------------------------------------------------------------------------
 
 
-def main():
+def print_summary(windows):
+    """Print per-window and per-chromosome summary statistics."""
+    sizes = windows["END"] - windows["START"]
+    has_target = "is_target" in windows.columns
+
+    print()
+    print("  Summary:")
+    print(f"    {len(windows)} windows across {windows['#CHR'].nunique()} chromosomes")
+    print(f"    {windows['region_id'].nunique()} distinct regions")
+    print(
+        f"    window size: min={sizes.min()}, median={int(sizes.median())}, "
+        f"max={sizes.max()}, mean={sizes.mean():.0f}"
+    )
+    total_bp = int(sizes.sum())
+    print(f"    total coverage: {total_bp:,} bp ({total_bp / 1e9:.2f} Gb)")
+
+    if has_target:
+        tgt_sizes = sizes[windows["is_target"].astype(bool)]
+        anti_sizes = sizes[~windows["is_target"].astype(bool)]
+        print(
+            f"    target size:     min={tgt_sizes.min()}, median={int(tgt_sizes.median())}, "
+            f"max={tgt_sizes.max()}"
+        )
+        print(
+            f"    antitarget size: min={anti_sizes.min()}, median={int(anti_sizes.median())}, "
+            f"max={anti_sizes.max()}"
+        )
+
+    # Per-chromosome table
+    header = f"    {'chrom':<8} {'windows':>8} {'regions':>8} {'coverage_Mb':>12} {'median_size':>12}"
+    if has_target:
+        header += f" {'target':>8} {'antitarget':>10}"
+    print(header)
+
+    for chrom in CHROM_ORDER:
+        mask = windows["#CHR"] == chrom
+        if not mask.any():
+            continue
+        ch_sizes = sizes[mask]
+        ch_regions = windows.loc[mask, "region_id"].nunique()
+        row = (
+            f"    {chrom:<8} {int(mask.sum()):>8} {ch_regions:>8} "
+            f"{ch_sizes.sum() / 1e6:>12.2f} {int(ch_sizes.median()):>12}"
+        )
+        if has_target:
+            n_tgt = int(windows.loc[mask, "is_target"].astype(bool).sum())
+            n_anti = int(mask.sum()) - n_tgt
+            row += f" {n_tgt:>8} {n_anti:>10}"
+        print(row)
+    print()
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def parse_args():
     parser = argparse.ArgumentParser(
         description=(
             "Build a per-window bias correction BED. "
@@ -449,100 +557,53 @@ def main():
             "    --out_file gc_map.wes.bed.gz"
         ),
     )
-    parser.add_argument(
-        "--reference_version",
-        required=True,
-        help="Reference genome version (hg19, hg38, chm13v2).",
-    )
-    parser.add_argument(
-        "--reference",
-        required=True,
-        help="Path to reference FASTA (must have .fai index).",
-    )
-    parser.add_argument(
-        "--genome_size",
-        required=True,
-        help="Path to chromosome sizes file (tab-separated: chrom, size).",
-    )
-    parser.add_argument(
-        "--region_bed",
-        required=True,
-        help="Accessible regions BED -- keep only windows overlapping these regions.",
-    )
-    parser.add_argument(
-        "--out_file",
-        required=True,
-        help="Output gzipped TSV path (e.g. gc_map_repli.1kbp.hg38.bed.gz).",
-    )
-    parser.add_argument(
-        "--blacklist_bed",
-        default=None,
-        help="Optional blacklist BED -- subtract these regions.",
-    )
-    parser.add_argument(
-        "--wes_targets_bed",
-        default=None,
-        help=(
-            "Vendor exon capture targets BED. If provided, enables WES mode "
-            "(target+antitarget windows instead of fixed-size tiling)."
-        ),
-    )
-    parser.add_argument(
-        "--target_avg_size",
-        type=int,
-        default=200,
-        help="Average target bin size for splitting large exon targets (WES only, default: 200).",
-    )
-    parser.add_argument(
-        "--antitarget_avg_size",
-        type=int,
-        default=150000,
-        help="Average off-target bin size (WES only, default: 150000).",
-    )
-    parser.add_argument(
-        "--pad_size",
-        type=int,
-        default=500,
-        help="Padding around targets for antitarget generation (WES only, default: 500).",
-    )
-    parser.add_argument(
-        "--window",
-        type=int,
-        default=1000,
-        help="Window size in bp (WGS only, default: 1000).",
-    )
-    parser.add_argument(
-        "--mappability_bed",
-        default=None,
-        help="Optional BED-format mappability track (4th column = score).",
-    )
-    parser.add_argument(
-        "--repliseq",
-        action="store_true",
-        help="Enable replication timing from ENCODE Repli-seq bigWigs.",
-    )
-    parser.add_argument(
-        "--chain",
-        default=None,
-        help=(
-            "hg19-to-hg38 liftOver chain file. "
-            "If not provided and --repliseq is set, downloads hg19ToHg38.over.chain.gz."
-        ),
-    )
-    parser.add_argument(
-        "--bigwig_dir",
-        default=None,
-        help=(
-            "Directory containing pre-downloaded WaveSignal bigWig files. "
-            "If not provided, bigWigs are downloaded to --work_dir/bigwigs/."
-        ),
-    )
-    parser.add_argument(
-        "--work_dir",
-        default=None,
-        help="Working directory for intermediate files (default: temp dir).",
-    )
-    args = parser.parse_args()
+    # Required
+    parser.add_argument("--reference_version", required=True,
+                        help="Reference genome version (hg19, hg38, chm13v2).")
+    parser.add_argument("--reference", required=True,
+                        help="Path to reference FASTA (must have .fai index).")
+    parser.add_argument("--genome_size", required=True,
+                        help="Path to chromosome sizes file (tab-separated: chrom, size).")
+    parser.add_argument("--region_bed", required=True,
+                        help="Accessible regions BED -- keep only windows overlapping these regions.")
+    parser.add_argument("--out_file", required=True,
+                        help="Output gzipped TSV path (e.g. gc_map_repli.1kbp.hg38.bed.gz).")
+    # Optional filtering
+    parser.add_argument("--blacklist_bed", default=None,
+                        help="Optional blacklist BED -- subtract these regions.")
+    # WGS options
+    parser.add_argument("--window", type=int, default=1000,
+                        help="Window size in bp (WGS only, default: 1000).")
+    # WES options
+    parser.add_argument("--wes_targets_bed", default=None,
+                        help="Vendor exon capture targets BED. Enables WES mode.")
+    parser.add_argument("--target_avg_size", type=int, default=200,
+                        help="Average target bin size (WES only, default: 200).")
+    parser.add_argument("--antitarget_avg_size", type=int, default=150000,
+                        help="Average off-target bin size (WES only, default: 150000).")
+    parser.add_argument("--pad_size", type=int, default=500,
+                        help="Padding around targets for antitarget generation (WES only, default: 500).")
+    # Covariate options
+    parser.add_argument("--mappability_bed", default=None,
+                        help="Optional BED-format mappability track (4th column = score).")
+    parser.add_argument("--repliseq", action="store_true",
+                        help="Enable replication timing from ENCODE Repli-seq bigWigs.")
+    parser.add_argument("--chain", default=None,
+                        help="hg19-to-hg38 liftOver chain file (downloaded if omitted with --repliseq).")
+    parser.add_argument("--bigwig_dir", default=None,
+                        help="Directory for pre-downloaded WaveSignal bigWig files.")
+    parser.add_argument("--work_dir", default=None,
+                        help="Working directory for intermediate files (default: temp dir).")
+    return parser.parse_args()
+
+
+# ---------------------------------------------------------------------------
+# Main pipeline
+# ---------------------------------------------------------------------------
+
+
+def main():
+    args = parse_args()
 
     # --- Validate inputs ---
     for name, path in [
@@ -557,8 +618,8 @@ def main():
             sys.exit(f"Error: {name} not found: {path}")
 
     wes_mode = args.wes_targets_bed is not None
-
     t0 = time.time()
+
     print("=== build_window_bed.py ===")
     print(f"  Ref version: {args.reference_version}")
     print(f"  Reference:   {args.reference}")
@@ -566,13 +627,13 @@ def main():
     print(f"  Region BED:  {args.region_bed}")
     print(f"  Blacklist:   {args.blacklist_bed or 'none'}")
     print(f"  Mode:        {'WES' if wes_mode else 'WGS'}")
-    if not wes_mode:
-        print(f"  Window:      {args.window} bp")
-    else:
+    if wes_mode:
         print(f"  WES targets: {args.wes_targets_bed}")
         print(f"  Target avg:  {args.target_avg_size} bp")
         print(f"  Antitarget:  {args.antitarget_avg_size} bp")
         print(f"  Pad size:    {args.pad_size} bp")
+    else:
+        print(f"  Window:      {args.window} bp")
     print(f"  Mappability: {args.mappability_bed or 'none'}")
     print(f"  Repli-seq:   {'yes' if args.repliseq else 'no'}")
     print(f"  Output:      {args.out_file}")
@@ -584,42 +645,41 @@ def main():
     # --- Step 1: Generate windows ---
     if wes_mode:
         print("[1/6] WES: generating target + antitarget windows ...")
-        targets = generate_wes_targets(args.wes_targets_bed, args.target_avg_size)
-        antitargets = generate_wes_antitargets(
-            targets,
-            args.region_bed,
-            args.blacklist_bed,
-            args.antitarget_avg_size,
-            args.pad_size,
-        )
-        targets["is_target"] = 1
-        antitargets["is_target"] = 0
-        windows = pd.concat([targets, antitargets], ignore_index=True)
-        windows = windows.sort_values(["#CHR", "START"]).reset_index(drop=True)
-        windows = windows[windows["#CHR"].isin(standard_chroms)].reset_index(drop=True)
-        n_tgt = int(windows["is_target"].sum())
-        print(
-            f"  {len(windows)} windows ({n_tgt} target, {len(windows) - n_tgt} antitarget)"
+        windows = generate_wes_windows(
+            args.wes_targets_bed, args.region_bed, args.blacklist_bed,
+            args.target_avg_size, args.antitarget_avg_size, args.pad_size,
+            standard_chroms,
         )
     else:
         print("[1/6] WGS: generating fixed windows ...")
-        windows = generate_windows(args.genome_size, args.window, standard_chroms)
-        print(
-            f"  {len(windows)} windows across {windows['#CHR'].nunique()} chromosomes"
+        windows = generate_wgs_windows(
+            args.genome_size, args.window, standard_chroms, args.region_bed,
         )
 
-        windows = filter_windows_by_region(windows, args.region_bed)
-        print(f"  {len(windows)} after region filter")
-
-        if args.blacklist_bed:
-            windows = subtract_blacklist(windows, args.blacklist_bed)
+    if args.blacklist_bed:
+        n_before = len(windows)
+        if wes_mode:
+            n_tgt_before = int(windows["is_target"].sum())
+        windows = subtract_blacklist(windows, args.blacklist_bed)
+        n_removed = n_before - len(windows)
+        if wes_mode:
+            n_tgt_after = int(windows["is_target"].sum())
+            n_tgt_rm = n_tgt_before - n_tgt_after
+            n_anti_rm = n_removed - n_tgt_rm
+            print(
+                f"  {len(windows)} after blacklist subtraction "
+                f"(removed {n_tgt_rm} target, {n_anti_rm} antitarget)"
+            )
+        else:
             print(f"  {len(windows)} after blacklist subtraction")
 
-    # --- Step 2: Assign region_id ---
+    # --- Step 2: Assign region_id, drop windows outside regions ---
     print("[2/6] Assigning region_id ...")
     windows["region_id"] = assign_region_id(windows, args.region_bed)
-    n_assigned = int(windows["region_id"].notna().sum())
-    print(f"  {n_assigned}/{len(windows)} assigned")
+    n_before = len(windows)
+    windows = windows[windows["region_id"].notna()].reset_index(drop=True)
+    n_dropped = n_before - len(windows)
+    print(f"  {len(windows)}/{n_before} assigned ({n_dropped} dropped)")
 
     # --- Step 3: Compute GC ---
     print("[3/6] Computing GC content ...")
@@ -631,7 +691,7 @@ def main():
     if args.mappability_bed:
         print("[4/6] Computing mappability ...")
         windows["MAP"] = compute_mappability(
-            windows, args.mappability_bed, args.genome_size
+            windows, args.mappability_bed, args.genome_size,
         )
         out_cols.append("MAP")
     else:
@@ -640,96 +700,22 @@ def main():
     # --- Step 5: Compute replication timing (optional) ---
     if args.repliseq:
         if args.reference_version not in ("hg38", "hg19"):
-            print(
-                f"[5/6] Skipping repli-seq (unsupported for {args.reference_version})"
-            )
+            print(f"[5/6] Skipping repli-seq (unsupported for {args.reference_version})")
         else:
             print("[5/6] Computing replication timing ...")
-            if args.work_dir:
-                work_dir = args.work_dir
-                os.makedirs(work_dir, exist_ok=True)
-                cleanup = False
-            else:
-                work_dir = tempfile.mkdtemp(prefix="repliseq_")
-                cleanup = True
-
-            chain = args.chain
-            if chain is None:
-                chain = os.path.join(work_dir, "hg19ToHg38.over.chain.gz")
-                if not os.path.isfile(chain):
-                    print("  Downloading chain file ...")
-                    download(CHAIN_URL, chain)
-            if not os.path.isfile(chain):
-                sys.exit(f"Error: chain file not found: {chain}")
-
-            bigwig_dir = args.bigwig_dir or os.path.join(work_dir, "bigwigs")
-            windows["REPLI"] = compute_repliseq(
-                windows, standard_chroms, chain, bigwig_dir, work_dir
-            )
+            windows["REPLI"] = compute_repliseq(windows, standard_chroms, args)
             out_cols.append("REPLI")
-
-            if cleanup:
-                import shutil
-
-                shutil.rmtree(work_dir)
     else:
         print("[5/6] Skipping repli-seq (--repliseq not set)")
 
     if "is_target" in windows.columns:
         out_cols.append("is_target")
 
-    # --- Summary stats ---
-    sizes = windows["END"] - windows["START"]
-    n_regions = windows["region_id"].nunique()
-    n_chroms = windows["#CHR"].nunique()
-    print()
-    print("  Summary:")
-    print(f"    {len(windows)} windows across {n_chroms} chromosomes")
-    print(f"    {n_regions} distinct regions")
-    print(
-        f"    window size: min={sizes.min()}, median={int(sizes.median())}, "
-        f"max={sizes.max()}, mean={sizes.mean():.0f}"
-    )
-    total_bp = int(sizes.sum())
-    print(f"    total coverage: {total_bp:,} bp ({total_bp / 1e9:.2f} Gb)")
-    if "is_target" in windows.columns:
-        tgt_sizes = sizes[windows["is_target"].astype(bool)]
-        anti_sizes = sizes[~windows["is_target"].astype(bool)]
-        print(
-            f"    target size:     min={tgt_sizes.min()}, median={int(tgt_sizes.median())}, "
-            f"max={tgt_sizes.max()}"
-        )
-        print(
-            f"    antitarget size: min={anti_sizes.min()}, median={int(anti_sizes.median())}, "
-            f"max={anti_sizes.max()}"
-        )
+    # --- Summary ---
+    print_summary(windows)
 
-    # Per-chromosome stats
-    has_target = "is_target" in windows.columns
-    header = f"    {'chrom':<8} {'windows':>8} {'regions':>8} {'coverage_Mb':>12} {'median_size':>12}"
-    if has_target:
-        header += f" {'target':>8} {'antitarget':>10}"
-    print(header)
-    # Sort chromosomes naturally (chr1, chr2, ..., chr22, chrX, chrY)
-    chrom_order = [f"chr{c}" for c in list(range(1, 23)) + ["X", "Y"]]
-    for chrom in chrom_order:
-        if chrom not in windows["#CHR"].values:
-            continue
-        mask = windows["#CHR"] == chrom
-        ch_sizes = sizes[mask]
-        ch_regions = windows.loc[mask, "region_id"].nunique()
-        row = (
-            f"    {chrom:<8} {int(mask.sum()):>8} {ch_regions:>8} "
-            f"{ch_sizes.sum() / 1e6:>12.2f} {int(ch_sizes.median()):>12}"
-        )
-        if has_target:
-            n_tgt = int(windows.loc[mask, "is_target"].astype(bool).sum())
-            n_anti = int(mask.sum()) - n_tgt
-            row += f" {n_tgt:>8} {n_anti:>10}"
-        print(row)
-    print()
-
-    # --- Step 6: Write output ---
+    # --- Step 6: Sort and write output ---
+    windows = _sort_windows(windows)
     os.makedirs(os.path.dirname(os.path.abspath(args.out_file)), exist_ok=True)
     windows[out_cols].to_csv(
         args.out_file,

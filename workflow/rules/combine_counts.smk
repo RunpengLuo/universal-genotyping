@@ -42,7 +42,7 @@ if workflow_mode == "bulk_genotyping":
             rdr_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.rdr.npz",
             bed_file=config["bb_dir"] + "/{assay_type}/bb.bed.gz",
             sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
-            qc_dir=directory(config["qc_dir"] + "/{assay_type}/segmentation/"),
+            qc_dir=directory(config["qc_dir"] + "/{assay_type}/combine_counts/"),
         wildcard_constraints:
             assay_type="(bulkWGS|bulkWES)",
         params:
