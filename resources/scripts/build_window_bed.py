@@ -215,7 +215,19 @@ def generate_wes_windows(wes_targets_bed, region_bed, blacklist_bed,
     windows = windows[windows["#CHR"].isin(standard_chroms)].reset_index(drop=True)
 
     n_tgt = int(windows["is_target"].sum())
-    print(f"  {len(windows)} windows ({n_tgt} target, {len(windows) - n_tgt} antitarget)")
+    n_anti = len(windows) - n_tgt
+    print(f"  {len(windows)} windows ({n_tgt} target, {n_anti} antitarget)")
+    sizes = windows["END"] - windows["START"]
+    tgt_sizes = sizes[windows["is_target"].astype(bool)]
+    anti_sizes = sizes[~windows["is_target"].astype(bool)]
+    print(
+        f"  target size:     min={tgt_sizes.min()}, mean={tgt_sizes.mean():.0f}, "
+        f"median={int(tgt_sizes.median())}, max={tgt_sizes.max()}"
+    )
+    print(
+        f"  antitarget size: min={anti_sizes.min()}, mean={anti_sizes.mean():.0f}, "
+        f"median={int(anti_sizes.median())}, max={anti_sizes.max()}"
+    )
     return windows
 
 
