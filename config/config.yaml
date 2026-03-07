@@ -8,6 +8,7 @@ eagle: /path/to/eagle2
 shapeit: /path/to/phase_common_static
 longphase: /path/to/longphase_linux-x64
 mosdepth: /path/to/mosdepth
+cnvkit: /path/to/cnvkit.py
 
 # Output paths, relative to snakemake --directory
 snp_dir: "snps"
@@ -45,6 +46,7 @@ genome_size: null
 region_bed: null
 window_bed: null
 blacklist_bed: null
+wes_targets_bed: null
 gene_blacklist_file: null
 gtf_file: null
 ref_label: "cell_type"
@@ -133,9 +135,31 @@ params_combine_counts:
   min_snp_per_block: 10
 
 ##################################################
+# CNVkit parameters (bulkWES only)
+params_cnvkit:
+  # autobin
+  method: "hybrid"
+  bp_per_bin: null
+  target_max_size: null
+  target_min_size: null
+  antitarget_max_size: null
+  antitarget_min_size: null
+  annotate: null
+  short_names: null
+  # coverage
+  min_mapq: null
+  # reference + fix
+  no_gc: null
+  no_edge: null
+  no_rmask: null
+  male_reference: null
+  cluster: null
+
+##################################################
 threads:
   genotype: 8
   phase: 2
   pileup: 16
   postprocess: 2
   mosdepth: 16
+  cnvkit: 4

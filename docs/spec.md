@@ -71,15 +71,15 @@ Window-level intermediates:
 
 | File | Description |
 |------|-------------|
-| `window.depth_corrected.npz` | Bias-corrected per-window depth matrix. |
+| `window.dp.npz` | Bias-corrected per-window depth matrix. |
 | `window.df.tsv.gz` | Window annotation with GC/mappability/replication-timing columns. |
 
 **Single-cell (`single_cell_genotyping`):**
 
 | File | Description |
 |------|-------------|
-| `bb.raw.tsv.gz` | Genomic bin annotation. |
-| `bb.raw.{Tallele,Aallele,Ballele}.npz` | Allele count matrices (bins x cells). |
+| `bb.tsv.gz` | Genomic bin annotation. |
+| `bb.{Tallele,Aallele,Ballele}.npz` | Allele count matrices (bins x cells). |
 
 **CNV segments (`copytyping_preprocess`):**
 
@@ -100,7 +100,7 @@ QC plots are produced during `rd_correct` (bias correction QC), `combine_counts`
 
 `#CHR`, `POS`, `POS0`, `START`, `END`, `GT`, `PHASE` (0 = B-allele is ALT, 1 = B-allele is REF), `region_id` (string, `CHR:START-END` of enclosing region), `feature_id`, `feature_type` (exon/intron/intergenic).
 
-### `bb.tsv.gz` / `bb.raw.tsv.gz`
+### `bb.tsv.gz`
 
 `#CHR`, `START`, `END`, `START0`, `END0`, `switchprobs`, `region_id`, `PS`, `#SNPS`, `BLOCKSIZE`, `feature_id`, `feature_type`, `bb_id`.
 

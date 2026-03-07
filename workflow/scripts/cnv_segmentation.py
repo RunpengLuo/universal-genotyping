@@ -137,14 +137,17 @@ if not is_bulk_assay:
     counts = adata.var["seg_id"].value_counts()
     segs_df[f"#{feature_type}"] = segs_df["seg_id"].map(counts).fillna(0).astype(int)
     x_count = matrix_segmentation(adata.X.T, adata.var["seg_id"].to_numpy(), num_segs)
+
+##################################################
+# Save outputs
+if not is_bulk_assay:
     save_npz(sm.output["x_count"], x_count)
     save_npz(sm.output["y_count"], y_count)
     save_npz(sm.output["d_count"], d_count)
 else:
     np.savez_compressed(sm.output["y_count"], mat=y_count)
     np.savez_compressed(sm.output["d_count"], mat=d_count)
-
 segs_df.to_csv(sm.output["cnv_segments"], header=True, sep="\t", index=False)
 shutil.copy2(all_barcodes, sm.output["barcodes_out"])
 shutil.copy2(sm.input["sample_file"], sm.output["sample_file"])
-logging.info(f"finished.")
+logging.info("finished.")

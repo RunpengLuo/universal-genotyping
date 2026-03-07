@@ -180,6 +180,8 @@ if gc_correct:
                 dp_raw[:, i],
                 gc_vals,
                 is_target,
+                mappability=map_vals,
+                min_mappability=min_mappability,
             )
     else:
         logging.info("applying correct_readcount per sample")
@@ -223,6 +225,22 @@ plot_rd_gc(
     region_bed=region_bed,
     blacklist_bed=blacklist_bed,
 )
+
+# ---------------------------------------------------------------------------
+# Filter windows with any NaN in corrected depth
+# ---------------------------------------------------------------------------
+nan_mask = np.isnan(dp_corrected).any(axis=1)
+n_nan_rows = int(nan_mask.sum())
+n_valid = n_windows - n_nan_rows
+logging.info(
+    f"NaN row filter: {n_nan_rows}/{n_windows} windows have NaN, "
+    f"keeping {n_valid} ({n_valid / max(n_windows, 1) * 100:.1f}%)"
+)
+
+if n_nan_rows > 0:
+    valid = ~nan_mask
+    dp_corrected = dp_corrected[valid]
+    win_df = win_df.loc[valid].reset_index(drop=True)
 
 # ---------------------------------------------------------------------------
 # Save outputs

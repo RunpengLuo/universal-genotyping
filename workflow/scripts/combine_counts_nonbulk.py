@@ -194,8 +194,35 @@ plot_allele_freqs(
     unit="bb",
 )
 
+if is_bulk_assay:
+    baf_mtx_bb = np.divide(
+        b_mtx_bb,
+        tot_mtx_bb,
+        where=tot_mtx_bb > 0,
+        out=np.full_like(b_mtx_bb, np.nan, dtype=np.float32),
+    )
+
+##################################################
+# Filter bins with any NaN across all bb matrices
+if is_bulk_assay:
+    nan_mask = np.isnan(baf_mtx_bb).any(axis=1)
+    n_nan_rows = int(nan_mask.sum())
+    n_valid = num_bbs - n_nan_rows
+    logging.info(
+        f"NaN row filter: {n_nan_rows}/{num_bbs} bins have NaN, "
+        f"keeping {n_valid} ({n_valid / max(num_bbs, 1) * 100:.1f}%)"
+    )
+    if n_nan_rows > 0:
+        valid = ~nan_mask
+        bbs = bbs.loc[valid].reset_index(drop=True)
+        tot_mtx_bb = tot_mtx_bb[valid]
+        a_mtx_bb = a_mtx_bb[valid]
+        b_mtx_bb = b_mtx_bb[valid]
+        baf_mtx_bb = baf_mtx_bb[valid]
+
+##################################################
+# Save outputs
 bbs.to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
-# RDR position files for mosdepth
 bbs.to_csv(
     sm.output["bed_file"],
     columns=["#CHR", "START", "END"],
@@ -207,19 +234,11 @@ if is_bulk_assay:
     np.savez_compressed(sm.output["tot_mtx_bb"], mat=tot_mtx_bb)
     np.savez_compressed(sm.output["a_mtx_bb"], mat=a_mtx_bb)
     np.savez_compressed(sm.output["b_mtx_bb"], mat=b_mtx_bb)
-    # BAF matrix (bins × samples) for downstream diploid-bin identification
-    baf_mtx_bb = np.divide(
-        b_mtx_bb,
-        tot_mtx_bb,
-        where=tot_mtx_bb > 0,
-        out=np.full_like(b_mtx_bb, np.nan, dtype=np.float32),
-    )
     np.savez_compressed(sm.output["baf_mtx_bb"], mat=baf_mtx_bb)
 else:
     save_npz(sm.output["tot_mtx_bb"], tot_mtx_bb)
     save_npz(sm.output["a_mtx_bb"], a_mtx_bb)
     save_npz(sm.output["b_mtx_bb"], b_mtx_bb)
-    # placeholder BAF for non-bulk (compute_rdr_bulk is bulk-only)
     save_npz(sm.output["baf_mtx_bb"], csr_matrix((0, 0), dtype=np.float32))
 if all_barcodes is not None:
     barcodes_out = os.path.join(
@@ -227,4 +246,4 @@ if all_barcodes is not None:
     )
     shutil.copy2(all_barcodes, barcodes_out)
 shutil.copy2(sm.input["sample_file"], sm.output["sample_file"])
-logging.info(f"finished.")
+logging.info("finished.")

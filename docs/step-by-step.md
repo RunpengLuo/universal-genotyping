@@ -31,7 +31,7 @@ For scRNA, scATAC, VISIUM, or VISIUM3prime. Genotypes SNPs from pseudobulk pileu
 
 1. Prepare a sample sheet with non-bulk samples. For multiome, give scRNA and scATAC rows the same `REP_ID`. Fill in `PATH_to_barcodes` and `PATH_to_10x_ranger`.
 2. Set `workflow_mode: single_cell_genotyping` and `assay_types` accordingly.
-3. Run the pipeline. Primary outputs in `bb_dir/{assay_type}/`: `bb.raw.tsv.gz`, `bb.raw.{Tallele,Aallele,Ballele}.npz`, plus `barcodes.tsv.gz` in `allele_dir`.
+3. Run the pipeline. Primary outputs in `bb_dir/{assay_type}/`: `bb.tsv.gz`, `bb.{Tallele,Aallele,Ballele}.npz`, plus `barcodes.tsv.gz` in `allele_dir`.
 
 **Tip:** To skip re-genotyping when matched bulk data was already processed, set `het_snp_vcf` in the config to point to the prior run's `phase/phased_het_snps.vcf.gz`.
 

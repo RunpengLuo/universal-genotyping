@@ -173,25 +173,12 @@ plot_allele_freqs(
     unit="bb",
 )
 
-bbs.to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
-bbs.to_csv(
-    sm.output["bed_file"],
-    columns=["#CHR", "START", "END"],
-    sep="\t",
-    header=False,
-    index=False,
-)
-np.savez_compressed(sm.output["tot_mtx_bb"], mat=tot_mtx_bb)
-np.savez_compressed(sm.output["a_mtx_bb"], mat=a_mtx_bb)
-np.savez_compressed(sm.output["b_mtx_bb"], mat=b_mtx_bb)
-
 baf_mtx_bb = np.divide(
     b_mtx_bb,
     tot_mtx_bb,
     where=tot_mtx_bb > 0,
     out=np.full_like(b_mtx_bb, np.nan, dtype=np.float32),
 )
-np.savez_compressed(sm.output["baf_mtx_bb"], mat=baf_mtx_bb)
 
 # ---------------------------------------------------------------------------
 # 5. Aggregate window depth per bin (length-weighted mean)
@@ -245,9 +232,6 @@ logging.info(
     f"{n_nan_bb} NaN"
 )
 
-np.savez_compressed(sm.output["rdr_mtx_bb"], mat=bb_rdr)
-np.savez_compressed(sm.output["dp_mtx_bb"], mat=bb_dp)
-
 tumor_rep_ids = rep_ids[tumor_sidx:]
 rdr_ylim = np.round(np.nanquantile(bb_rdr, 0.99)).astype(int) + 1
 for i, label in enumerate(tumor_rep_ids):
@@ -259,7 +243,46 @@ for i, label in enumerate(tumor_rep_ids):
     )
 
 # ---------------------------------------------------------------------------
-# 7. Copy sample_ids
+# 7. Filter bins with any NaN across all bb matrices
 # ---------------------------------------------------------------------------
+nan_mask = (
+    np.isnan(baf_mtx_bb).any(axis=1)
+    | np.isnan(bb_dp).any(axis=1)
+    | np.isnan(bb_rdr).any(axis=1)
+)
+n_nan_rows = int(nan_mask.sum())
+n_valid = num_bbs - n_nan_rows
+logging.info(
+    f"NaN row filter: {n_nan_rows}/{num_bbs} bins have NaN, "
+    f"keeping {n_valid} ({n_valid / max(num_bbs, 1) * 100:.1f}%)"
+)
+
+if n_nan_rows > 0:
+    valid = ~nan_mask
+    bbs = bbs.loc[valid].reset_index(drop=True)
+    tot_mtx_bb = tot_mtx_bb[valid]
+    a_mtx_bb = a_mtx_bb[valid]
+    b_mtx_bb = b_mtx_bb[valid]
+    baf_mtx_bb = baf_mtx_bb[valid]
+    bb_dp = bb_dp[valid]
+    bb_rdr = bb_rdr[valid]
+
+# ---------------------------------------------------------------------------
+# 8. Save outputs
+# ---------------------------------------------------------------------------
+bbs.to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
+bbs.to_csv(
+    sm.output["bed_file"],
+    columns=["#CHR", "START", "END"],
+    sep="\t",
+    header=False,
+    index=False,
+)
+np.savez_compressed(sm.output["tot_mtx_bb"], mat=tot_mtx_bb)
+np.savez_compressed(sm.output["a_mtx_bb"], mat=a_mtx_bb)
+np.savez_compressed(sm.output["b_mtx_bb"], mat=b_mtx_bb)
+np.savez_compressed(sm.output["baf_mtx_bb"], mat=baf_mtx_bb)
+np.savez_compressed(sm.output["dp_mtx_bb"], mat=bb_dp)
+np.savez_compressed(sm.output["rdr_mtx_bb"], mat=bb_rdr)
 shutil.copy2(sm.input["sample_file"], sm.output["sample_file"])
 logging.info("finished combine_counts.")

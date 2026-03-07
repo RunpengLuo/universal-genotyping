@@ -223,6 +223,7 @@ else:
 
 ##################################################
 # entrypoint
+include: "rules/common.smk"
 include: "rules/genotype_snps.smk"
 include: "rules/phase_snps.smk"
 include: "rules/pileup_snps.smk"
