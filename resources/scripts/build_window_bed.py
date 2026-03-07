@@ -227,11 +227,14 @@ def _read_and_subdivide_targets(wes_targets_bed, target_avg_size):
     )
     df = df[df["END"] > df["START"]].copy()
     df = df.sort_values(["#CHR", "START"]).reset_index(drop=True)
+    n_before = len(df)
     df = (
         BedTool.from_dataframe(df)
         .merge()
         .to_dataframe(names=["#CHR", "START", "END"])
     )
+    n_after = len(df)
+    print(f"  {n_before} targets, {n_before - n_after} overlapping, {n_after} after merge")
     rows = _subdivide_intervals(df, "#CHR", "START", "END", target_avg_size, min_size=1)
     return pd.DataFrame(rows, columns=["#CHR", "START", "END"])
 
