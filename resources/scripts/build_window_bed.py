@@ -745,7 +745,10 @@ def main():
     n_before = len(windows)
     windows = windows[windows["region_id"].notna()].reset_index(drop=True)
     n_dropped = n_before - len(windows)
-    print(f"  {len(windows)}/{n_before} assigned ({n_dropped} dropped)")
+    assert n_dropped == 0, (
+        f"{n_dropped}/{n_before} windows could not be assigned a region_id"
+    )
+    print(f"  {len(windows)} assigned")
 
     # --- Step 3: Compute GC ---
     print("[3/6] Computing GC content ...")
