@@ -253,15 +253,9 @@ rdr_ylim = np.round(np.nanquantile(bb_rdr, 0.99)).astype(int) + 1
 for i, label in enumerate(tumor_rep_ids):
     plot_1d_sample(
         bbs, bb_rdr[:, i], genome_size,
-        os.path.join(qc_dir, f"rdr.{label}.pdf"),
+        os.path.join(qc_dir, f"rdr_bb.{label}.pdf"),
         unit="bb", val_type="RDR", max_ylim=rdr_ylim,
         smooth=True, region_bed=region_bed, blacklist_bed=blacklist_bed,
-    )
-    plot_1d_sample(
-        bbs, baf_mtx_bb[:, tumor_sidx + i], genome_size,
-        os.path.join(qc_dir, f"baf.{label}.pdf"),
-        unit="bb", val_type="BAF",
-        region_bed=region_bed, blacklist_bed=blacklist_bed,
     )
 
 # ---------------------------------------------------------------------------
