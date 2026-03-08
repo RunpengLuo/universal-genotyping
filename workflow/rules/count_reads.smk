@@ -125,7 +125,7 @@ rule cnvkit_autobin:
         bam=lambda wc: branch(
             len(normal_bams) > 0, then=normal_bams[0], otherwise=tumor_bams[0]
         ),
-        targets_bed=config.get("wes_targets_bed") or "",
+        targets_bed=config.get("wes_targets_bed") or [],
         access_bed=config["region_bed"],
     output:
         target_bed=config["bb_dir"] + "/{assay_type}/cnvkit/targets.bed",
