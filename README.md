@@ -2,12 +2,6 @@
 
 A Snakemake pipeline for unified SNP genotyping, phasing, and allele counting across multiple assay types (bulk WGS/WES, scRNA, scATAC, VISIUM, VISIUM HD 3prime) from the same patient. Supports bulk genotyping, single-cell genotyping, and copy-typing preprocessing modes.
 
-## Table of Contents
-
-- [Quick-Start](#quick-start)
-- [Workflow Overview](#workflow-overview)
-- [Documentation](#documentation)
-
 ---
 
 ## Quick-Start
@@ -28,18 +22,6 @@ snakemake --cores <num_cores> \
     --directory <output> \
     --config sample_file=/path/to/sample_file.tsv sample_id=<PATIENT_ID>
 ```
-
----
-
-## Workflow Overview
-
-### Bulk Genotyping
-
-![Bulk genotyping rulegraph](docs/rulegraph.bulk_genotyping.png)
-
-### Single-Cell Genotyping
-
-![Single-cell genotyping rulegraph](docs/rulegraph.single_cell_genotyping.png)
 
 ---
 
