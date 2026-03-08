@@ -13,7 +13,7 @@ _rdr_cfg = config.get("params_count_reads", {})
 rule window_bed_to_3bed:
     """Extract headerless 3-column BED from window_bed for mosdepth --by."""
     input:
-        window_bed=config.get("window_bed", []),
+        window_bed=config.get("window_bed") or [],
     output:
         mosdepth_bed=temp(config["bb_dir"] + "/windows.bed.gz"),
     log:
@@ -85,10 +85,10 @@ rule rd_correct:
             for rep_id in assay2rep_ids[wc.assay_type]
         ],
         sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
-        window_bed=config.get("window_bed", []),
+        window_bed=config.get("window_bed") or [],
         genome_size=config["genome_size"],
         region_bed=config["region_bed"],
-        blacklist_bed=config.get("blacklist_bed", []),
+        blacklist_bed=config.get("blacklist_bed") or [],
     output:
         dp_corrected=config["bb_dir"] + "/{assay_type}/window.dp.npz",
         window_df=config["bb_dir"] + "/{assay_type}/window.tsv.gz",
@@ -125,7 +125,7 @@ rule cnvkit_autobin:
         bam=lambda wc: branch(
             len(normal_bams) > 0, then=normal_bams[0], otherwise=tumor_bams[0]
         ),
-        targets_bed=config.get("wes_targets_bed", ""),
+        targets_bed=config.get("wes_targets_bed") or "",
         access_bed=config["region_bed"],
     output:
         target_bed=config["bb_dir"] + "/{assay_type}/cnvkit/targets.bed",
@@ -304,7 +304,7 @@ rule cnvkit_to_window_dp:
         ],
         sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
         region_bed=config["region_bed"],
-        blacklist_bed=config.get("blacklist_bed", []),
+        blacklist_bed=config.get("blacklist_bed") or [],
         genome_size=config["genome_size"],
     output:
         dp_corrected=config["bb_dir"] + "/{assay_type}/window.dp.npz",

@@ -19,7 +19,7 @@ rule combine_counts:
             config["phase_dir"] + "/genetic_map.tsv.gz" if require_genetic_map else []
         ),
         region_bed=lambda wc: config["region_bed"],
-        blacklist_bed=lambda wc: config.get("blacklist_bed", []),
+        blacklist_bed=lambda wc: config.get("blacklist_bed") or [],
         genome_size=lambda wc: config["genome_size"],
         gtf_file=lambda wc: config["gtf_file"],
     output:
