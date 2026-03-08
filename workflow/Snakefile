@@ -6,6 +6,23 @@ nonbulk_assays = {"scATAC", "scRNA", "VISIUM", "VISIUM3prime"}
 bulk_assays = {"bulkWGS", "bulkWES"}
 allowed_assay_types = list(bulk_assays) + list(nonbulk_assays)
 
+assay_type2modality = {
+    "bulkWGS": "DNA",
+    "bulkWES": "DNA",
+    "scATAC": "DNA",
+    "scRNA": "RNA",
+    "VISIUM": "RNA",
+    "VISIUM3prime": "RNA",
+}
+assay_type2feature_type = {
+    "bulkWGS": "unknown",
+    "bulkWES": "exon",
+    "scATAC": "tile",
+    "scRNA": "gene",
+    "VISIUM": "gene",
+    "VISIUM3prime": "gene",
+}
+
 # Allow parsing rule files without a real config (e.g., --conda-create-envs-only)
 _has_config = "workflow_mode" in config
 
@@ -47,25 +64,6 @@ if _has_config:
 
     uniq_sample_types = sample_df["sample_type"].unique().tolist()
     assert all(st in ["normal", "tumor"] for st in uniq_sample_types)
-
-    rep_ids = sample_df["REP_ID"].unique().tolist()
-    assay_types = sample_df["assay_type"].unique().tolist()
-    assay_type2modality = {
-        "bulkWGS": "DNA",
-        "bulkWES": "DNA",
-        "scATAC": "DNA",
-        "scRNA": "RNA",
-        "VISIUM": "RNA",
-        "VISIUM3prime": "RNA",
-    }
-    assay_type2feature_type = {
-        "bulkWGS": "unknown",
-        "bulkWES": "exon",
-        "scATAC": "tile",
-        "scRNA": "gene",
-        "VISIUM": "gene",
-        "VISIUM3prime": "gene",
-    }
     sample_df["modality"] = sample_df["assay_type"].map(assay_type2modality)
 
     if workflow_mode == "bulk_genotyping":
@@ -112,6 +110,8 @@ if _has_config:
     else:
         raise ValueError(f"unknown mode: {workflow_mode}")
 
+    rep_ids = sample_df["REP_ID"].unique().tolist()
+    assay_types = sample_df["assay_type"].unique().tolist()
     modalities = sample_df["modality"].unique().tolist()
     normal_bams = sample_df.loc[
         sample_df["sample_type"] == "normal", "PATH_to_bam"
@@ -254,9 +254,7 @@ if _has_config:
         default_target: True
 
 else:
-
-    # No config provided — expose conda envs for --conda-create-envs-only.
-    # Dummy rules must have outputs requested by rule all so they appear in the DAG.
+    # install conda env
     rule _conda_env_base:
         output:
             temp(".conda_env_base"),

@@ -4,45 +4,23 @@ A Snakemake pipeline for unified SNP genotyping, phasing, and allele counting ac
 
 ## Table of Contents
 
-- [Installation](#installation)
 - [Quick-Start](#quick-start)
 - [Workflow Overview](#workflow-overview)
 - [Documentation](#documentation)
 
 ---
 
-## Installation
+## Quick-Start
 
 Requires [conda](https://docs.conda.io/en/latest/) or [mamba](https://mamba.readthedocs.io/) and [Snakemake](https://snakemake.readthedocs.io/) >= 7.0.
 
-Setup environments, modify `profile/config.yaml` if required, all 
+Modify `profile/config.yaml` for system configuration and conda path, etc., and run the workflow:
+
 ```sh
 snakemake --profile profile/ --conda-create-envs-only --cores 1 \
-    -s workflow/Snakefile --conda-prefix /absolute/path
-```
+    -s workflow/Snakefile
 
-| Env file | Packages | Rules |
-|---|---|---|
-| `workflow/envs/base.yaml` | python, scipy, numpy, pandas, numba, scanpy, statsmodels | Python scripts |
-| `workflow/envs/tools.yaml` | bcftools, samtools, cellsnp-lite, mosdepth | Bioinformatics tools |
-| `workflow/envs/cnvkit.yaml` | cnvkit | WES depth correction |
-| `workflow/envs/snapatac2.yaml` | snapatac2, scanpy | ATAC fragment processing |
-
----
-
-## Quick-Start
-
-```sh
-# dry-run to check input files are formatted properly
-snakemake --cores 1 \
-    --dry-run \
-    --profile profile/ \
-    -s /path/to/workflow/Snakefile \
-    --configfile config/config.yaml \
-    --directory <output> \
-    --config sample_file=/path/to/sample_file.tsv sample_id=<PATIENT_ID>
-
-# run the pipeline
+# use `--dry-run` to check input files are formatted properly
 snakemake --cores <num_cores> \
     --profile profile/ \
     -s /path/to/workflow/Snakefile \
