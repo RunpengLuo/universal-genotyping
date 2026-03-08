@@ -8,26 +8,26 @@ channels:
 dependencies:
   - python>=3.10
   - snakemake
-  - cellsnp-lite
+  - cellsnp-lite>=1.2
   - bcftools>=1.19
   - samtools>=1.19
-  - mosdepth
-  - cnvkit
-  - scipy
-  - pandas
-  - numpy
+  - mosdepth>=0.3
+  - cnvkit>=0.9.9
+  - scipy>=1.7
+  - pandas>=1.5
+  - numpy>=1.21
   - tabix
   - pip
-  - pyranges
+  - pyranges>=0.0.120,<1.0
 
-  - matplotlib-base
-  - statsmodels
-  - pybedtools
-  - squidpy
-  - scanpy
-  - snapatac2
-  - numba
-  - anndata
+  - matplotlib-base>=3.5
+  - statsmodels>=0.13
+  - pybedtools>=0.9
+  - squidpy>=1.2
+  - scanpy>=1.9
+  - snapatac2>=2.3
+  - numba>=0.56
+  - anndata>=0.8
   # Optional: only needed for resources/scripts/convert_bam_visium3prime.py
   # - pysam
   # Optional: only needed for resources/scripts/build_window_bed.py --repliseq

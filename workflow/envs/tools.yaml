@@ -5,6 +5,6 @@ channels:
 dependencies:
   - bcftools>=1.19
   - samtools>=1.19
-  - cellsnp-lite
-  - mosdepth
+  - cellsnp-lite>=1.2
+  - mosdepth>=0.3
   - tabix
