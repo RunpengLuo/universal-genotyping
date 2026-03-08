@@ -6,12 +6,10 @@
 rule process_rna_anndata:
     input:
         barcodes=lambda wc: [
-            get_data[(wc.assay_type, rid)][0]
-            for rid in assay2rep_ids[wc.assay_type]
+            get_data[(wc.assay_type, rid)][0] for rid in assay2rep_ids[wc.assay_type]
         ],
         ranger_dirs=lambda wc: [
-            get_data[(wc.assay_type, rid)][2]
-            for rid in assay2rep_ids[wc.assay_type]
+            get_data[(wc.assay_type, rid)][2] for rid in assay2rep_ids[wc.assay_type]
         ],
         region_bed=lambda wc: config["region_bed"],
         genome_size=lambda wc: config["genome_size"],
@@ -47,12 +45,10 @@ rule process_rna_anndata:
 rule process_atac_fragments:
     input:
         barcodes=lambda wc: [
-            get_data[(wc.assay_type, rid)][0]
-            for rid in assay2rep_ids[wc.assay_type]
+            get_data[(wc.assay_type, rid)][0] for rid in assay2rep_ids[wc.assay_type]
         ],
         ranger_dirs=lambda wc: [
-            get_data[(wc.assay_type, rid)][2]
-            for rid in assay2rep_ids[wc.assay_type]
+            get_data[(wc.assay_type, rid)][2] for rid in assay2rep_ids[wc.assay_type]
         ],
         region_bed=lambda wc: config["region_bed"],
         genome_size=lambda wc: config["genome_size"],

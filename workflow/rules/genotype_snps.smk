@@ -10,8 +10,6 @@ snps/<chrom>.vcf.gz
 
 if workflow_mode == "bulk_genotyping":
 
-    # TODO genotyping tumor samples
-    # handle mulitple BAM files
     rule genotype_snps_bulk:
         input:
             bams=lambda wc: branch(

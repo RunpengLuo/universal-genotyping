@@ -1,5 +1,6 @@
 ##################################################
 
+
 rule phase_and_concat_bulk:
     input:
         vcfs=lambda wc: [
@@ -59,6 +60,7 @@ rule phase_and_concat_bulk:
 
 ##################################################
 
+
 rule phase_and_concat_single_cell:
     input:
         vcfs=lambda wc: [
@@ -82,8 +84,7 @@ rule phase_and_concat_single_cell:
             then=config["phase_dir"] + "/phased_het_snps.vcf.gz",
             otherwise=config["het_snp_vcf"],
         ),
-        h5ad_file=lambda wc: config["bb_dir"]
-        + "/{assay_type}/{assay_type}.h5ad",
+        h5ad_file=lambda wc: config["bb_dir"] + "/{assay_type}/{assay_type}.h5ad",
         region_bed=lambda wc: config["region_bed"],
         genome_size=lambda wc: config["genome_size"],
         gtf_file=lambda wc: config["gtf_file"],

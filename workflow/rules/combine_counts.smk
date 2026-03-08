@@ -7,26 +7,16 @@
 
 rule combine_counts:
     input:
-        # Corrected window depth (from rd_correct or cnvkit_to_window_dp)
-        dp_corrected=lambda wc: config["bb_dir"]
-        + f"/{wc.assay_type}/window.dp.npz",
-        window_df=lambda wc: config["bb_dir"]
-        + f"/{wc.assay_type}/window.tsv.gz",
-        # SNP data (from phase_and_concat_bulk)
+        dp_corrected=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/window.dp.npz",
+        window_df=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/window.tsv.gz",
         snp_info=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snps.tsv.gz",
         tot_mtx_snp=lambda wc: config["allele_dir"]
         + f"/{wc.assay_type}/snp.Tallele.npz",
-        a_mtx_snp=lambda wc: config["allele_dir"]
-        + f"/{wc.assay_type}/snp.Aallele.npz",
-        b_mtx_snp=lambda wc: config["allele_dir"]
-        + f"/{wc.assay_type}/snp.Ballele.npz",
-        sample_file=lambda wc: config["allele_dir"]
-        + f"/{wc.assay_type}/sample_ids.tsv",
-        # Reference
+        a_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Aallele.npz",
+        b_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Ballele.npz",
+        sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
         gmap_file=lambda wc: (
-            config["phase_dir"] + "/genetic_map.tsv.gz"
-            if require_genetic_map
-            else []
+            config["phase_dir"] + "/genetic_map.tsv.gz" if require_genetic_map else []
         ),
         region_bed=lambda wc: config["region_bed"],
         blacklist_bed=lambda wc: config.get("blacklist_bed", []),
@@ -48,7 +38,6 @@ rule combine_counts:
     params:
         sample_name=SAMPLE_ID,
         assay_type=lambda wc: wc.assay_type,
-        # Binning params
         nu=config["params_combine_counts"]["nu"],
         min_switchprob=config["params_combine_counts"]["min_switchprob"],
         max_switchprob=config["params_combine_counts"]["max_switchprob"],

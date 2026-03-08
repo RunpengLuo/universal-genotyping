@@ -38,12 +38,12 @@ if _has_config:
     assert all(
         at in allowed_assay_types for at in configured_assay_types
     ), f"unknown assay_types in config: {configured_assay_types}"
-    sample_df = sample_df.loc[sample_df["assay_type"].isin(configured_assay_types)].reset_index(
-        drop=True
-    )
-    assert len(sample_df) > 0, (
-        f"no rows with assay_type in {configured_assay_types} for sample_id={SAMPLE_ID}"
-    )
+    sample_df = sample_df.loc[
+        sample_df["assay_type"].isin(configured_assay_types)
+    ].reset_index(drop=True)
+    assert (
+        len(sample_df) > 0
+    ), f"no rows with assay_type in {configured_assay_types} for sample_id={SAMPLE_ID}"
 
     uniq_sample_types = sample_df["sample_type"].unique().tolist()
     assert all(st in ["normal", "tumor"] for st in uniq_sample_types)
@@ -69,9 +69,9 @@ if _has_config:
     sample_df["modality"] = sample_df["assay_type"].map(assay_type2modality)
 
     if workflow_mode == "bulk_genotyping":
-        sample_df = sample_df.loc[sample_df["assay_type"].isin(bulk_assays), :].reset_index(
-            drop=True
-        )
+        sample_df = sample_df.loc[
+            sample_df["assay_type"].isin(bulk_assays), :
+        ].reset_index(drop=True)
         assert len(sample_df) > 0, "no samples for bulk_genotyping mode"
         assert sample_df["assay_type"].nunique() == 1, (
             "bulk_genotyping mode requires all samples to have the same assay_type "
@@ -95,7 +95,9 @@ if _has_config:
         # validate per-replicate records
         for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
             rep_assay_types = rep_df["assay_type"].unique().tolist()
-            assert len(rep_assay_types) <= 2, "at most 2 data types allowed per replicate"
+            assert (
+                len(rep_assay_types) <= 2
+            ), "at most 2 data types allowed per replicate"
             if len(rep_assay_types) == 2:
                 assert ("scRNA" in rep_assay_types) and ("scATAC" in rep_assay_types)
         run_genotype_snps = True
@@ -114,7 +116,9 @@ if _has_config:
     normal_bams = sample_df.loc[
         sample_df["sample_type"] == "normal", "PATH_to_bam"
     ].to_list()
-    tumor_bams = sample_df.loc[sample_df["sample_type"] == "tumor", "PATH_to_bam"].to_list()
+    tumor_bams = sample_df.loc[
+        sample_df["sample_type"] == "tumor", "PATH_to_bam"
+    ].to_list()
 
     modality2bams = {}
     for modality, rows in sample_df.groupby("modality", sort=False):
@@ -210,16 +214,28 @@ if _has_config:
     if workflow_mode == "copytyping_preprocess":
         for assay_type in assay_types:
             final_targets += _bb_targets(
-                assay_type, ["cnv_segments.tsv", "X_count.npz", "Y_count.npz", "D_count.npz"]
+                assay_type,
+                ["cnv_segments.tsv", "X_count.npz", "Y_count.npz", "D_count.npz"],
             )
     else:
-        common_suffixes = ["bb.tsv.gz", "bb.Tallele.npz", "bb.Aallele.npz", "bb.Ballele.npz"]
+        common_suffixes = [
+            "bb.tsv.gz",
+            "bb.Tallele.npz",
+            "bb.Aallele.npz",
+            "bb.Ballele.npz",
+        ]
         for assay_type in assay_types:
-            final_targets += _bb_targets(assay_type, ["sample_ids.tsv"] + common_suffixes)
+            final_targets += _bb_targets(
+                assay_type, ["sample_ids.tsv"] + common_suffixes
+            )
             if assay_type in bulk_assays:
-                final_targets += _bb_targets(assay_type, ["bb.baf.npz", "bb.rdr.npz", "bb.depth.npz"])
+                final_targets += _bb_targets(
+                    assay_type, ["bb.baf.npz", "bb.rdr.npz", "bb.depth.npz"]
+                )
             else:
-                final_targets.append(config["allele_dir"] + f"/{assay_type}/barcodes.tsv.gz")
+                final_targets.append(
+                    config["allele_dir"] + f"/{assay_type}/barcodes.tsv.gz"
+                )
 
     ##################################################
     # entrypoint
@@ -238,27 +254,40 @@ if _has_config:
         default_target: True
 
 else:
+
     # No config provided — expose conda envs for --conda-create-envs-only.
     # Dummy rules must have outputs requested by rule all so they appear in the DAG.
     rule _conda_env_base:
-        output: temp(".conda_env_base")
-        conda: "envs/base.yaml"
-        shell: "touch {output}"
+        output:
+            temp(".conda_env_base"),
+        conda:
+            "envs/base.yaml"
+        shell:
+            "touch {output}"
 
     rule _conda_env_tools:
-        output: temp(".conda_env_tools")
-        conda: "envs/tools.yaml"
-        shell: "touch {output}"
+        output:
+            temp(".conda_env_tools"),
+        conda:
+            "envs/tools.yaml"
+        shell:
+            "touch {output}"
 
     rule _conda_env_cnvkit:
-        output: temp(".conda_env_cnvkit")
-        conda: "envs/cnvkit.yaml"
-        shell: "touch {output}"
+        output:
+            temp(".conda_env_cnvkit"),
+        conda:
+            "envs/cnvkit.yaml"
+        shell:
+            "touch {output}"
 
     rule _conda_env_snapatac2:
-        output: temp(".conda_env_snapatac2")
-        conda: "envs/snapatac2.yaml"
-        shell: "touch {output}"
+        output:
+            temp(".conda_env_snapatac2"),
+        conda:
+            "envs/snapatac2.yaml"
+        shell:
+            "touch {output}"
 
     rule all:
         input:
