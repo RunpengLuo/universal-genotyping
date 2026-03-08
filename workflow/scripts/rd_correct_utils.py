@@ -483,62 +483,97 @@ def correct_readcount_wes(reads, gc, is_target, mappability=None, min_mappabilit
     return corrected.astype(np.float32), gc_sse
 
 
-def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf, gc_sse=None):
-    """Two-page PDF: before/after GC correction KDE density plots.
+def _plot_cov_panel(ax, covariate, reads, xlabel, show_ylabel, rep_id,
+                    sse=None, is_before=False):
+    """KDE density scatter of readcov vs a covariate on a single axes."""
+    valid = (reads > 0) & np.isfinite(covariate)
+    if valid.sum() < 20:
+        ax.set_visible(False)
+        return
+    x, y = covariate[valid], reads[valid]
+    ylim = np.nanquantile(y, 0.99) * 1.1
+
+    n_pts = len(x)
+    rng = np.random.default_rng(0)
+    if n_pts > 20000:
+        idx = rng.choice(n_pts, size=20000, replace=False)
+        kde = gaussian_kde(np.vstack([x[idx], y[idx]]))
+    else:
+        kde = gaussian_kde(np.vstack([x, y]))
+
+    xgrid = np.linspace(x.min(), x.max(), 200)
+    ygrid = np.linspace(0, ylim * 1.5, 200)
+    xx, yy = np.meshgrid(xgrid, ygrid)
+    positions = np.vstack([xx.ravel(), yy.ravel()])
+    zz = kde(positions).reshape(xx.shape)
+
+    ax.pcolormesh(xx, yy, zz, shading="gouraud", cmap="Blues", rasterized=True)
+    ax.contour(
+        xx, yy, zz, levels=6, colors="steelblue", linewidths=0.5, alpha=0.5
+    )
+
+    mad = np.median(np.abs(y - np.median(y)))
+    r_pearson, _ = pearsonr(x, y)
+    r_spearman, _ = spearmanr(x, y)
+    metrics = f"MAD={mad:.2f}  r={r_pearson:.4f}  rho={r_spearman:.4f}"
+    if sse is not None and is_before:
+        metrics = f"SSE={sse:.1f}  " + metrics
+    logging.info(f"  {xlabel:<8s} {rep_id:<8s}: {metrics}")
+    ax.set_xlabel(xlabel)
+    if show_ylabel:
+        ax.set_ylabel("Observed Readcov")
+    ax.set_title(f"{rep_id}\n{metrics}", fontsize=8)
+    ax.set_xlim(x.min(), x.max())
+    ax.set_ylim(0, ylim * 1.1)
+
+
+def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf, gc_sse=None,
+                           mappability=None, repliseq=None):
+    """Two-page PDF: before/after correction KDE density plots.
+
+    Each page has up to 3 rows (GC, MAP, RT) x nsamples columns.
 
     Parameters
     ----------
     gc_sse : list of float or None
-        Per-sample SSE from the GC LOWESS fit. Shown on the "Before" panel only.
+        Per-sample SSE from the GC fit. Shown on the "Before" panel only.
+    mappability : np.ndarray or None
+        Per-window mappability values. If provided, a MAP row is added.
+    repliseq : np.ndarray or None
+        Per-window replication timing values. If provided, an RT row is added.
     """
     nsamples = len(rep_ids)
     panel_w = max(5, 5 * nsamples)
+
+    # Build list of (row_label, covariate, xlabel)
+    rows = [("GC", gc, "GC Content")]
+    if mappability is not None:
+        rows.append(("MAP", mappability, "Mappability"))
+    if repliseq is not None:
+        rows.append(("RT", repliseq, "Replication Timing"))
+    nrows = len(rows)
+
     is_before = True
-
     for title, dp_mat in [
-        ("Before GC Correction", dp_before),
-        ("After GC Correction", dp_after),
+        ("Before Correction", dp_before),
+        ("After Correction", dp_after),
     ]:
-        fig, axes = plt.subplots(1, nsamples, figsize=(panel_w, 5), squeeze=False)
-        for si, rep_id in enumerate(rep_ids):
-            ax = axes[0, si]
-            reads = dp_mat[:, si]
-            valid = (reads > 0) & np.isfinite(gc)
-            x, y = gc[valid], reads[valid]
-            ylim = np.nanquantile(y, 0.99) * 1.1
-
-            n_pts = len(x)
-            rng = np.random.default_rng(0)
-            if n_pts > 20000:
-                idx = rng.choice(n_pts, size=20000, replace=False)
-                kde = gaussian_kde(np.vstack([x[idx], y[idx]]))
-            else:
-                kde = gaussian_kde(np.vstack([x, y]))
-
-            xgrid = np.linspace(x.min(), x.max(), 200)
-            ygrid = np.linspace(0, ylim * 1.5, 200)
-            xx, yy = np.meshgrid(xgrid, ygrid)
-            positions = np.vstack([xx.ravel(), yy.ravel()])
-            zz = kde(positions).reshape(xx.shape)
-
-            ax.pcolormesh(xx, yy, zz, shading="gouraud", cmap="Blues", rasterized=True)
-            ax.contour(
-                xx, yy, zz, levels=6, colors="steelblue", linewidths=0.5, alpha=0.5
-            )
-
-            mad = np.median(np.abs(y - np.median(y)))
-            r_pearson, _ = pearsonr(x, y)
-            r_spearman, _ = spearmanr(x, y)
-            metrics = f"MAD={mad:.2f}  r={r_pearson:.4f}  rho={r_spearman:.4f}"
-            if gc_sse is not None and is_before:
-                metrics = f"SSE={gc_sse[si]:.1f}  " + metrics
-            logging.info(f"  {title:<24s} {rep_id:<8s}: {metrics}")
-            ax.set_xlabel("GC Content")
-            if si == 0:
-                ax.set_ylabel("Observed Readcov")
-            ax.set_title(f"{rep_id}\n{metrics}", fontsize=8)
-            ax.set_xlim(x.min(), x.max())
-            ax.set_ylim(0, ylim * 1.1)
+        fig, axes = plt.subplots(
+            nrows, nsamples, figsize=(panel_w, 5 * nrows), squeeze=False,
+        )
+        for ri, (row_label, covariate, xlabel) in enumerate(rows):
+            for si, rep_id in enumerate(rep_ids):
+                sse = gc_sse[si] if (gc_sse is not None and row_label == "GC") else None
+                _plot_cov_panel(
+                    axes[ri, si],
+                    covariate,
+                    dp_mat[:, si],
+                    xlabel,
+                    show_ylabel=(si == 0),
+                    rep_id=rep_id,
+                    sse=sse,
+                    is_before=is_before,
+                )
         fig.suptitle(title, fontsize=14)
         plt.tight_layout()
         pdf.savefig(fig, dpi=150)

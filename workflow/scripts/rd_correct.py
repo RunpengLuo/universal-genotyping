@@ -235,7 +235,10 @@ else:
 log_nan_summary("corrected depth", dp_corrected, rep_ids, n_windows)
 
 pdf = PdfPages(os.path.join(qc_dir, "rd_correct.pdf"))
-plot_gc_correction_pdf(gc_vals, dp_raw, dp_corrected, rep_ids, pdf, gc_sse=gc_sse_list)
+plot_gc_correction_pdf(
+    gc_vals, dp_raw, dp_corrected, rep_ids, pdf,
+    gc_sse=gc_sse_list, mappability=map_vals, repliseq=repli_vals,
+)
 pdf.close()
 
 rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0) * 1.1
