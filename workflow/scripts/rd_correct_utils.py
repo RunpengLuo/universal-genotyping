@@ -77,8 +77,23 @@ def correct_readcount(
         _, idx = np.unique(xy[:, 0], return_index=True)
         return xy[idx]
 
+    def _dedup_input(y, x):
+        """Average y-values for duplicate x-values to avoid degenerate
+        local regressions (division by zero) inside LOWESS."""
+        ux, inv = np.unique(x, return_inverse=True)
+        if len(ux) == len(x):
+            return y, x
+        uy = np.zeros(len(ux), dtype=np.float64)
+        np.add.at(uy, inv, y)
+        counts = np.bincount(inv).astype(np.float64)
+        uy /= counts
+        return uy, ux
+
     def _fit_lowess_interp(y, x, grid):
         """Tight LOWESS -> grid smooth -> final interpolator."""
+        y, x = _dedup_input(y, x)
+        if len(x) < 2:
+            return None
         s1 = lowess(y, x, frac=lowess_frac_tight, return_sorted=True)
         s1 = _dedup_sorted(s1)
         if len(s1) < 2:
