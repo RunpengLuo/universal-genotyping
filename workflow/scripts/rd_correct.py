@@ -31,6 +31,7 @@ from count_reads_utils import (
 )
 from rd_correct_utils import (
     correct_readcount,
+    correct_readcount_median,
     correct_readcount_wes,
     plot_gc_correction_pdf,
 )
@@ -59,6 +60,7 @@ routlier = float(sm.params["routlier"])
 doutlier = float(sm.params["doutlier"])
 min_mappability = float(sm.params["min_mappability"])
 gc_correct = bool(sm.params["gc_correct"])
+gc_correct_method = str(sm.params.get("gc_correct_method", "lowess"))
 rt_correct = bool(sm.params["rt_correct"])
 
 qc_dir = sm.output["qc_dir"]
@@ -113,6 +115,17 @@ logging.info(
 dp_raw = np.zeros((n_windows, nsamples), dtype=np.float32)
 for i, mos_df in enumerate(mos_dfs):
     dp_raw[:, i] = mos_df["DEPTH"].to_numpy(dtype=np.float32)
+
+# ---------------------------------------------------------------------------
+# Load SNP allele matrices (for future neutral-bin identification)
+# ---------------------------------------------------------------------------
+snps = pd.read_table(sm.input["snp_info"], sep="\t")
+tot_mtx_snp = np.load(sm.input["tot_mtx_snp"])["mat"].astype(np.int32)
+a_mtx_snp = np.load(sm.input["a_mtx_snp"])["mat"].astype(np.int32)
+b_mtx_snp = np.load(sm.input["b_mtx_snp"])["mat"].astype(np.int32)
+logging.info(
+    f"loaded {len(snps)} SNPs, allele matrices shape={tot_mtx_snp.shape}"
+)
 
 gc_vals = win_df["GC"].to_numpy()
 
@@ -184,6 +197,19 @@ if gc_correct:
                 gc_vals,
                 is_target,
                 mappability=map_vals,
+                min_mappability=min_mappability,
+            )
+            gc_sse_list.append(gc_sse)
+    elif gc_correct_method == "median":
+        logging.info("applying correct_readcount_median per sample")
+        for i, rep_id in enumerate(rep_ids):
+            logging.info(f"correcting {rep_id}")
+            dp_corrected[:, i], gc_sse = correct_readcount_median(
+                dp_raw[:, i],
+                gc_vals,
+                mappability=map_vals,
+                repliseq=repli_vals,
+                doutlier=doutlier,
                 min_mappability=min_mappability,
             )
             gc_sse_list.append(gc_sse)

@@ -119,6 +119,8 @@ params_mosdepth:
 params_count_reads:
   # true | false
   gc_correct: true
+  # lowess | median
+  gc_correct_method: lowess
   # true | false
   rt_correct: true
   samplesize: 50000

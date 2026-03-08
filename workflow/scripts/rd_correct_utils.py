@@ -227,6 +227,92 @@ def correct_readcount(
     return cor.astype(np.float32), gc_sse
 
 
+def correct_readcount_median(
+    reads,
+    gc,
+    mappability=None,
+    repliseq=None,
+    doutlier=0.001,
+    min_mappability=0.9,
+    eps_quantile=0.01,
+):
+    """Quadratic median quantile regression GC correction.
+
+    Fits RD ~ GC + GC**2 via median quantile regression on valid bins,
+    then divides raw depth by predicted and rescales to preserve median.
+    Mappability is used as a filter (not a covariate).
+    Replication timing correction is not yet implemented (TODO).
+
+    Returns
+    -------
+    np.ndarray
+        Corrected read counts. NaN where correction is not possible.
+    float
+        SSE from the GC fit.
+    """
+    import pandas as pd
+    import statsmodels.formula.api as smf
+
+    reads = reads.astype(np.float64)
+    n = len(reads)
+
+    gc_lo = np.nanquantile(gc, doutlier)
+    gc_hi = np.nanquantile(gc, 1.0 - doutlier)
+
+    # Filter: positive depth, GC in range, sufficient mappability
+    valid = (reads > 0) & np.isfinite(gc) & (gc >= gc_lo) & (gc <= gc_hi)
+    if mappability is not None:
+        valid &= mappability >= min_mappability
+
+    if repliseq is not None:
+        logging.info("    MEDIAN: RT correction not yet implemented; ignoring repliseq")
+
+    # Build fitting DataFrame — GC-only regression
+    fit_df = pd.DataFrame({"RD": reads[valid], "GC": gc[valid]})
+    pred_df = pd.DataFrame({"GC": gc})
+    formula = "RD ~ GC + I(GC**2)"
+
+    n_fit = len(fit_df)
+    logging.info(f"    MEDIAN  {n_fit:>8d}/{n} fitting bins, formula: {formula}")
+
+    if n_fit < 10:
+        logging.warning("    MEDIAN: too few fitting bins; skipping correction")
+        return reads.astype(np.float32), 0.0
+
+    res = smf.quantreg(formula, data=fit_df).fit(q=0.5)
+    predicted = res.predict(pred_df).to_numpy()
+
+    # SSE between raw and predicted at valid bins
+    all_valid = (reads > 0) & np.isfinite(gc)
+    sse = float(np.sum((reads[all_valid] - predicted[all_valid]) ** 2))
+
+    # Correct: divide raw by predicted, clip predicted floor
+    eps = (
+        np.nanquantile(predicted[predicted > 0], eps_quantile)
+        if (predicted > 0).any()
+        else 1.0
+    )
+    den = np.clip(np.nan_to_num(predicted, nan=eps), eps, None)
+
+    with np.errstate(invalid="ignore", divide="ignore"):
+        corrected = np.where(reads > 0, reads / den, np.nan)
+
+    # Set bins below mappability threshold to NaN
+    if mappability is not None:
+        corrected[mappability < min_mappability] = np.nan
+
+    # Rescale to preserve median of valid bins
+    valid_corr = np.isfinite(corrected) & (reads > 0)
+    if valid_corr.any():
+        scale = np.median(reads[valid_corr]) / np.median(corrected[valid_corr])
+        corrected[valid_corr] *= scale
+
+    n_nan = int(np.isnan(corrected).sum())
+    logging.info(f"    MEDIAN  {n_nan:>8d}/{n} ({n_nan / max(n, 1) * 100:5.1f}%) NaN")
+
+    return corrected.astype(np.float32), sse
+
+
 def _rolling_median(x, fraction):
     """Rolling median with mirrored edge padding.
 

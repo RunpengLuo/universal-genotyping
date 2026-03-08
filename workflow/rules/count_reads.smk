@@ -80,6 +80,10 @@ rule rd_correct:
         genome_size=config["genome_size"],
         region_bed=config["region_bed"],
         blacklist_bed=config.get("blacklist_bed") or [],
+        snp_info=config["allele_dir"] + "/{assay_type}/snps.tsv.gz",
+        tot_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Tallele.npz",
+        a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
+        b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
     output:
         dp_corrected=config["bb_dir"] + "/{assay_type}/window.dp.npz",
         window_df=config["bb_dir"] + "/{assay_type}/window.tsv.gz",
@@ -95,6 +99,7 @@ rule rd_correct:
         doutlier=_rdr_cfg.get("doutlier", 0.001),
         min_mappability=_rdr_cfg.get("min_mappability", 0.9),
         gc_correct=_rdr_cfg.get("gc_correct", True),
+        gc_correct_method=_rdr_cfg.get("gc_correct_method", "lowess"),
         rt_correct=_rdr_cfg.get("rt_correct", False),
         assay_type=lambda wc: wc.assay_type,
     log:
