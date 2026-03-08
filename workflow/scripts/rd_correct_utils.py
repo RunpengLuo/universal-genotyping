@@ -487,7 +487,7 @@ def correct_readcount_wes(reads, gc, is_target, mappability=None, min_mappabilit
 
 
 def _plot_cov_panel(ax, covariate, reads, xlabel, show_ylabel, rep_id,
-                    rmse=None, is_before=False):
+                    rmse=None, is_before=False, xlim=None, xticks=None):
     """KDE density scatter of readcov vs a covariate on a single axes."""
     valid = (reads > 0) & np.isfinite(covariate)
     if valid.sum() < 20:
@@ -504,7 +504,9 @@ def _plot_cov_panel(ax, covariate, reads, xlabel, show_ylabel, rep_id,
     else:
         kde = gaussian_kde(np.vstack([x, y]))
 
-    xgrid = np.linspace(x.min(), x.max(), 200)
+    xlo = xlim[0] if xlim is not None else x.min()
+    xhi = xlim[1] if xlim is not None else x.max()
+    xgrid = np.linspace(xlo, xhi, 200)
     ygrid = np.linspace(0, ylim * 1.5, 200)
     xx, yy = np.meshgrid(xgrid, ygrid)
     positions = np.vstack([xx.ravel(), yy.ravel()])
@@ -526,7 +528,12 @@ def _plot_cov_panel(ax, covariate, reads, xlabel, show_ylabel, rep_id,
     if show_ylabel:
         ax.set_ylabel("Observed Readcov")
     ax.set_title(f"{rep_id}\n{metrics}", fontsize=8)
-    ax.set_xlim(x.min(), x.max())
+    if xlim is not None:
+        ax.set_xlim(*xlim)
+    else:
+        ax.set_xlim(x.min(), x.max())
+    if xticks is not None:
+        ax.set_xticks(xticks)
     ax.set_ylim(0, ylim * 1.1)
 
 
@@ -567,6 +574,9 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf, gc_rmse=None,
         for ri, (row_label, covariate, xlabel) in enumerate(rows):
             for si, rep_id in enumerate(rep_ids):
                 rmse = gc_rmse[si] if (gc_rmse is not None and row_label == "GC") else None
+                kw = {}
+                if row_label == "MAP":
+                    kw = {"xlim": (-0.2, 1.2), "xticks": np.arange(0, 1.1, 0.2)}
                 _plot_cov_panel(
                     axes[ri, si],
                     covariate,
@@ -576,6 +586,7 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf, gc_rmse=None,
                     rep_id=rep_id,
                     rmse=rmse,
                     is_before=is_before,
+                    **kw,
                 )
         fig.suptitle(title, fontsize=14)
         plt.tight_layout()
