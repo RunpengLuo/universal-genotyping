@@ -71,10 +71,11 @@ params_cellsnp_lite:
   minCOUNT_pileup: 1
 
 params_bcftools:
-  min_mapq: 0
-  min_baseq: 11
+  min_mapq: 20
+  min_baseq: 20
   min_dp: 5
   max_depth: 300
+  min_qual: 30
 
 ##################################################
 # Annotate SNP genotypes (single_cell_genotyping)
@@ -157,9 +158,9 @@ params_cnvkit:
 
 ##################################################
 threads:
-  genotype: 8
-  phase: 2
-  pileup: 16
+  genotype: 4
+  phase: 4
+  pileup: 8
   postprocess: 2
-  mosdepth: 16
+  mosdepth: 4
   cnvkit: 4

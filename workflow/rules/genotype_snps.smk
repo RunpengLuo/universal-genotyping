@@ -19,6 +19,7 @@ if workflow_mode == "bulk_genotyping":
             reference=config["reference"],
         output:
             snp_vcf=config["snp_dir"] + "/chr{chrname}.vcf.gz",
+            unfiltered_vcf=temp(config["snp_dir"] + "/chr{chrname}.unfiltered.vcf.gz"),
         log:
             config["log_dir"] + "/genotype_snps_bulk/chr{chrname}.log",
         threads: config["threads"]["genotype"]
@@ -29,6 +30,7 @@ if workflow_mode == "bulk_genotyping":
             min_baseq=config["params_bcftools"]["min_baseq"],
             min_dp=config["params_bcftools"]["min_dp"],
             max_depth=config["params_bcftools"]["max_depth"],
+            min_qual=config["params_bcftools"]["min_qual"],
         conda:
             "../envs/tools.yaml"
         shell:
@@ -36,16 +38,24 @@ if workflow_mode == "bulk_genotyping":
             {params.bcftools} mpileup {input.bams} \
                 -f "{input.reference}" \
                 -Ou \
+                --threads {threads} \
                 -a INFO/AD,AD,DP \
                 --skip-indels \
                 -q {params.min_mapq} \
                 -Q {params.min_baseq} \
                 -d {params.max_depth} \
                 -T {input.target_pos} \
-            | {params.bcftools} call -m -Ou \
-            | {params.bcftools} view -v snps -m2 -M2 \
-                -i 'GT="alt" && FMT/DP>={params.min_dp}' \
-                -Oz -o {output.snp_vcf} > {log} 2>&1
+            | {params.bcftools} call -m \
+                -Oz -o {output.unfiltered_vcf} 2> {log}
+
+            TOTAL=$({params.bcftools} view -H {output.unfiltered_vcf} | wc -l | tr -d ' ')
+
+            {params.bcftools} view {output.unfiltered_vcf} -v snps -m2 -M2 \
+                -i 'QUAL>={params.min_qual} && GT="alt" && FMT/DP>={params.min_dp}' \
+                -Oz -o {output.snp_vcf} 2>> {log}
+
+            PASS=$({params.bcftools} view -H {output.snp_vcf} | wc -l | tr -d ' ')
+            echo "Total called: $TOTAL, Passed filters: $PASS, Filtered: $((TOTAL - PASS))" >> {log}
 
             tabix -p vcf {output.snp_vcf}
             """
