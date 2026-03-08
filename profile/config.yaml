@@ -1,3 +1,2 @@
 use-conda: true
 conda-prefix: .snakemake/conda
-conda-frontend: mamba

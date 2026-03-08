@@ -11,7 +11,7 @@ snakemake --cores <N> \
     --config sample_file=/path/to/samples.tsv sample_id=<PATIENT_ID>
 ```
 
-`sample_id` must match a `SAMPLE` value in the sample sheet. `--profile profile/` enables per-rule conda envs and mamba.
+`sample_id` must match a `SAMPLE` value in the sample sheet. `--profile profile/` enables per-rule conda envs.
 
 ---
 
