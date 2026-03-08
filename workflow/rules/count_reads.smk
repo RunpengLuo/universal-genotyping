@@ -57,24 +57,15 @@ rule run_mosdepth:
         config["log_dir"] + "/run_mosdepth/run_mosdepth.{assay_type}_{rep_id}.log",
     conda:
         "../envs/tools.yaml"
-    run:
-        import subprocess
-
-        cmd = [
-            str(params.mosdepth),
-            "-t",
-            str(threads),
-            "-Q",
-            str(params.read_quality),
-            "--by",
-            str(input.windows_bed),
-        ]
-        if params.extra_params:
-            cmd.extend(params.extra_params.split())
-        cmd.extend([str(params.out_prefix), str(input.bam)])
-
-        with open(str(log[0]), "w") as fh:
-            subprocess.check_call(cmd, stdout=fh, stderr=subprocess.STDOUT)
+    shell:
+        r"""
+        {params.mosdepth} \
+            -t {threads} \
+            -Q {params.read_quality} \
+            --by {input.windows_bed} \
+            {params.extra_params} \
+            {params.out_prefix} {input.bam} > {log} 2>&1
+        """
 
 
 rule rd_correct:
@@ -135,41 +126,31 @@ rule cnvkit_autobin:
     params:
         cnvkit=_cnvkit_exe,
         reference=config["reference"],
-        cfg=_cnvkit_cfg,
+        extra_flags=cli_flags_str(
+            _cnvkit_cfg,
+            ("method", "--method"),
+            ("bp_per_bin", "--bp-per-bin"),
+            ("target_max_size", "--target-max-size"),
+            ("target_min_size", "--target-min-size"),
+            ("antitarget_max_size", "--antitarget-max-size"),
+            ("antitarget_min_size", "--antitarget-min-size"),
+            ("annotate", "--annotate"),
+            ("short_names", "--short-names", True),
+        ),
     log:
         config["log_dir"] + "/cnvkit_autobin.{assay_type}.log",
     conda:
         "../envs/cnvkit.yaml"
-    run:
-        import subprocess
-
-        cmd = [
-            str(params.cnvkit),
-            "autobin",
-            str(input.bam),
-            "-t",
-            str(input.targets_bed),
-            "-g",
-            str(input.access_bed),
-            "-f",
-            str(params.reference),
-            "--target-output-bed",
-            str(output.target_bed),
-            "--antitarget-output-bed",
-            str(output.antitarget_bed),
-        ]
-        cfg = params.cfg
-        cmd += cli_flag(cfg, "method", "--method")
-        cmd += cli_flag(cfg, "bp_per_bin", "--bp-per-bin")
-        cmd += cli_flag(cfg, "target_max_size", "--target-max-size")
-        cmd += cli_flag(cfg, "target_min_size", "--target-min-size")
-        cmd += cli_flag(cfg, "antitarget_max_size", "--antitarget-max-size")
-        cmd += cli_flag(cfg, "antitarget_min_size", "--antitarget-min-size")
-        cmd += cli_flag(cfg, "annotate", "--annotate")
-        cmd += cli_flag(cfg, "short_names", "--short-names", is_bool=True)
-
-        with open(str(log[0]), "w") as fh:
-            subprocess.check_call(cmd, stdout=fh, stderr=subprocess.STDOUT)
+    shell:
+        r"""
+        {params.cnvkit} autobin {input.bam} \
+            -t {input.targets_bed} \
+            -g {input.access_bed} \
+            -f {params.reference} \
+            --target-output-bed {output.target_bed} \
+            --antitarget-output-bed {output.antitarget_bed} \
+            {params.extra_flags} > {log} 2>&1
+        """
 
 
 rule cnvkit_coverage:
@@ -184,31 +165,19 @@ rule cnvkit_coverage:
         region_type="(target|antitarget)",
     params:
         cnvkit=_cnvkit_exe,
-        reference=config["reference"],
-        cfg=_cnvkit_cfg,
+        extra_flags=cli_flags_str(_cnvkit_cfg, ("min_mapq", "-q")),
     threads: _cnvkit_threads
     log:
         config["log_dir"] + "/cnvkit_coverage.{assay_type}_{rep_id}.{region_type}.log",
     conda:
         "../envs/cnvkit.yaml"
-    run:
-        import subprocess
-
-        cmd = [
-            str(params.cnvkit),
-            "coverage",
-            str(input.bam),
-            str(input.interval),
-            "-o",
-            str(output.cnn),
-            "-p",
-            str(threads),
-        ]
-        cfg = params.cfg
-        cmd += cli_flag(cfg, "min_mapq", "-q")
-
-        with open(str(log[0]), "w") as fh:
-            subprocess.check_call(cmd, stdout=fh, stderr=subprocess.STDOUT)
+    shell:
+        r"""
+        {params.cnvkit} coverage {input.bam} {input.interval} \
+            -o {output.cnn} \
+            -p {threads} \
+            {params.extra_flags} > {log} 2>&1
+        """
 
 
 rule cnvkit_reference:
@@ -230,30 +199,25 @@ rule cnvkit_reference:
     params:
         cnvkit=_cnvkit_exe,
         reference=config["reference"],
-        cfg=_cnvkit_cfg,
+        extra_flags=cli_flags_str(
+            _cnvkit_cfg,
+            ("no_gc", "--no-gc", True),
+            ("no_edge", "--no-edge", True),
+            ("no_rmask", "--no-rmask", True),
+            ("male_reference", "--male-reference", True),
+            ("cluster", "--cluster", True),
+        ),
     log:
         config["log_dir"] + "/cnvkit_reference.{assay_type}.log",
     conda:
         "../envs/cnvkit.yaml"
-    run:
-        import subprocess
-
-        cmd = [
-            str(params.cnvkit),
-            "reference",
-        ]
-        cmd += [str(f) for f in input.normal_cnn]
-        cmd += ["-f", str(params.reference)]
-        cmd += ["-o", str(output.reference_cnn)]
-        cfg = params.cfg
-        cmd += cli_flag(cfg, "no_gc", "--no-gc", is_bool=True)
-        cmd += cli_flag(cfg, "no_edge", "--no-edge", is_bool=True)
-        cmd += cli_flag(cfg, "no_rmask", "--no-rmask", is_bool=True)
-        cmd += cli_flag(cfg, "male_reference", "--male-reference", is_bool=True)
-        cmd += cli_flag(cfg, "cluster", "--cluster", is_bool=True)
-
-        with open(str(log[0]), "w") as fh:
-            subprocess.check_call(cmd, stdout=fh, stderr=subprocess.STDOUT)
+    shell:
+        r"""
+        {params.cnvkit} reference {input.normal_cnn} \
+            -f {params.reference} \
+            -o {output.reference_cnn} \
+            {params.extra_flags} > {log} 2>&1
+        """
 
 
 rule cnvkit_fix:
@@ -269,30 +233,22 @@ rule cnvkit_fix:
         assay_type="bulkWES",
     params:
         cnvkit=_cnvkit_exe,
-        cfg=_cnvkit_cfg,
+        extra_flags=cli_flags_str(
+            _cnvkit_cfg,
+            ("no_gc", "--no-gc", True),
+            ("no_edge", "--no-edge", True),
+            ("no_rmask", "--no-rmask", True),
+        ),
     log:
         config["log_dir"] + "/cnvkit_fix.{assay_type}_{rep_id}.log",
     conda:
         "../envs/cnvkit.yaml"
-    run:
-        import subprocess
-
-        cmd = [
-            str(params.cnvkit),
-            "fix",
-            str(input.target_cnn),
-            str(input.antitarget_cnn),
-            str(input.reference_cnn),
-            "-o",
-            str(output.cnr),
-        ]
-        cfg = params.cfg
-        cmd += cli_flag(cfg, "no_gc", "--no-gc", is_bool=True)
-        cmd += cli_flag(cfg, "no_edge", "--no-edge", is_bool=True)
-        cmd += cli_flag(cfg, "no_rmask", "--no-rmask", is_bool=True)
-
-        with open(str(log[0]), "w") as fh:
-            subprocess.check_call(cmd, stdout=fh, stderr=subprocess.STDOUT)
+    shell:
+        r"""
+        {params.cnvkit} fix {input.target_cnn} {input.antitarget_cnn} {input.reference_cnn} \
+            -o {output.cnr} \
+            {params.extra_flags} > {log} 2>&1
+        """
 
 
 rule cnvkit_to_window_dp:
