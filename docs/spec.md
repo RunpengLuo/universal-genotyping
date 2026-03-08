@@ -58,3 +58,23 @@ One subdirectory per `{assay_type}_{rep_id}` with cellsnp-lite output.
 ### QC (`qc_dir/`)
 
 Plots from bias correction and binning steps, organized under `qc_dir/{assay_type}/`.
+
+---
+
+## Key TSV Columns
+
+### `snps.tsv.gz`
+
+`#CHR`, `POS`, `POS0`, `START`, `END`, `GT`, `PHASE` (0 = B-allele is ALT, 1 = B-allele is REF), `region_id`, `feature_id`, `feature_type` (exon/intron/intergenic).
+
+### `bb.tsv.gz`
+
+`#CHR`, `START`, `END`, `START0`, `END0`, `switchprobs`, `region_id`, `PS`, `#SNPS`, `BLOCKSIZE`, `feature_id`, `feature_type`, `bb_id`.
+
+### `sample_ids.tsv`
+
+`SAMPLE`, `SAMPLE_NAME`, `REP_ID`, `sample_type`.
+
+### `barcodes.tsv.gz`
+
+Single column, no header. Each row: `{BARCODE}_{REP_ID}`.
