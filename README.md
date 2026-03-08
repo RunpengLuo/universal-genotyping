@@ -4,21 +4,39 @@ A Snakemake pipeline for unified SNP genotyping, phasing, and allele counting ac
 
 ## Table of Contents
 
+- [Installation](#installation)
 - [Quick-Start](#quick-start)
 - [Workflow Overview](#workflow-overview)
 - [Documentation](#documentation)
 
 ---
 
+## Installation
+
+Requires [conda](https://docs.conda.io/en/latest/) or [mamba](https://mamba.readthedocs.io/) and [Snakemake](https://snakemake.readthedocs.io/) >= 7.0.
+
+Setup environments, modify `profile/config.yaml` if required, all 
+```sh
+snakemake --profile profile/ --conda-create-envs-only --cores 1 \
+    -s workflow/Snakefile --conda-prefix /absolute/path
+```
+
+| Env file | Packages | Rules |
+|---|---|---|
+| `workflow/envs/base.yaml` | python, scipy, numpy, pandas, numba, scanpy, statsmodels | Python scripts |
+| `workflow/envs/tools.yaml` | bcftools, samtools, cellsnp-lite, mosdepth | Bioinformatics tools |
+| `workflow/envs/cnvkit.yaml` | cnvkit | WES depth correction |
+| `workflow/envs/snapatac2.yaml` | snapatac2, scanpy | ATAC fragment processing |
+
+---
+
 ## Quick-Start
 
 ```sh
-mamba env create -f ./environment.yaml -p /path/to/envs/genotyping_env
-conda activate /path/to/envs/genotyping_env
-
 # dry-run to check input files are formatted properly
 snakemake --cores 1 \
     --dry-run \
+    --profile profile/ \
     -s /path/to/workflow/Snakefile \
     --configfile config/config.yaml \
     --directory <output> \
@@ -26,6 +44,7 @@ snakemake --cores 1 \
 
 # run the pipeline
 snakemake --cores <num_cores> \
+    --profile profile/ \
     -s /path/to/workflow/Snakefile \
     --configfile config/config.yaml \
     --directory <output> \

@@ -13,7 +13,7 @@ _rdr_cfg = config.get("params_count_reads", {})
 rule window_bed_to_3bed:
     """Extract headerless 3-column BED from window_bed for mosdepth --by."""
     input:
-        window_bed=config.get("window_bed", ""),
+        window_bed=config.get("window_bed", []),
     output:
         mosdepth_bed=temp(config["bb_dir"] + "/windows.bed.gz"),
     log:
@@ -85,7 +85,7 @@ rule rd_correct:
             for rep_id in assay2rep_ids[wc.assay_type]
         ],
         sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
-        window_bed=config.get("window_bed", ""),
+        window_bed=config.get("window_bed", []),
         genome_size=config["genome_size"],
         region_bed=config["region_bed"],
         blacklist_bed=config.get("blacklist_bed", []),
