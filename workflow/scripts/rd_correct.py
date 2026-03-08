@@ -170,25 +170,28 @@ else:
 # ---------------------------------------------------------------------------
 # Bias correction (separate for target / antitarget when WES)
 # ---------------------------------------------------------------------------
+gc_sse_list = None
 if gc_correct:
     dp_corrected = np.zeros_like(dp_raw, dtype=np.float32)
+    gc_sse_list = []
 
     if assay_type == "bulkWES":
         logging.info("applying correct_readcount_wes per sample")
         for i, rep_id in enumerate(rep_ids):
             logging.info(f"  correcting {rep_id}")
-            dp_corrected[:, i] = correct_readcount_wes(
+            dp_corrected[:, i], gc_sse = correct_readcount_wes(
                 dp_raw[:, i],
                 gc_vals,
                 is_target,
                 mappability=map_vals,
                 min_mappability=min_mappability,
             )
+            gc_sse_list.append(gc_sse)
     else:
         logging.info("applying correct_readcount per sample")
         for i, rep_id in enumerate(rep_ids):
             logging.info(f"correcting {rep_id}")
-            dp_corrected[:, i] = correct_readcount(
+            dp_corrected[:, i], gc_sse = correct_readcount(
                 dp_raw[:, i],
                 gc_vals,
                 mappability=map_vals,
@@ -198,6 +201,7 @@ if gc_correct:
                 doutlier=doutlier,
                 min_mappability=min_mappability,
             )
+            gc_sse_list.append(gc_sse)
 else:
     logging.info("gc_correct=False; skipping bias correction")
     dp_corrected = dp_raw.copy()
@@ -205,7 +209,7 @@ else:
 log_nan_summary("corrected depth", dp_corrected, rep_ids, n_windows)
 
 pdf = PdfPages(os.path.join(qc_dir, "rd_correct.pdf"))
-plot_gc_correction_pdf(gc_vals, dp_raw, dp_corrected, rep_ids, pdf)
+plot_gc_correction_pdf(gc_vals, dp_raw, dp_corrected, rep_ids, pdf, gc_sse=gc_sse_list)
 pdf.close()
 
 rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0) * 1.1

@@ -8,7 +8,7 @@ import logging
 import numpy as np
 from scipy.interpolate import interp1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
-from scipy.stats import pearsonr, gaussian_kde
+from scipy.stats import pearsonr, spearmanr, gaussian_kde
 
 import matplotlib
 
@@ -67,6 +67,9 @@ def correct_readcount(
     np.ndarray
         Corrected read counts (same length as *reads*).  NaN where
         correction is not possible.
+    float
+        SSE from the GC LOWESS fit (sum of squared residuals between raw
+        depth and LOWESS prediction at valid bins).
     """
     reads = reads.astype(np.float64)
     n = len(reads)
@@ -127,7 +130,7 @@ def correct_readcount(
         stage_name="",
         extra_ideal_mask=None,
     ):
-        """Apply one LOWESS correction stage and return corrected values."""
+        """Apply one LOWESS correction stage and return (corrected, sse)."""
         valid = (prev > 0) & np.isfinite(covariate)
         val_hi = np.nanquantile(prev[valid], 1.0 - routlier)
         ideal = valid & (prev <= val_hi) & (covariate >= cov_lo) & (covariate <= cov_hi)
@@ -139,7 +142,7 @@ def correct_readcount(
             logging.warning(
                 f"    {stage_name}: only {ideal_idx.size} ideal bins; skipping correction"
             )
-            return prev.copy()
+            return prev.copy(), 0.0
         if ideal_idx.size > samplesize:
             rng = np.random.default_rng(seed)
             ideal_idx = rng.choice(ideal_idx, size=samplesize, replace=False)
@@ -149,8 +152,12 @@ def correct_readcount(
             logging.warning(
                 f"    {stage_name}: LOWESS fit failed (too few distinct values); skipping correction"
             )
-            return prev.copy()
+            return prev.copy(), 0.0
         predicted = interp_fn(covariate)
+
+        # SSE between raw values and LOWESS prediction (valid bins only)
+        valid_pred = (predicted > 0) & (prev > 0)
+        sse = float(np.sum((prev[valid_pred] - predicted[valid_pred]) ** 2))
 
         with np.errstate(invalid="ignore", divide="ignore"):
             corrected = np.where(
@@ -172,13 +179,13 @@ def correct_readcount(
             f"    {stage_name:<5s}  {n_ideal:>8d}/{n_valid} ({ideal_pct:5.1f}%) fit,  "
             f"{n_nan:>8d}/{n} ({nan_pct:5.1f}%) NaN"
         )
-        return corrected
+        return corrected, sse
 
     gc_lo = np.nanquantile(gc, doutlier)
     gc_hi = np.nanquantile(gc, 1.0 - doutlier)
     grid_01 = np.linspace(0, 1, grid_size)
     extra = (mappability >= min_mappability) if mappability is not None else None
-    cor = _apply_stage(
+    cor, gc_sse = _apply_stage(
         reads,
         gc,
         gc_lo,
@@ -192,7 +199,7 @@ def correct_readcount(
     if mappability is not None:
         map_lo = np.nanquantile(mappability, doutlier)
         map_hi = np.nanquantile(mappability, 1.0 - doutlier)
-        cor = _apply_stage(
+        cor, _ = _apply_stage(
             cor,
             mappability,
             map_lo,
@@ -207,7 +214,7 @@ def correct_readcount(
         repli_lo = np.nanquantile(repliseq[repli_finite], doutlier)
         repli_hi = np.nanquantile(repliseq[repli_finite], 1.0 - doutlier)
         grid_repli = np.linspace(repli_lo, repli_hi, grid_size)
-        cor = _apply_stage(
+        cor, _ = _apply_stage(
             cor,
             repliseq,
             repli_lo,
@@ -217,7 +224,7 @@ def correct_readcount(
             stage_name="REPLI",
         )
 
-    return cor.astype(np.float32)
+    return cor.astype(np.float32), gc_sse
 
 
 def _rolling_median(x, fraction):
@@ -326,8 +333,13 @@ def correct_readcount_wes(reads, gc, is_target, mappability=None, min_mappabilit
     -------
     np.ndarray
         Corrected read counts (same length as *reads*).
+    float
+        SSE from the GC correction (sum of squared residuals between raw
+        and corrected depth at valid bins, accumulated across target and
+        antitarget groups).
     """
     corrected = np.full(len(reads), np.nan, dtype=np.float64)
+    gc_sse = 0.0
 
     for label, mask in [("target", is_target), ("antitarget", ~is_target)]:
         idx = np.where(mask)[0]
@@ -372,6 +384,9 @@ def correct_readcount_wes(reads, gc, is_target, mappability=None, min_mappabilit
         out[valid] = 2.0**corrected_log2
         corrected[idx] = out
 
+        # SSE: difference between raw and corrected depth at valid bins
+        gc_sse += float(np.sum((r[valid] - out[valid]) ** 2))
+
         n_valid = int(valid.sum())
         n_nan = int(np.isnan(out).sum())
         logging.info(
@@ -379,13 +394,20 @@ def correct_readcount_wes(reads, gc, is_target, mappability=None, min_mappabilit
             f"{n_nan:>8d}/{len(idx)} NaN"
         )
 
-    return corrected.astype(np.float32)
+    return corrected.astype(np.float32), gc_sse
 
 
-def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
-    """Two-page PDF: before/after GC correction KDE density plots."""
+def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf, gc_sse=None):
+    """Two-page PDF: before/after GC correction KDE density plots.
+
+    Parameters
+    ----------
+    gc_sse : list of float or None
+        Per-sample SSE from the GC LOWESS fit. Shown on the "Before" panel only.
+    """
     nsamples = len(rep_ids)
     panel_w = max(5, 5 * nsamples)
+    is_before = True
 
     for title, dp_mat in [
         ("Before GC Correction", dp_before),
@@ -419,15 +441,20 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf):
             )
 
             mad = np.median(np.abs(y - np.median(y)))
-            r, _ = pearsonr(x, y)
-            logging.info(f"  {title:<24s} {rep_id:<8s}: MAD={mad:.4f}  r={r:.4f}")
+            r_pearson, _ = pearsonr(x, y)
+            r_spearman, _ = spearmanr(x, y)
+            metrics = f"MAD={mad:.2f}  r={r_pearson:.4f}  rho={r_spearman:.4f}"
+            if gc_sse is not None and is_before:
+                metrics = f"SSE={gc_sse[si]:.1f}  " + metrics
+            logging.info(f"  {title:<24s} {rep_id:<8s}: {metrics}")
             ax.set_xlabel("GC Content")
             if si == 0:
                 ax.set_ylabel("Observed Readcov")
-            ax.set_title(f"{rep_id}\nMAD={mad:.4f}  r={r:.4f}")
+            ax.set_title(f"{rep_id}\n{metrics}", fontsize=8)
             ax.set_xlim(x.min(), x.max())
             ax.set_ylim(0, ylim * 1.1)
         fig.suptitle(title, fontsize=14)
         plt.tight_layout()
         pdf.savefig(fig, dpi=150)
         plt.close(fig)
+        is_before = False
