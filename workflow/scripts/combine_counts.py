@@ -216,10 +216,11 @@ logging.info(
 )
 
 tumor_rep_ids = rep_ids[tumor_sidx:]
-rdr_ylim = (np.round(np.nanquantile(bb_rdr, 0.99)).astype(int) + 1) * 1.1
+bb_rdr_tumor = bb_rdr[:, tumor_sidx:] if not has_normal else bb_rdr
+rdr_ylim = (np.round(np.nanquantile(bb_rdr_tumor, 0.99)).astype(int) + 1) * 1.1
 plot_1d_multi_sample(
     bbs,
-    bb_rdr[:, tumor_sidx:],
+    bb_rdr_tumor,
     list(tumor_rep_ids),
     genome_size,
     os.path.join(qc_dir, "rdr_bb.pdf"),
