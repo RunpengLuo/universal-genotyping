@@ -22,7 +22,6 @@ dependencies:
 
   - matplotlib-base
   - statsmodels
-  - patsy
   - pybedtools
   - squidpy
   - scanpy

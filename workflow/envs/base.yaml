@@ -12,7 +12,6 @@ dependencies:
   - pybedtools
   - matplotlib-base
   - statsmodels
-  - patsy
   - anndata
   - scanpy
   - squidpy
