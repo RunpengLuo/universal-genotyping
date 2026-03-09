@@ -28,7 +28,7 @@ from count_reads_utils import (
     plot_rd_gc,
 )
 from rd_correct_utils import plot_gc_correction_pdf
-from io_utils import read_region_file
+from io_utils import read_region_file, get_chr_sizes
 
 import matplotlib
 
@@ -113,6 +113,99 @@ def _fill_depth_matrix(depth_maps, win, fill=0.0):
             if val is not None:
                 mat[j, i] = val
     return mat
+
+
+def _extend_windows_to_midpoints(win_df, blacklist_bed, region_bed, genome_size):
+    """Extend each window's START/END to the midpoint of the gap with its neighbor.
+
+    Extensions respect blacklist regions and capture-panel (region) boundaries.
+    Edge windows are extended toward chromosome boundaries (0 / chrom_size).
+    Windows are never shrunk — only expanded into gaps.
+    """
+    chr_sizes = get_chr_sizes(genome_size)
+    win_df = win_df.copy()
+
+    # Build sorted barrier arrays per chromosome.
+    # Left barriers (clamp left extension): blacklist ENDs + all region boundaries.
+    # Right barriers (clamp right extension): blacklist STARTs + all region boundaries.
+    left_bar_by_chr = {}
+    right_bar_by_chr = {}
+
+    bl_by_chr = {}
+    if blacklist_bed is not None:
+        bl_df = pr.read_bed(blacklist_bed, as_df=True)
+        for chrom, grp in bl_df.groupby("Chromosome"):
+            bl_by_chr[chrom] = grp[["Start", "End"]].values
+
+    reg_bounds_by_chr = {}
+    if region_bed is not None:
+        reg_df = read_region_file(region_bed)
+        for chrom, grp in reg_df.groupby("#CHR"):
+            reg_bounds_by_chr[chrom] = np.unique(
+                np.concatenate([grp["START"].values, grp["END"].values])
+            )
+
+    for chrom in win_df["#CHR"].unique():
+        lb, rb = [], []
+        if chrom in bl_by_chr:
+            bl = bl_by_chr[chrom]
+            lb.append(bl[:, 1])   # blacklist ends
+            rb.append(bl[:, 0])   # blacklist starts
+        if chrom in reg_bounds_by_chr:
+            lb.append(reg_bounds_by_chr[chrom])
+            rb.append(reg_bounds_by_chr[chrom])
+        left_bar_by_chr[chrom] = np.unique(np.concatenate(lb)) if lb else np.array([], dtype=np.int64)
+        right_bar_by_chr[chrom] = np.unique(np.concatenate(rb)) if rb else np.array([], dtype=np.int64)
+
+    starts = win_df["START"].values.copy()
+    ends = win_df["END"].values.copy()
+
+    for chrom, idx in win_df.groupby("#CHR", sort=False).groups.items():
+        idx = idx.values
+        order = np.argsort(starts[idx])
+        idx = idx[order]
+        n = len(idx)
+        if n == 0:
+            continue
+
+        s = starts[idx]
+        e = ends[idx]
+        chrom_size = chr_sizes.get(chrom, int(e[-1]))
+
+        # Midpoints between adjacent windows (vectorized)
+        mids = (e[:-1] + s[1:]) // 2
+        raw_lefts = np.empty(n, dtype=np.int64)
+        raw_rights = np.empty(n, dtype=np.int64)
+        raw_lefts[0] = 0
+        raw_lefts[1:] = mids
+        raw_rights[:-1] = mids
+        raw_rights[-1] = chrom_size
+
+        # Clamp left extensions: find max barrier in (raw_lefts[k], s[k]]
+        lb = left_bar_by_chr.get(chrom, np.array([], dtype=np.int64))
+        if len(lb) > 0:
+            lo = np.searchsorted(lb, raw_lefts, side="right")   # first index > raw_left
+            hi = np.searchsorted(lb, s, side="right")           # first index > s
+            has = hi > lo
+            best = lb[np.clip(hi - 1, 0, len(lb) - 1)]
+            raw_lefts = np.where(has, np.maximum(raw_lefts, best), raw_lefts)
+
+        # Clamp right extensions: find min barrier in [e[k], raw_rights[k])
+        rb = right_bar_by_chr.get(chrom, np.array([], dtype=np.int64))
+        if len(rb) > 0:
+            lo = np.searchsorted(rb, e, side="left")            # first index >= e
+            hi = np.searchsorted(rb, raw_rights, side="left")   # first index >= raw_right
+            has = hi > lo
+            best = rb[np.clip(lo, 0, len(rb) - 1)]
+            raw_rights = np.where(has, np.minimum(raw_rights, best), raw_rights)
+
+        # Never shrink
+        starts[idx] = np.minimum(raw_lefts, s)
+        ends[idx] = np.maximum(raw_rights, e)
+
+    win_df["START"] = starts
+    win_df["END"] = ends
+    return win_df
 
 
 cnr_depth_maps = []
@@ -205,6 +298,16 @@ del dp_raw_ref  # free memory before subdivision
 win_df["_parent_chr"] = win_df["#CHR"].values
 win_df["_parent_start"] = win_df["START"].values
 win_df["_parent_end"] = win_df["END"].values
+
+n_before_ext = len(win_df)
+win_df = _extend_windows_to_midpoints(win_df, blacklist_bed, region_bed, genome_size)
+total_gap_bp = int(
+    (win_df["END"] - win_df["START"]).sum()
+    - (win_df["_parent_end"] - win_df["_parent_start"]).sum()
+)
+logging.info(
+    f"window extension: {n_before_ext} windows extended by {total_gap_bp:,} bp total"
+)
 
 if min_window_length > 0:
     rows = []
