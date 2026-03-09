@@ -154,6 +154,8 @@ plot_allele_freqs(
     apply_pseudobulk=False,
     allele="B",
     unit="bb",
+    region_bed=region_bed,
+    blacklist_bed=blacklist_bed,
 )
 
 baf_mtx_bb = np.divide(
