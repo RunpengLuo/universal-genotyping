@@ -210,6 +210,17 @@ def plot_rd_gc(
     )
 
 
+def _adaptive_dot_size(n_points, s_base=4, s_min=0.5, s_max=10, n_ref=5000):
+    """Scale dot size inversely with point count.
+
+    At *n_ref* points the size equals *s_base*; fewer points → bigger dots,
+    more points → smaller dots, clamped to [s_min, s_max].
+    """
+    if n_points <= 0:
+        return s_base
+    return float(np.clip(s_base * n_ref / n_points, s_min, s_max))
+
+
 def plot_1d_multi_sample(
     pos_df: pd.DataFrame,
     mat: np.ndarray,
@@ -276,6 +287,8 @@ def plot_1d_multi_sample(
             continue
 
         x = pos[lo:hi]
+        n_chr_pts = hi - lo
+        s_chr = _adaptive_dot_size(n_chr_pts, s_base=s)
 
         fig, axes = plt.subplots(
             nrows=n_samples,
@@ -302,7 +315,7 @@ def plot_1d_multi_sample(
                     )
 
             if m.any():
-                ax.scatter(x[m], y[m], s=s, alpha=alpha, rasterized=True)
+                ax.scatter(x[m], y[m], s=s_chr, alpha=alpha, rasterized=True)
 
             if val_type in ["AF", "BAF"]:
                 ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
@@ -385,6 +398,7 @@ def plot_1d_sample(
         mask_chr = mask[lo:hi] if mask is not None else None
 
         n_plot = int(m.sum())
+        s_chr = _adaptive_dot_size(n_plot, s_base=s)
         if n_plot == 0:
             logging.warning(f"{chrom}: all {val_type} values are non-finite")
             continue
@@ -402,7 +416,7 @@ def plot_1d_sample(
                 ax.scatter(
                     x[filt],
                     y[filt],
-                    s=s,
+                    s=s_chr,
                     alpha=0.8,
                     color="red",
                     rasterized=True,
@@ -412,7 +426,7 @@ def plot_1d_sample(
                 ax.scatter(
                     x[kept],
                     y[kept],
-                    s=s,
+                    s=s_chr,
                     alpha=0.8,
                     color="blue",
                     rasterized=True,
@@ -420,7 +434,7 @@ def plot_1d_sample(
                 )
             ax.legend(loc="upper right", fontsize=8, markerscale=2)
         else:
-            ax.scatter(x[m], y[m], s=s, alpha=alpha, rasterized=True)
+            ax.scatter(x[m], y[m], s=s_chr, alpha=alpha, rasterized=True)
         if val_type in ["AF", "BAF"]:
             ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
             ax.set_ylim(-0.05, 1.05)
