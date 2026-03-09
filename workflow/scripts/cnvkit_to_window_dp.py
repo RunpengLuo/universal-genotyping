@@ -93,15 +93,23 @@ else:
     ref_cnn_file = sm.input["reference_cnn"]
     ref_cnn = pd.read_table(ref_cnn_file, sep="\t")
     ref_cnn = ref_cnn[ref_cnn["chromosome"].isin(target_chroms)].reset_index(drop=True)
-    if "gc" in ref_cnn.columns and len(ref_cnn) == n_windows:
-        win_df["GC"] = ref_cnn["gc"].values
-        logging.info(f"GC loaded from reference.cnn ({ref_cnn_file})")
+    if "gc" in ref_cnn.columns:
+        merged = win_df[["#CHR", "START", "END"]].merge(
+            ref_cnn.rename(columns={"chromosome": "#CHR", "start": "START", "end": "END"})[
+                ["#CHR", "START", "END", "gc"]
+            ],
+            on=["#CHR", "START", "END"],
+            how="left",
+        )
+        win_df["GC"] = merged["gc"].values
+        n_matched = int(merged["gc"].notna().sum())
+        logging.info(
+            f"GC loaded from reference.cnn: {n_matched}/{n_windows} "
+            f"({n_matched / max(n_windows, 1) * 100:.1f}%) bins matched"
+        )
     else:
         win_df["GC"] = np.nan
-        logging.warning(
-            f"no GC in .cnr or reference.cnn; setting GC=NaN "
-            f"(ref_cnn cols={ref_cnn.columns.tolist()}, rows={len(ref_cnn)} vs {n_windows})"
-        )
+        logging.warning(f"no gc column in reference.cnn ({ref_cnn_file})")
 
 if region_bed is not None:
     region_df = read_region_file(region_bed)
