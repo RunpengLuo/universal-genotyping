@@ -55,6 +55,7 @@ ad_mtx_files = sm.input["ad_mtxs"]
 snp_vcf = sm.input["snp_vcf"]
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
+run_id = getattr(sm.params, "run_id", "")
 
 region_bed = sm.input["region_bed"]
 genome_size = sm.input["genome_size"]
@@ -197,6 +198,7 @@ plot_allele_freqs(
     snp_mask=snp_mask,
     region_bed=region_bed,
     blacklist_bed=blacklist_bed,
+    run_id=run_id,
 )
 
 snps = snps.loc[snp_mask, :].reset_index(drop=True)
@@ -238,6 +240,7 @@ plot_allele_freqs(
     suffix=f"_{assay_type}",
     region_bed=region_bed,
     blacklist_bed=blacklist_bed,
+    run_id=run_id,
 )
 
 ##################################################

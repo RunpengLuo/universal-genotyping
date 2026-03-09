@@ -21,7 +21,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = str(t)
 import numpy as np
 import pandas as pd
 
-from utils import setup_logging, maybe_path
+from utils import setup_logging, maybe_path, stamp_path
 from aggregation_utils import (
     adaptive_binning_windows,
     assign_pos_to_range,
@@ -55,6 +55,7 @@ gtf_file = maybe_path(sm.input["gtf_file"])
 
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
+run_id = getattr(sm.params, "run_id", "")
 
 sample_df = pd.read_table(sm.input["sample_file"])
 sample_name = sample_df["SAMPLE"].iloc[0]
@@ -156,6 +157,7 @@ plot_allele_freqs(
     unit="bb",
     region_bed=region_bed,
     blacklist_bed=blacklist_bed,
+    run_id=run_id,
 )
 
 baf_mtx_bb = np.divide(
@@ -225,7 +227,7 @@ plot_1d_multi_sample(
     bb_rdr_tumor,
     list(tumor_rep_ids),
     genome_size,
-    os.path.join(qc_dir, "rdr_bb.pdf"),
+    stamp_path(os.path.join(qc_dir, "rdr_bb.pdf"), run_id),
     unit="bb",
     val_type="RDR",
     max_ylim=rdr_ylim,

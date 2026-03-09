@@ -17,7 +17,7 @@ rule window_bed_to_3bed:
     output:
         mosdepth_bed=temp(config["bb_dir"] + "/windows.bed.gz"),
     log:
-        config["log_dir"] + "/window_bed_to_3bed.log",
+        config["log_dir"] + f"/window_bed_to_3bed.{_run_id}.log",
     conda:
         "../envs/base.yaml"
     run:
@@ -54,7 +54,7 @@ rule run_mosdepth:
         read_quality=config["params_mosdepth"]["read_quality"],
         extra_params=config["params_mosdepth"].get("extra_params", ""),
     log:
-        config["log_dir"] + "/run_mosdepth/run_mosdepth.{assay_type}_{rep_id}.log",
+        config["log_dir"] + f"/run_mosdepth/run_mosdepth.{{assay_type}}_{{rep_id}}.{_run_id}.log",
     conda:
         "../envs/tools.yaml"
     shell:
@@ -102,8 +102,9 @@ rule rd_correct:
         gc_correct_method=_rdr_cfg.get("gc_correct_method", "lowess"),
         rt_correct=_rdr_cfg.get("rt_correct", False),
         assay_type=lambda wc: wc.assay_type,
+        run_id=_run_id,
     log:
-        config["log_dir"] + "/rd_correct.{assay_type}.log",
+        config["log_dir"] + f"/rd_correct.{{assay_type}}.{_run_id}.log",
     conda:
         "../envs/base.yaml"
     script:
@@ -144,7 +145,7 @@ rule cnvkit_autobin:
             ("short_names", "--short-names", True),
         ),
     log:
-        config["log_dir"] + "/cnvkit_autobin.{assay_type}.log",
+        config["log_dir"] + f"/cnvkit_autobin.{{assay_type}}.{_run_id}.log",
     conda:
         "../envs/cnvkit.yaml"
     shell:
@@ -179,7 +180,7 @@ rule cnvkit_coverage:
         extra_flags=cli_flags_str(_cnvkit_cfg, ("min_mapq", "-q")),
     threads: _cnvkit_threads
     log:
-        config["log_dir"] + "/cnvkit_coverage.{assay_type}_{rep_id}.{region_type}.log",
+        config["log_dir"] + f"/cnvkit_coverage.{{assay_type}}_{{rep_id}}.{{region_type}}.{_run_id}.log",
     conda:
         "../envs/cnvkit.yaml"
     shell:
@@ -219,7 +220,7 @@ rule cnvkit_reference:
             ("cluster", "--cluster", True),
         ),
     log:
-        config["log_dir"] + "/cnvkit_reference.{assay_type}.log",
+        config["log_dir"] + f"/cnvkit_reference.{{assay_type}}.{_run_id}.log",
     conda:
         "../envs/cnvkit.yaml"
     shell:
@@ -251,7 +252,7 @@ rule cnvkit_fix:
             ("no_rmask", "--no-rmask", True),
         ),
     log:
-        config["log_dir"] + "/cnvkit_fix.{assay_type}_{rep_id}.log",
+        config["log_dir"] + f"/cnvkit_fix.{{assay_type}}_{{rep_id}}.{_run_id}.log",
     conda:
         "../envs/cnvkit.yaml"
     shell:
@@ -284,8 +285,9 @@ rule cnvkit_to_window_dp:
         sample_name=SAMPLE_ID,
         cnvkit_dir=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/cnvkit",
         chromosomes=config["chromosomes"],
+        run_id=_run_id,
     log:
-        config["log_dir"] + "/cnvkit_to_window_dp.{assay_type}.log",
+        config["log_dir"] + f"/cnvkit_to_window_dp.{{assay_type}}.{_run_id}.log",
     conda:
         "../envs/base.yaml"
     script:

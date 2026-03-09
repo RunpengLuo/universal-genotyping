@@ -50,8 +50,9 @@ rule phase_and_concat_bulk:
         min_depth=config["params_phase_and_concat"]["min_depth"],
         gamma=config["params_phase_and_concat"]["gamma"],
         exon_only=config["params_phase_and_concat"]["exon_only"],
+        run_id=_run_id,
     log:
-        config["log_dir"] + "/phase_and_concat.{assay_type}.log",
+        config["log_dir"] + f"/phase_and_concat.{{assay_type}}.{_run_id}.log",
     conda:
         "../envs/base.yaml"
     script:
@@ -114,8 +115,9 @@ rule phase_and_concat_single_cell:
         min_depth=config["params_phase_and_concat"]["min_depth"],
         gamma=config["params_phase_and_concat"]["gamma"],
         exon_only=config["params_phase_and_concat"]["exon_only"],
+        run_id=_run_id,
     log:
-        config["log_dir"] + "/phase_and_concat.{assay_type}.log",
+        config["log_dir"] + f"/phase_and_concat.{{assay_type}}.{_run_id}.log",
     conda:
         "../envs/base.yaml"
     script:

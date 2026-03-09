@@ -39,6 +39,7 @@ gmap_file = maybe_path(sm.input["gmap_file"])
 all_barcodes = maybe_path(sm.input["all_barcodes"])
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
+run_id = getattr(sm.params, "run_id", "")
 
 region_bed = sm.input["region_bed"]
 genome_size = sm.input["genome_size"]
@@ -99,6 +100,7 @@ plot_allele_freqs(
     apply_pseudobulk=True,
     allele="B",
     unit="multi-snp",
+    run_id=run_id,
 )
 multi_snps["multi_id"] = np.arange(len(multi_snps))
 if gmap_file is not None:
@@ -146,6 +148,7 @@ plot_allele_freqs(
     apply_pseudobulk=True,
     allele="B",
     unit="bb",
+    run_id=run_id,
 )
 
 ##################################################

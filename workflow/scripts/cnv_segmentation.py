@@ -34,6 +34,7 @@ h5ad_file = sm.input["h5ad_file"]
 all_barcodes = sm.input["all_barcodes"]
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
+run_id = getattr(sm.params, "run_id", "")
 
 region_bed = sm.input["region_bed"]
 genome_size = sm.input["genome_size"]
@@ -111,6 +112,7 @@ plot_allele_freqs(
     allele="cnv-B",
     unit="snp",
     suffix=f"_{assay_type}",
+    run_id=run_id,
 )
 
 # segment counts by CNV profile

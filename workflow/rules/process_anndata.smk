@@ -35,7 +35,7 @@ rule process_rna_anndata:
     wildcard_constraints:
         assay_type="(scRNA|VISIUM|VISIUM3prime)",
     log:
-        config["log_dir"] + "/process_rna_anndata.{assay_type}.log",
+        config["log_dir"] + f"/process_rna_anndata.{{assay_type}}.{_run_id}.log",
     conda:
         "../envs/base.yaml"
     script:
@@ -71,7 +71,7 @@ rule process_atac_fragments:
     wildcard_constraints:
         assay_type="scATAC",
     log:
-        config["log_dir"] + "/process_atac_fragments.{assay_type}.log",
+        config["log_dir"] + f"/process_atac_fragments.{{assay_type}}.{_run_id}.log",
     conda:
         "../envs/snapatac2.yaml"
     script:

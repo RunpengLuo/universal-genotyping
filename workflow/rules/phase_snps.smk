@@ -15,7 +15,7 @@ if config["phaser"] == "shapeit":
             shapeit=config["shapeit"],
             bcftools=config["bcftools"],
         log:
-            config["log_dir"] + "/phase_snps_shapeit/phase_snps.chr{chrname}.log",
+            config["log_dir"] + f"/phase_snps_shapeit/phase_snps.chr{{chrname}}.{_run_id}.log",
         conda:
             "../envs/tools.yaml"
         shell:
@@ -49,7 +49,7 @@ if config["phaser"] == "eagle":
             bcftools=config["bcftools"],
             out_prefix=config["phase_dir"] + "/chr{chrname}",
         log:
-            config["log_dir"] + "/phase_snps_eagle/phase_snps.chr{chrname}.log",
+            config["log_dir"] + f"/phase_snps_eagle/phase_snps.chr{{chrname}}.{_run_id}.log",
         conda:
             "../envs/tools.yaml"
         shell:
@@ -85,7 +85,7 @@ if config["phaser"] == "longphase":
             out_prefix=config["phase_dir"] + "/chr{chrname}",
         threads: config["threads"]["phase"]
         log:
-            config["log_dir"] + "/phase_snps_longphase/phase_snps.chr{chrname}.log",
+            config["log_dir"] + f"/phase_snps_longphase/phase_snps.chr{{chrname}}.{_run_id}.log",
         conda:
             "../envs/tools.yaml"
         shell:
@@ -132,7 +132,7 @@ rule parse_genetic_map:
     output:
         gmap_tsv=config["phase_dir"] + "/genetic_map.tsv.gz",
     log:
-        config["log_dir"] + "/parse_genetic_map.log",
+        config["log_dir"] + f"/parse_genetic_map.{_run_id}.log",
     params:
         chrnames=config["chromosomes"],
         phaser=config["phaser"],

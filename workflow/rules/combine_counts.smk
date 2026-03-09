@@ -45,9 +45,10 @@ rule combine_counts:
         min_snp_reads=config["params_combine_counts"]["min_snp_reads"],
         min_snp_per_block=config["params_combine_counts"]["min_snp_per_block"],
         chromosomes=config["chromosomes"],
+        run_id=_run_id,
     threads: 1
     log:
-        config["log_dir"] + "/combine_counts.{assay_type}.log",
+        config["log_dir"] + f"/combine_counts.{{assay_type}}.{_run_id}.log",
     conda:
         "../envs/base.yaml"
     script:
@@ -98,9 +99,10 @@ rule combine_counts_nonbulk:
         nsnp_multi=config["params_combine_counts"]["nsnp_multi"],
         min_snp_reads=config["params_combine_counts"]["min_snp_reads"],
         min_snp_per_block=config["params_combine_counts"]["min_snp_per_block"],
+        run_id=_run_id,
     threads: 1
     log:
-        config["log_dir"] + "/combine_counts_nonbulk.{assay_type}.log",
+        config["log_dir"] + f"/combine_counts_nonbulk.{{assay_type}}.{_run_id}.log",
     conda:
         "../envs/base.yaml"
     script:
@@ -137,9 +139,10 @@ rule cnv_segmentation:
         sample_name=SAMPLE_ID,
         assay_type=lambda wc: wc.assay_type,
         feature_type=lambda wc: assay_type2feature_type[wc.assay_type],
+        run_id=_run_id,
     threads: 1
     log:
-        config["log_dir"] + "/cnv_segmentation.{assay_type}.log",
+        config["log_dir"] + f"/cnv_segmentation.{{assay_type}}.{_run_id}.log",
     conda:
         "../envs/base.yaml"
     script:

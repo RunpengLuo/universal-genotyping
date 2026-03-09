@@ -23,7 +23,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = str(t)
 import numpy as np
 import pandas as pd
 
-from utils import setup_logging, maybe_path
+from utils import setup_logging, maybe_path, stamp_path
 from count_reads_utils import (
     log_nan_summary,
     compute_gc_rd_stats,
@@ -65,6 +65,7 @@ rt_correct = bool(sm.params["rt_correct"])
 
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
+run_id = getattr(sm.params, "run_id", "")
 
 # ---------------------------------------------------------------------------
 # Load sample info
@@ -143,6 +144,7 @@ plot_rd_gc(
     rd_raw_ylim,
     gc_corr=gc_corr_before,
     gc_bin_median_std=gc_std_before,
+    run_id=run_id,
     region_bed=region_bed,
     blacklist_bed=blacklist_bed,
 )
@@ -234,7 +236,7 @@ else:
 
 log_nan_summary("corrected depth", dp_corrected, rep_ids, n_windows)
 
-pdf = PdfPages(os.path.join(qc_dir, "rd_correct.pdf"))
+pdf = PdfPages(stamp_path(os.path.join(qc_dir, "rd_correct.pdf"), run_id))
 plot_gc_correction_pdf(
     gc_vals, dp_raw, dp_corrected, rep_ids, pdf,
     gc_rmse=gc_rmse_list, mappability=map_vals, repliseq=repli_vals,
@@ -255,6 +257,7 @@ plot_rd_gc(
     rd_ylim,
     gc_corr=gc_corr_after,
     gc_bin_median_std=gc_std_after,
+    run_id=run_id,
     region_bed=region_bed,
     blacklist_bed=blacklist_bed,
 )

@@ -96,6 +96,14 @@ def adaptive_dot_size(n_points, s_base=4, s_min=0.5, s_max=10, n_ref=5000):
     return float(np.clip(s_base * n_ref / n_points, s_min, s_max))
 
 
+def stamp_path(path, run_id):
+    """Insert run_id before file extension: 'foo.pdf' -> 'foo.20260309_143000.pdf'."""
+    if not run_id:
+        return path
+    base, ext = os.path.splitext(path)
+    return f"{base}.{run_id}{ext}"
+
+
 def sort_df_chr(df: pd.DataFrame, ch="#CHR", pos="POS"):
     """Sort a DataFrame by chromosome (genomic order) then by position, in-place.
 

@@ -17,6 +17,7 @@ import pyranges as pr
 
 from io_utils import read_VCF
 from count_reads_utils import plot_1d_sample, plot_1d_multi_sample
+from utils import stamp_path
 
 
 def canon_mat_one_replicate(
@@ -409,6 +410,7 @@ def plot_allele_freqs(
     snp_mask=None,
     region_bed=None,
     blacklist_bed=None,
+    run_id="",
 ):
     """Generate genome-wide allele-frequency scatter plots.
 
@@ -447,7 +449,7 @@ def plot_allele_freqs(
     )
     if apply_pseudobulk:
         af = compute_af_pseudobulk(tot_mtx, b_mtx)
-        plot_file = os.path.join(plot_dir, f"af_{allele}_{unit}.pseudobulk{suffix}.pdf")
+        plot_file = stamp_path(os.path.join(plot_dir, f"af_{allele}_{unit}.pseudobulk{suffix}.pdf"), run_id)
         plot_1d_sample(
             pos_df,
             af,
@@ -465,7 +467,7 @@ def plot_allele_freqs(
         af_mat = np.column_stack(
             [compute_af_per_sample(_tot_mtx, _b_mtx, i) for i in range(len(rep_ids))]
         )
-        plot_file = os.path.join(plot_dir, f"af_{allele}_{unit}{suffix}.pdf")
+        plot_file = stamp_path(os.path.join(plot_dir, f"af_{allele}_{unit}{suffix}.pdf"), run_id)
         plot_1d_multi_sample(
             pos_df,
             af_mat,

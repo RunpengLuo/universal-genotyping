@@ -21,7 +21,7 @@ if workflow_mode == "bulk_genotyping":
             snp_vcf=config["snp_dir"] + "/chr{chrname}.vcf.gz",
             unfiltered_vcf=temp(config["snp_dir"] + "/chr{chrname}.unfiltered.vcf.gz"),
         log:
-            config["log_dir"] + "/genotype_snps_bulk/chr{chrname}.log",
+            config["log_dir"] + f"/genotype_snps_bulk/chr{{chrname}}.{_run_id}.log",
         threads: config["threads"]["genotype"]
         params:
             chrom="chr{chrname}",
@@ -75,7 +75,7 @@ if workflow_mode == "single_cell_genotyping":
             out_ad=config["snp_dir"] + "/pseudobulk_{modality}/cellSNP.tag.AD.mtx",
             bam_lst=temp("tmp/bams.{modality}.lst"),
         log:
-            config["log_dir"] + "/genotype_snps_pseudobulk.{modality}.log",
+            config["log_dir"] + f"/genotype_snps_pseudobulk.{{modality}}.{_run_id}.log",
         threads: config["threads"]["genotype"]
         params:
             bcftools=config["bcftools"],
@@ -129,7 +129,7 @@ if workflow_mode == "single_cell_genotyping":
             filter_hom_ALT=config["params_annotate_snps"]["filter_hom_ALT"],
         threads: 1
         log:
-            config["log_dir"] + "/annotate_snps_pseudobulk.log",
+            config["log_dir"] + f"/annotate_snps_pseudobulk.{_run_id}.log",
         conda:
             "../envs/base.yaml"
         script:

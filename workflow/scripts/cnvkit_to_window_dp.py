@@ -20,7 +20,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = str(t)
 import numpy as np
 import pandas as pd
 
-from utils import setup_logging, maybe_path
+from utils import setup_logging, maybe_path, stamp_path
 from count_reads_utils import (
     log_nan_summary,
     compute_gc_rd_stats,
@@ -46,6 +46,7 @@ chromosomes = sm.params["chromosomes"]
 
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
+run_id = getattr(sm.params, "run_id", "")
 
 sample_df = pd.read_table(sample_file, sep="\t")
 rep_ids = sample_df["REP_ID"].astype(str).tolist()
@@ -189,6 +190,7 @@ if has_gc:
             rd_raw_ylim,
             gc_corr=gc_corr_before,
             gc_bin_median_std=gc_std_before,
+            run_id=run_id,
             region_bed=region_bed,
             blacklist_bed=blacklist_bed,
         )
@@ -207,11 +209,12 @@ if has_gc:
         rd_ylim,
         gc_corr=gc_corr_after,
         gc_bin_median_std=gc_std_after,
+        run_id=run_id,
         region_bed=region_bed,
         blacklist_bed=blacklist_bed,
     )
 
-    pdf = PdfPages(os.path.join(qc_dir, "rd_correct.pdf"))
+    pdf = PdfPages(stamp_path(os.path.join(qc_dir, "rd_correct.pdf"), run_id))
     if dp_raw is not None:
         plot_gc_correction_pdf(gc_vals, dp_raw, dp_corrected, rep_ids, pdf)
     else:
@@ -230,6 +233,7 @@ else:
         "window",
         "RD",
         rd_ylim,
+        run_id=run_id,
         region_bed=region_bed,
         blacklist_bed=blacklist_bed,
     )

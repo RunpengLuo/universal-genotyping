@@ -1,6 +1,10 @@
 import os
 import sys
+from datetime import datetime
+
 import pandas as pd
+
+_run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 nonbulk_assays = {"scATAC", "scRNA", "VISIUM", "VISIUM3prime"}
 bulk_assays = {"bulkWGS", "bulkWES"}

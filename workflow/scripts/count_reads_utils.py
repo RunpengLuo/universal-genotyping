@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 from io_utils import get_chr_sizes, read_region_file
-from utils import adaptive_dot_size
+from utils import adaptive_dot_size, stamp_path
 
 
 def compute_overlap_weights(win_s, win_e, bb_starts, bb_ends):
@@ -171,6 +171,7 @@ def plot_rd_gc(
     ylim,
     gc_corr=None,
     gc_bin_median_std=None,
+    run_id="",
     **plot_kwargs,
 ):
     """Log GC-correlation stats per column and generate a combined multi-sample
@@ -197,7 +198,7 @@ def plot_rd_gc(
             logging.info(
                 f"  {prefix:<28s} {label:<8s}: A_GC std={gc_bin_median_std[label]:.4f}"
             )
-    plot_file = os.path.join(qc_dir, f"{prefix}.pdf")
+    plot_file = stamp_path(os.path.join(qc_dir, f"{prefix}.pdf"), run_id)
     plot_1d_multi_sample(
         pos_df,
         mat,
