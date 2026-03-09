@@ -43,9 +43,6 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 setup_logging(sm.log[0])
 
-# ---------------------------------------------------------------------------
-# Inputs / params
-# ---------------------------------------------------------------------------
 sample_file = sm.input["sample_file"]
 window_bed_file = sm.input["window_bed"]
 genome_size = sm.input["genome_size"]
@@ -67,9 +64,6 @@ qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 run_id = getattr(sm.params, "run_id", "")
 
-# ---------------------------------------------------------------------------
-# Load sample info
-# ---------------------------------------------------------------------------
 sample_df = pd.read_table(sample_file, sep="\t")
 rep_ids = sample_df["REP_ID"].astype(str).tolist()
 nsamples = len(sample_df)
@@ -78,21 +72,14 @@ join_keys = ["#CHR", "START", "END"]
 
 logging.info(f"rd_correct: {nsamples} samples, {len(target_chroms)} chroms")
 
-# ---------------------------------------------------------------------------
-# Load window BED (pre-filtered by region and blacklist)
-# ---------------------------------------------------------------------------
 logging.info("load window BED and mosdepth depth")
 win_df = pd.read_table(window_bed_file, sep="\t")
 assert "#CHR" in win_df.columns and "GC" in win_df.columns, (
     f"window_bed must have #CHR, START, END, GC columns; got {win_df.columns.tolist()}"
 )
 
-# Filter to target chromosomes
 win_df = win_df[win_df["#CHR"].isin(target_chroms)].reset_index(drop=True)
 
-# ---------------------------------------------------------------------------
-# Load mosdepth depth and join with window BED
-# ---------------------------------------------------------------------------
 mos_dfs = []
 for rep_id in rep_ids:
     mos_file = os.path.join(mosdepth_dir, f"{rep_id}.regions.bed.gz")
@@ -106,7 +93,6 @@ coords = mos_dfs[0][join_keys].copy()
 n_windows = len(coords)
 logging.info(f"{n_windows} windows across {len(target_chroms)} chromosomes")
 
-# Merge mosdepth coords with window BED to get covariates
 win_df = pd.merge(left=coords, right=win_df, on=join_keys, how="left", sort=False)
 _gc_matched = int(win_df["GC"].notna().sum())
 logging.info(
@@ -117,9 +103,6 @@ dp_raw = np.zeros((n_windows, nsamples), dtype=np.float32)
 for i, mos_df in enumerate(mos_dfs):
     dp_raw[:, i] = mos_df["DEPTH"].to_numpy(dtype=np.float32)
 
-# ---------------------------------------------------------------------------
-# Load SNP allele matrices (for future neutral-bin identification)
-# ---------------------------------------------------------------------------
 snps = pd.read_table(sm.input["snp_info"], sep="\t")
 tot_mtx_snp = np.load(sm.input["tot_mtx_snp"])["mat"].astype(np.int32)
 a_mtx_snp = np.load(sm.input["a_mtx_snp"])["mat"].astype(np.int32)
@@ -151,9 +134,6 @@ plot_rd_gc(
 
 logging.info(f"{n_windows} windows for bias correction")
 
-# ---------------------------------------------------------------------------
-# Use is_target from window BED (WES) or default to all-target (WGS)
-# ---------------------------------------------------------------------------
 if "is_target" in win_df.columns:
     is_target = win_df["is_target"].astype(bool).to_numpy()
     n_tgt = int(is_target.sum())
@@ -165,9 +145,6 @@ else:
     is_target = np.ones(n_windows, dtype=bool)
     win_df["is_target"] = True
 
-# ---------------------------------------------------------------------------
-# Extract bias covariates
-# ---------------------------------------------------------------------------
 map_vals = win_df["MAP"].to_numpy() if gc_correct and "MAP" in win_df.columns else None
 repli_vals = (
     win_df["REPLI"].to_numpy(dtype=np.float64)
@@ -182,9 +159,6 @@ if repli_vals is not None:
 else:
     logging.info("no REPLI column; skipping replication timing correction")
 
-# ---------------------------------------------------------------------------
-# Bias correction (separate for target / antitarget when WES)
-# ---------------------------------------------------------------------------
 gc_rmse_list = None
 if gc_correct:
     dp_corrected = np.zeros_like(dp_raw, dtype=np.float32)
@@ -262,9 +236,6 @@ plot_rd_gc(
     blacklist_bed=blacklist_bed,
 )
 
-# ---------------------------------------------------------------------------
-# Filter windows with any NaN in corrected depth
-# ---------------------------------------------------------------------------
 nan_mask = np.isnan(dp_corrected).any(axis=1)
 n_nan_rows = int(nan_mask.sum())
 n_valid = n_windows - n_nan_rows
@@ -278,9 +249,6 @@ if n_nan_rows > 0:
     dp_corrected = dp_corrected[valid]
     win_df = win_df.loc[valid].reset_index(drop=True)
 
-# ---------------------------------------------------------------------------
-# Save outputs
-# ---------------------------------------------------------------------------
 np.savez_compressed(sm.output["dp_corrected"], mat=dp_corrected)
 
 out_cols = ["#CHR", "START", "END", "region_id", "GC"]

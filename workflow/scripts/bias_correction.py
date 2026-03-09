@@ -313,7 +313,6 @@ def gc_correct_depth_loess(
                 reads / predicted,
                 0.0,
             )
-        # Rescale so corrected median matches original median (for valid bins)
         valid_corr = (predicted > 0) & (reads > 0)
         if valid_corr.any():
             scale = np.median(reads[valid_corr]) / np.median(corr[valid_corr])

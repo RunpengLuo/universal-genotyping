@@ -260,7 +260,6 @@ def correct_readcount_quadreg(
     gc_lo = np.nanquantile(gc, doutlier)
     gc_hi = np.nanquantile(gc, 1.0 - doutlier)
 
-    # Filter: positive depth, GC in range, sufficient mappability
     valid = (reads > 0) & np.isfinite(gc) & (gc >= gc_lo) & (gc <= gc_hi)
     if mappability is not None:
         valid &= mappability >= min_mappability
@@ -268,7 +267,6 @@ def correct_readcount_quadreg(
     if repliseq is not None:
         valid &= np.isfinite(repliseq)
 
-    # Build fitting DataFrame and formula
     if repliseq is not None:
         fit_df = pd.DataFrame({"RD": reads[valid], "GC": gc[valid], "RT": repliseq[valid]})
         pred_df = pd.DataFrame({"GC": gc, "RT": np.nan_to_num(repliseq, nan=0.0)})
@@ -288,12 +286,10 @@ def correct_readcount_quadreg(
     res = smf.quantreg(formula, data=fit_df).fit(q=0.5)
     predicted = res.predict(pred_df).to_numpy()
 
-    # RMSE between raw and predicted at valid bins
     all_valid = (reads > 0) & np.isfinite(gc)
     n_all_valid = int(all_valid.sum())
     rmse = float(np.sqrt(np.mean((reads[all_valid] - predicted[all_valid]) ** 2))) if n_all_valid > 0 else 0.0
 
-    # Correct: divide raw by predicted, clip predicted floor
     eps = (
         np.nanquantile(predicted[predicted > 0], eps_quantile)
         if (predicted > 0).any()
@@ -304,11 +300,9 @@ def correct_readcount_quadreg(
     with np.errstate(invalid="ignore", divide="ignore"):
         corrected = np.where(reads > 0, reads / den, np.nan)
 
-    # Set bins below mappability threshold to NaN
     if mappability is not None:
         corrected[mappability < min_mappability] = np.nan
 
-    # Rescale to preserve median of valid bins
     valid_corr = np.isfinite(corrected) & (reads > 0)
     if valid_corr.any():
         scale = np.median(reads[valid_corr]) / np.median(corrected[valid_corr])
@@ -373,20 +367,16 @@ def _center_by_window(log2_vals, sort_key, fraction=None, seed=0xA5EED):
 
     log2 = log2_vals.copy()
 
-    # 1. Shuffle to break spatial clustering
     rng = np.random.default_rng(seed)
     shuffle_order = rng.permutation(n)
     log2_shuf = log2[shuffle_order]
     key_shuf = sort_key[shuffle_order]
 
-    # 2. Sort by bias covariate
     sort_order = np.argsort(key_shuf, kind="mergesort")
     log2_sorted = log2_shuf[sort_order]
 
-    # 3. Rolling median to estimate bias
     biases = _rolling_median(log2_sorted, fraction)
 
-    # 4. Subtract bias
     log2_sorted -= biases
 
     # Reverse sort and shuffle to restore original order
@@ -442,7 +432,6 @@ def correct_readcount_wes(reads, gc, is_target, mappability=None, min_mappabilit
         r = reads[idx].astype(np.float64)
         g = gc[idx]
 
-        # Valid = positive depth, finite GC, sufficient mappability
         valid = (r > 0) & np.isfinite(g)
         if mappability is not None:
             valid &= mappability[idx] >= min_mappability
@@ -453,31 +442,25 @@ def correct_readcount_wes(reads, gc, is_target, mappability=None, min_mappabilit
             )
             continue
 
-        # Convert to log2 space (CNVkit convention)
         with np.errstate(divide="ignore", invalid="ignore"):
             log2_r = np.where(valid, np.log2(np.maximum(r, 1e-10)), np.nan)
 
-        # Center before correction
         median_log2 = np.nanmedian(log2_r[valid])
         log2_centered = log2_r - median_log2
 
-        # GC correction on valid bins
         valid_log2 = log2_centered[valid]
         valid_gc = g[valid]
         corrected_log2 = _center_by_window(valid_log2, valid_gc)
 
-        # Optional mappability correction
         if mappability is not None:
             valid_map = mappability[idx][valid]
             corrected_log2 = _center_by_window(corrected_log2, valid_map)
 
-        # Restore median level and convert back to linear
         corrected_log2 += median_log2
         out = np.full(len(idx), np.nan)
         out[valid] = 2.0**corrected_log2
         corrected[idx] = out
 
-        # Collect residuals for combined RMSE
         gc_rmse_parts.append(r[valid] - out[valid])
 
         n_valid = int(valid.sum())

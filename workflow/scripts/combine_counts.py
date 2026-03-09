@@ -37,9 +37,6 @@ from switchprobs import (
 
 setup_logging(sm.log[0])
 
-# ---------------------------------------------------------------------------
-# Inputs / params
-# ---------------------------------------------------------------------------
 snp_info = sm.input["snp_info"]
 tot_mtx_snp = sm.input["tot_mtx_snp"]
 a_mtx_snp = sm.input["a_mtx_snp"]
@@ -73,9 +70,6 @@ logging.info(
     f"nsamples={nsamples}, has_normal={has_normal}"
 )
 
-# ---------------------------------------------------------------------------
-# Load SNP data
-# ---------------------------------------------------------------------------
 snps = pd.read_table(snp_info, sep="\t")
 tot_mtx = np.load(tot_mtx_snp)["mat"].astype(np.int32)
 a_mtx = np.load(a_mtx_snp)["mat"].astype(np.int32)
@@ -83,17 +77,11 @@ b_mtx = np.load(b_mtx_snp)["mat"].astype(np.int32)
 nsnps = tot_mtx.shape[0]
 logging.info(f"loaded {nsnps} SNPs, {nsamples} samples")
 
-# ---------------------------------------------------------------------------
-# Load corrected window data
-# ---------------------------------------------------------------------------
 dp_mtx = np.load(dp_corrected)["mat"]
 window_df = pd.read_table(window_df_file, sep="\t")
 n_window_df = len(window_df)
 logging.info(f"loaded {n_window_df} corrected window_df")
 
-# ---------------------------------------------------------------------------
-# 1. Define aggregation boundaries
-# ---------------------------------------------------------------------------
 assert "region_id" in snps.columns, "invalid SNP file"
 grp_cols = ["region_id"]
 if "PS" not in snps.columns:
@@ -105,9 +93,6 @@ num_phaseset = snps["PS"].nunique()
 logging.info(f"#phaseset={num_phaseset}")
 grp_cols.append("PS")
 
-# ---------------------------------------------------------------------------
-# 2. Window-based adaptive binning
-# ---------------------------------------------------------------------------
 window_df["win_idx"] = np.arange(len(window_df))
 # Assign PS to window_df from SNPs: each window gets the majority-vote PS
 _snps_tmp = snps[["#CHR", "POS0", "PS"]].copy()
@@ -132,15 +117,11 @@ bbs, snps = adaptive_binning_windows(
 num_bbs = len(bbs)
 bb_ids = snps["bb_id"].to_numpy()
 
-# Filter allele matrices to SNPs that survived window assignment
 snp_orig_idx = snps["_orig_idx"].to_numpy()
 tot_mtx = tot_mtx[snp_orig_idx]
 a_mtx = a_mtx[snp_orig_idx]
 b_mtx = b_mtx[snp_orig_idx]
 
-# ---------------------------------------------------------------------------
-# 3. Aggregate allele counts per bin
-# ---------------------------------------------------------------------------
 a_mtx_bb = matrix_segmentation(a_mtx, bb_ids, num_bbs)
 b_mtx_bb = matrix_segmentation(b_mtx, bb_ids, num_bbs)
 tot_mtx_bb = matrix_segmentation(tot_mtx, bb_ids, num_bbs)
@@ -167,9 +148,6 @@ baf_mtx_bb = np.divide(
     out=np.full_like(b_mtx_bb, np.nan, dtype=np.float32),
 )
 
-# ---------------------------------------------------------------------------
-# 4. Aggregate window depth per bin (length-weighted mean)
-# ---------------------------------------------------------------------------
 logging.info("aggregating corrected window depth into adaptive bins")
 
 win_bin_ids = window_df["bin_id"].to_numpy()
@@ -186,9 +164,6 @@ for s in range(nsamples):
 
 log_nan_summary("bb depth", bb_dp, rep_ids, num_bbs)
 
-# ---------------------------------------------------------------------------
-# 5. RDR computation
-# ---------------------------------------------------------------------------
 logging.info(f"compute bb RDR, has_normal={has_normal}")
 
 if has_normal:
@@ -235,9 +210,6 @@ plot_1d_multi_sample(
     blacklist_bed=blacklist_bed,
 )
 
-# ---------------------------------------------------------------------------
-# 6. Filter bins with any NaN across all bb matrices
-# ---------------------------------------------------------------------------
 nan_mask = (
     np.isnan(baf_mtx_bb).any(axis=1)
     | np.isnan(bb_dp).any(axis=1)
@@ -260,9 +232,6 @@ if n_nan_rows > 0:
     bb_dp = bb_dp[valid]
     bb_rdr = bb_rdr[valid]
 
-# ---------------------------------------------------------------------------
-# 7. Compute bin-level switchprobs (last SNP of bin i → first SNP of bin i+1)
-# ---------------------------------------------------------------------------
 kept_bb_ids = np.where(~nan_mask)[0] if n_nan_rows > 0 else np.arange(num_bbs)
 old_to_new = {old: new for new, old in enumerate(kept_bb_ids)}
 snps_valid = snps[snps["bb_id"].isin(old_to_new)].copy()
@@ -282,9 +251,6 @@ else:
     switchprob_ps = float(sm.params["switchprob_ps"])
     bbs["switchprobs"] = estimate_switchprobs_PS(bbs, switchprob_ps)
 
-# ---------------------------------------------------------------------------
-# 8. Save
-# ---------------------------------------------------------------------------
 bbs.to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
 bbs.to_csv(
     sm.output["bed_file"],

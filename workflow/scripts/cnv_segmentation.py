@@ -24,7 +24,6 @@ Input for Copy-typing.
 """
 setup_logging(sm.log[0])
 
-# inputs
 snp_info = sm.input["snp_info"]
 tot_mtx_snp = sm.input["tot_mtx_snp"]
 a_mtx_snp = sm.input["a_mtx_snp"]
@@ -65,8 +64,6 @@ else:
     a_mtx = load_npz(a_mtx_snp)
     b_mtx = load_npz(b_mtx_snp)
 
-##################################################
-# load cnv profile
 segs_df, clones = read_ucn_file(sm.input["seg_ucn"])
 num_segs = len(segs_df)
 segs_df["seg_id"] = np.arange(len(segs_df))
@@ -86,15 +83,12 @@ assert bbcs_df["PHASE"].notna().all(), f"corrupted bbc* files, un-matched coordi
 bbcs_df.rename(columns={"PHASE": "PHASE-BBC"}, inplace=True)
 bbcs_df["bbc_id"] = bbcs_df.index
 
-##################################################
-# annotate per-SNP phase by CNV phase
 snps["RAW_SNP_IDX"] = np.arange(len(snps))
 snps = snp_to_region(snps, bbcs_df, assay_type, region_id="bbc_id")
 bbc_phases = pd.merge(
     left=snps, right=bbcs_df[["bbc_id", "PHASE-BBC"]], on="bbc_id", how="left"
 )["PHASE-BBC"].to_numpy()
 
-##################################################
 raw_snp_ids = snps["RAW_SNP_IDX"].to_numpy()
 tot_mtx = tot_mtx[raw_snp_ids, :]
 a_mtx = a_mtx[raw_snp_ids, :]
@@ -115,7 +109,6 @@ plot_allele_freqs(
     run_id=run_id,
 )
 
-# segment counts by CNV profile
 snps = snp_to_region(snps, segs_df, assay_type, region_id="seg_id")
 seg_ids = snps["seg_id"].to_numpy()
 y_count = matrix_segmentation(b_mtx_corr, seg_ids, num_segs)
@@ -125,7 +118,6 @@ assert y_count.shape[0] == num_segs
 ##################################################
 if not is_bulk_assay:
     adata: sc.AnnData = sc.read_h5ad(h5ad_file)
-    # consistent order with allele mats
     barcodes = np.asarray(read_barcodes(all_barcodes), dtype=str)
     missing = barcodes[~np.isin(barcodes, adata.obs_names)]
     assert len(missing) == 0, (
@@ -140,8 +132,6 @@ if not is_bulk_assay:
     segs_df[f"#{feature_type}"] = segs_df["seg_id"].map(counts).fillna(0).astype(int)
     x_count = matrix_segmentation(adata.X.T, adata.var["seg_id"].to_numpy(), num_segs)
 
-##################################################
-# Save outputs
 if not is_bulk_assay:
     save_npz(sm.output["x_count"], x_count)
     save_npz(sm.output["y_count"], y_count)

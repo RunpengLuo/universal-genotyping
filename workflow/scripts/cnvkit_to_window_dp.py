@@ -1,12 +1,9 @@
-"""Convert CNVkit .cnr files to window.dp.npz + window.tsv.gz.
+"""Convert CNVkit outputs to window.dp.npz + window.tsv.gz.
 
-Uses reference.cnn as the canonical window set (not .cnr, which drops windows
-with bad coverage). Large windows are subdivided, blacklisted regions removed,
-and target/antitarget annotated. Depth from .cnr is left-joined onto the
-canonical windows, with unmatched windows filled with 0.0.
-
-Raw coverage from .targetcoverage.cnn / .antitargetcoverage.cnn is loaded for
-before/after comparison when available.
+Uses reference.cnn as the canonical window set. Large windows are subdivided,
+blacklisted regions removed, and target/antitarget annotated. Depth from .cnr
+is left-joined onto the canonical windows (unmatched → 0.0). Raw .cnn coverage
+is loaded for before/after QC comparison when available.
 """
 
 import os
@@ -40,14 +37,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 setup_logging(sm.log[0])
 
-# ---------------------------------------------------------------------------
-# Natural chromosome sort order
-# ---------------------------------------------------------------------------
 CHROM_ORDER = [f"chr{c}" for c in list(range(1, 23)) + ["X", "Y"]]
 
-# ---------------------------------------------------------------------------
-# Inputs & params
-# ---------------------------------------------------------------------------
 sample_file = sm.input["sample_file"]
 region_bed = sm.input["region_bed"] or None
 blacklist_bed = maybe_path(sm.input.get("blacklist_bed", None))
@@ -68,41 +59,32 @@ target_chroms = {f"chr{c}" for c in chromosomes}
 
 logging.info(f"cnvkit_to_window_dp: {nsamples} samples, {len(target_chroms)} chroms")
 
-# ---------------------------------------------------------------------------
-# 1. Build canonical window set from reference.cnn
-# ---------------------------------------------------------------------------
-ref_cnn_file = sm.input["reference_cnn"]
-ref_cnn = pd.read_table(ref_cnn_file, sep="\t")
+ref_cnn = pd.read_table(sm.input["reference_cnn"], sep="\t")
 ref_cnn = ref_cnn[ref_cnn["chromosome"].isin(target_chroms)].reset_index(drop=True)
 
-# Assert no duplicate coordinates in reference.cnn
 coords = ref_cnn[["chromosome", "start", "end"]].apply(tuple, axis=1)
 assert coords.is_unique, "Duplicate coordinates in reference.cnn"
 
-win_df = pd.DataFrame(
-    {
-        "#CHR": ref_cnn["chromosome"].values,
-        "START": ref_cnn["start"].values,
-        "END": ref_cnn["end"].values,
-    }
-)
+win_df = pd.DataFrame({
+    "#CHR": ref_cnn["chromosome"].values,
+    "START": ref_cnn["start"].values,
+    "END": ref_cnn["end"].values,
+})
 
-# GC from reference.cnn
 if "gc" in ref_cnn.columns:
     win_df["GC"] = ref_cnn["gc"].values
     logging.info(f"GC loaded from reference.cnn for {len(win_df)} windows")
 else:
     win_df["GC"] = np.nan
-    logging.warning(f"no gc column in reference.cnn ({ref_cnn_file})")
+    logging.warning("no gc column in reference.cnn")
 
-# is_target: gene not in ("Antitarget", "Background") → 1, else 0
 if "gene" in ref_cnn.columns:
     win_df["is_target"] = (
         ~ref_cnn["gene"].isin(["Antitarget", "Background"])
     ).astype(np.int8)
 else:
     win_df["is_target"] = np.int8(1)
-    logging.warning("no gene column in reference.cnn; assuming all windows are target")
+    logging.warning("no gene column in reference.cnn; assuming all target")
 
 n_ref = len(win_df)
 n_target = int(win_df["is_target"].sum())
@@ -110,52 +92,130 @@ logging.info(
     f"reference.cnn: {n_ref} windows ({n_target} target, {n_ref - n_target} antitarget)"
 )
 
-# ---------------------------------------------------------------------------
-# 2. Load .cnr depth lookups (keyed by parent coordinates, before subdivision)
-# ---------------------------------------------------------------------------
+def _build_depth_map(df):
+    """Build (chromosome, start, end) → depth dict."""
+    return {
+        (row["chromosome"], int(row["start"]), int(row["end"])): float(row["depth"])
+        for _, row in df.iterrows()
+    }
+
+
+def _fill_depth_matrix(depth_maps, win, fill=0.0):
+    """Fill (n_windows, n_samples) matrix from depth maps keyed by coordinates."""
+    n = len(win)
+    mat = np.full((n, len(depth_maps)), fill, dtype=np.float32)
+    chrs = win["#CHR"].values
+    starts = win["START"].values.astype(int)
+    ends = win["END"].values.astype(int)
+    for i, dmap in enumerate(depth_maps):
+        for j in range(n):
+            val = dmap.get((chrs[j], starts[j], ends[j]))
+            if val is not None:
+                mat[j, i] = val
+    return mat
+
+
 cnr_depth_maps = []
 for rep_id in rep_ids:
     cnr_file = os.path.join(cnvkit_dir, f"{rep_id}.cnr")
     df = pd.read_table(cnr_file, sep="\t")
     df = df[df["chromosome"].isin(target_chroms)].reset_index(drop=True)
-    depth_map = {}
-    for _, row in df.iterrows():
-        depth_map[(row["chromosome"], int(row["start"]), int(row["end"]))] = float(
-            row["depth"]
-        )
-    cnr_depth_maps.append(depth_map)
+    dmap = _build_depth_map(df)
+    cnr_depth_maps.append(dmap)
     n_matched = sum(
-        1
-        for _, r in win_df.iterrows()
-        if (r["#CHR"], int(r["START"]), int(r["END"])) in depth_map
+        1 for _, r in win_df.iterrows()
+        if (r["#CHR"], int(r["START"]), int(r["END"])) in dmap
     )
     logging.info(
         f"  {rep_id}: {len(df)} .cnr bins, {n_matched}/{n_ref} matched to reference.cnn"
     )
 
-# Store parent coordinates for depth lookup after subdivision
+dp_corr_ref = _fill_depth_matrix(cnr_depth_maps, win_df, fill=0.0)
+
+dp_raw_ref = None
+try:
+    raw_depth_maps = []
+    for rep_id in rep_ids:
+        tgt_file = os.path.join(cnvkit_dir, f"{rep_id}.targetcoverage.cnn")
+        anti_file = os.path.join(cnvkit_dir, f"{rep_id}.antitargetcoverage.cnn")
+        tgt_df = pd.read_table(tgt_file, sep="\t")
+        anti_df = pd.read_table(anti_file, sep="\t")
+        raw_df = pd.concat([tgt_df, anti_df], ignore_index=True)
+        raw_df = raw_df[raw_df["chromosome"].isin(target_chroms)].reset_index(drop=True)
+        raw_depth_maps.append(_build_depth_map(raw_df))
+
+    dp_raw_ref = _fill_depth_matrix(raw_depth_maps, win_df, fill=np.nan)
+    n_matched = int(np.isfinite(dp_raw_ref[:, 0]).sum())
+    logging.info(
+        f"raw coverage: {n_matched}/{n_ref} "
+        f"({n_matched / max(n_ref, 1) * 100:.1f}%) bins matched"
+    )
+    if n_matched == 0:
+        dp_raw_ref = None
+except Exception as e:
+    logging.warning(f"could not load raw .cnn files: {e}; skipping before/after comparison")
+    dp_raw_ref = None
+
+gc_vals = win_df["GC"].to_numpy()
+has_gc = np.isfinite(gc_vals).any()
+is_target_mask = win_df["is_target"].to_numpy().astype(bool)
+
+if has_gc:
+    def _qc_plot_subset(dp_mat, mask, prefix):
+        sub_win = win_df.loc[mask].reset_index(drop=True)
+        sub_dp = dp_mat[mask]
+        sub_gc = gc_vals[mask]
+        if len(sub_win) == 0:
+            logging.info(f"  {prefix}: no windows, skipping")
+            return None, None
+        ylim = max(np.nanquantile(sub_dp, 0.99), 1.0) * 1.1
+        gc_corr, gc_std = compute_gc_rd_stats(sub_dp, sub_gc, rep_ids)
+        plot_rd_gc(
+            sub_win, sub_dp, rep_ids, genome_size, qc_dir,
+            prefix, "window", "RD", ylim,
+            gc_corr=gc_corr, gc_bin_median_std=gc_std,
+            run_id=run_id, region_bed=region_bed, blacklist_bed=blacklist_bed,
+        )
+        return gc_corr, gc_std
+
+    if dp_raw_ref is not None:
+        _qc_plot_subset(dp_raw_ref, is_target_mask, "depth_raw_target")
+        _qc_plot_subset(dp_raw_ref, ~is_target_mask, "depth_raw_antitarget")
+
+    _qc_plot_subset(dp_corr_ref, is_target_mask, "depth_corrected_target")
+    _qc_plot_subset(dp_corr_ref, ~is_target_mask, "depth_corrected_antitarget")
+
+    pdf = PdfPages(stamp_path(os.path.join(qc_dir, "rd_correct.pdf"), run_id))
+    if dp_raw_ref is not None:
+        plot_gc_correction_pdf(gc_vals, dp_raw_ref, dp_corr_ref, rep_ids, pdf)
+    else:
+        plot_gc_correction_pdf(gc_vals, dp_corr_ref, dp_corr_ref, rep_ids, pdf)
+    pdf.close()
+else:
+    logging.info("no GC data; skipping GC-related QC plots")
+    ylim = max(np.nanquantile(dp_corr_ref, 0.99), 1.0) * 1.1
+    plot_rd_gc(
+        win_df, dp_corr_ref, rep_ids, genome_size, qc_dir,
+        "depth_corrected", "window", "RD", ylim,
+        run_id=run_id, region_bed=region_bed, blacklist_bed=blacklist_bed,
+    )
+
+del dp_raw_ref  # free memory before subdivision
+
 win_df["_parent_chr"] = win_df["#CHR"].values
 win_df["_parent_start"] = win_df["START"].values
 win_df["_parent_end"] = win_df["END"].values
 
-# ---------------------------------------------------------------------------
-# 3. Subdivide large windows
-# ---------------------------------------------------------------------------
 if min_window_length > 0:
     rows = []
     for _, row in win_df.iterrows():
         size = int(row["END"] - row["START"])
         if size >= min_window_length:
-            n_pieces = size // min_window_length
-            if n_pieces < 1:
-                n_pieces = 1
+            n_pieces = max(size // min_window_length, 1)
             start = int(row["START"])
             for j in range(n_pieces):
                 sub_start = start + j * min_window_length
-                if j == n_pieces - 1:
-                    sub_end = int(row["END"])
-                else:
-                    sub_end = sub_start + min_window_length
+                sub_end = int(row["END"]) if j == n_pieces - 1 else sub_start + min_window_length
                 new_row = row.copy()
                 new_row["START"] = sub_start
                 new_row["END"] = sub_end
@@ -163,16 +223,12 @@ if min_window_length > 0:
         else:
             rows.append(row)
 
-    win_df_sub = pd.DataFrame(rows).reset_index(drop=True)
+    win_df = pd.DataFrame(rows).reset_index(drop=True)
     logging.info(
         f"subdivision (min_window_length={min_window_length}): "
-        f"{n_ref} → {len(win_df_sub)} windows"
+        f"{n_ref} → {len(win_df)} windows"
     )
-    win_df = win_df_sub
 
-# ---------------------------------------------------------------------------
-# 4. Subtract blacklisted regions
-# ---------------------------------------------------------------------------
 if blacklist_bed is not None:
     n_before = len(win_df)
     pr_windows = pr.PyRanges(
@@ -187,9 +243,6 @@ if blacklist_bed is not None:
         f"({n_before - len(win_df)} removed)"
     )
 
-# ---------------------------------------------------------------------------
-# 5. Sort by natural chromosome order, then START
-# ---------------------------------------------------------------------------
 chrom_rank = {c: i for i, c in enumerate(CHROM_ORDER)}
 win_df = win_df[win_df["#CHR"].isin(chrom_rank)].copy()
 win_df["_chrom_rank"] = win_df["#CHR"].map(chrom_rank)
@@ -199,9 +252,6 @@ win_df = win_df.drop(columns=["_chrom_rank"])
 n_windows = len(win_df)
 logging.info(f"{n_windows} final windows after filtering and sorting")
 
-# ---------------------------------------------------------------------------
-# 6. Build dp_corrected matrix (depth from parent .cnr, or 0.0 if missing)
-# ---------------------------------------------------------------------------
 dp_corrected = np.zeros((n_windows, nsamples), dtype=np.float32)
 for i, depth_map in enumerate(cnr_depth_maps):
     for j in range(n_windows):
@@ -212,20 +262,15 @@ for i, depth_map in enumerate(cnr_depth_maps):
         )
         dp_corrected[j, i] = depth_map.get(key, 0.0)
 
+win_df = win_df.drop(columns=["_parent_chr", "_parent_start", "_parent_end"])
+
 n_zero = int((dp_corrected[:, 0] == 0.0).sum())
 logging.info(
     f"depth filled: {n_windows - n_zero}/{n_windows} from .cnr, "
     f"{n_zero} filled with 0.0"
 )
-
-# Drop parent coordinate columns
-win_df = win_df.drop(columns=["_parent_chr", "_parent_start", "_parent_end"])
-
 log_nan_summary("cnvkit corrected depth", dp_corrected, rep_ids, n_windows)
 
-# ---------------------------------------------------------------------------
-# 7. Region ID assignment
-# ---------------------------------------------------------------------------
 if region_bed is not None:
     region_df = read_region_file(region_bed)
     midpoints = ((win_df["START"] + win_df["END"]) // 2).values
@@ -249,112 +294,6 @@ else:
     win_df["region_id"] = 0
     logging.info("no region_bed; setting region_id=0 for all windows")
 
-# ---------------------------------------------------------------------------
-# 8. Load raw coverage for QC plots (optional)
-# ---------------------------------------------------------------------------
-dp_raw = None
-cnr_coords = win_df[["#CHR", "START", "END"]]
-try:
-    dp_raw = np.full((n_windows, nsamples), np.nan, dtype=np.float32)
-    for i, rep_id in enumerate(rep_ids):
-        tgt_file = os.path.join(cnvkit_dir, f"{rep_id}.targetcoverage.cnn")
-        anti_file = os.path.join(cnvkit_dir, f"{rep_id}.antitargetcoverage.cnn")
-        tgt_df = pd.read_table(tgt_file, sep="\t")
-        anti_df = pd.read_table(anti_file, sep="\t")
-        raw_df = pd.concat([tgt_df, anti_df], ignore_index=True)
-        raw_df = raw_df[raw_df["chromosome"].isin(target_chroms)].reset_index(drop=True)
-        raw_df = raw_df.rename(columns={"chromosome": "#CHR", "start": "START", "end": "END"})
-        merged = cnr_coords.merge(
-            raw_df[["#CHR", "START", "END", "depth"]],
-            on=["#CHR", "START", "END"],
-            how="left",
-        )
-        dp_raw[:, i] = merged["depth"].to_numpy(dtype=np.float32)
-    n_matched = int(np.isfinite(dp_raw[:, 0]).sum())
-    logging.info(
-        f"loaded raw coverage from .cnn files: {n_matched}/{n_windows} "
-        f"({n_matched / max(n_windows, 1) * 100:.1f}%) bins matched"
-    )
-    if n_matched == 0:
-        dp_raw = None
-except Exception as e:
-    logging.warning(
-        f"could not load raw .cnn files: {e}; skipping before/after comparison"
-    )
-
-# ---------------------------------------------------------------------------
-# 9. QC plots
-# ---------------------------------------------------------------------------
-gc_vals = win_df["GC"].to_numpy()
-has_gc = np.isfinite(gc_vals).any()
-
-if has_gc:
-    if dp_raw is not None:
-        rd_raw_ylim = max(np.nanquantile(dp_raw, 0.99), 1.0) * 1.1
-        gc_corr_before, gc_std_before = compute_gc_rd_stats(dp_raw, gc_vals, rep_ids)
-        plot_rd_gc(
-            win_df,
-            dp_raw,
-            rep_ids,
-            genome_size,
-            qc_dir,
-            "depth_before_correction",
-            "window",
-            "RD",
-            rd_raw_ylim,
-            gc_corr=gc_corr_before,
-            gc_bin_median_std=gc_std_before,
-            run_id=run_id,
-            region_bed=region_bed,
-            blacklist_bed=blacklist_bed,
-        )
-
-    rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0) * 1.1
-    gc_corr_after, gc_std_after = compute_gc_rd_stats(dp_corrected, gc_vals, rep_ids)
-    plot_rd_gc(
-        win_df,
-        dp_corrected,
-        rep_ids,
-        genome_size,
-        qc_dir,
-        "depth_cnvkit_corrected",
-        "window",
-        "RD",
-        rd_ylim,
-        gc_corr=gc_corr_after,
-        gc_bin_median_std=gc_std_after,
-        run_id=run_id,
-        region_bed=region_bed,
-        blacklist_bed=blacklist_bed,
-    )
-
-    pdf = PdfPages(stamp_path(os.path.join(qc_dir, "rd_correct.pdf"), run_id))
-    if dp_raw is not None:
-        plot_gc_correction_pdf(gc_vals, dp_raw, dp_corrected, rep_ids, pdf)
-    else:
-        plot_gc_correction_pdf(gc_vals, dp_corrected, dp_corrected, rep_ids, pdf)
-    pdf.close()
-else:
-    logging.info("no GC data available; skipping GC-related QC plots")
-    rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0) * 1.1
-    plot_rd_gc(
-        win_df,
-        dp_corrected,
-        rep_ids,
-        genome_size,
-        qc_dir,
-        "depth_cnvkit_corrected",
-        "window",
-        "RD",
-        rd_ylim,
-        run_id=run_id,
-        region_bed=region_bed,
-        blacklist_bed=blacklist_bed,
-    )
-
-# ---------------------------------------------------------------------------
-# 10. Write outputs (no NaN filtering)
-# ---------------------------------------------------------------------------
 np.savez_compressed(sm.output["dp_corrected"], mat=dp_corrected)
 
 out_cols = ["#CHR", "START", "END", "region_id", "GC", "is_target"]

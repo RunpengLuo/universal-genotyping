@@ -62,8 +62,6 @@ def get_genotype(row):
     return "./."
 
 
-##################################################
-# step 1. remove duplicated rows and collapse VCF files from multiple modalities
 KEY = ["#CHROM", "POS", "REF", "ALT"]
 CNT = ["DP", "AD", "OTH"]
 modalities = list(sm.params["modalities"])
@@ -127,12 +125,9 @@ for idx, raw_snps in enumerate(raw_snps_list):
         base_snps[cnt] += base_snps[f"{cnt}{idx}"].fillna(0).astype(np.int64)
     base_snps = base_snps.drop(columns=[f"{cnt}{idx}" for cnt in CNT])
 
-##################################################
-# step 2. genotype and filter SNPs
 base_snps["REF_COUNT"] = base_snps["DP"] - base_snps["AD"]
 base_snps["AR"] = base_snps["AD"] / base_snps["DP"]
 
-## genotyping criteria
 base_snps["is_het"] = (
     base_snps[["AD", "REF_COUNT"]].min(axis=1) >= min_het_reads
 ) & base_snps["AR"].between(min_vaf_thres, 1 - min_vaf_thres)
@@ -142,14 +137,12 @@ base_snps["is_hom_alt"] = (base_snps["AD"] == base_snps["DP"]) & (
 )
 base_snps["is_hom_ref"] = (base_snps["AD"] == 0) & (base_snps["DP"] >= min_hom_dp)
 
-## assign&filter genotype
 base_snps["SAMPLE"] = base_snps.apply(get_genotype, axis=1)
 keep_gts = ["0/1"]
 if not filter_hom_ALT:
     keep_gts.append("1/1")
 base_snps = base_snps[base_snps["SAMPLE"].isin(keep_gts)].reset_index(drop=True)
 
-## handle OTH rows
 nz_oth = base_snps["OTH"] > 0
 nnz_oth = np.sum(nz_oth)
 nz_oth_hom_alt = int(base_snps.loc[nz_oth, "is_hom_alt"].sum())
@@ -164,7 +157,6 @@ if filter_nz_OTH:
     logging.info("SNPs with nonzero OTHs are filtered.")
     base_snps = base_snps[~nz_oth]
 
-## final summary stats
 num_het = (base_snps["SAMPLE"] == "0/1").sum()
 num_hom_ref = (base_snps["SAMPLE"] == "0/0").sum()
 num_hom_alt = (base_snps["SAMPLE"] == "1/1").sum()
@@ -189,8 +181,6 @@ final_snps["INFO"] = (
     + final_snps["OTH"].astype(str)
 )
 
-##################################################
-# save final vcf file
 cols = [
     "#CHROM",
     "POS",

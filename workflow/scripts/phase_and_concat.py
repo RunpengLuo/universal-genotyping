@@ -243,7 +243,6 @@ plot_allele_freqs(
     run_id=run_id,
 )
 
-##################################################
 logging.info("saving output files")
 snps[
     [

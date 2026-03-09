@@ -43,8 +43,6 @@ ref_label = sm.params["ref_label"]
 logging.info(f"prepare atac anndata, assay_type={assay_type}, rep_ids={rep_ids}")
 logging.info(f"tile_width={tile_width}bp")
 
-##################################################
-# concat adata over multiple replicates from same assay type
 adatas = {}
 for idx, rep_id in enumerate(rep_ids):
     logging.info(f"process {assay_type}-{rep_id}")
@@ -107,8 +105,6 @@ logging.info(f"#concat barcodes={adata.n_obs}, #union features={adata.n_vars}")
 adata.var["pseudobulk_counts"] = np.asarray(adata.X.sum(axis=0)).flatten()
 adata = adata[:, adata.var["pseudobulk_counts"] > 0].copy()
 
-##################################################
-# annotate positions
 adata.var["#CHR"] = adata.var_names.str.split(":").str[0].astype(str)
 chs = sort_chroms(adata.var["#CHR"].unique().tolist())
 adata.var["#CHR"] = pd.Categorical(adata.var["#CHR"], categories=chs, ordered=True)
@@ -119,9 +115,6 @@ adata.var["END"] = (
     adata.var_names.str.split(":").str[1].str.split("-").str[1].astype(int)
 )
 
-##################################################
-# filter tiles
-## 1. filter files by region file, e.g., centromeric and HLA regions.
 regions = read_region_file(sm.input["region_bed"])
 regions["region_id"] = (
     regions["#CHR"].astype(str)
@@ -132,7 +125,6 @@ regions["region_id"] = (
 )
 adata = feature_to_blocks(adata, regions, assay_type)
 
-##################################################
 assert adata.var_names.is_unique, "var_names is not unique!"
 sort_index = adata.var.sort_values(by=["#CHR", "START"]).index
 adata = adata[:, sort_index].copy()
@@ -140,8 +132,6 @@ adata = adata[:, sort_index].copy()
 adata.obsm.clear()
 adata.uns.clear()
 
-##################################################
-# write cell_types.tsv.gz and conditionally keep ref_label in h5ad
 has_annotations = ref_label in adata.obs.columns
 if has_annotations:
     ct_df = adata.obs[[ref_label]].copy()

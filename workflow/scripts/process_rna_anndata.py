@@ -41,8 +41,6 @@ rep2ref_annotation = dict(sm.params["rep2ref_annotation"])
 ref_label = sm.params["ref_label"]
 logging.info(f"prepare rna anndata, assay_type={assay_type}, rep_ids={rep_ids}")
 
-##################################################
-# concat adata over multiple replicates from same assay type
 adatas = {}
 for idx, rep_id in enumerate(rep_ids):
     logging.info(f"process {assay_type}-{rep_id}")
@@ -103,10 +101,6 @@ adata.X = adata.X.tocsr()
 num_total_barcodes = adata.n_obs
 logging.info(f"#concat barcodes={num_total_barcodes}, #union features={adata.n_vars}")
 
-##################################################
-# annotate gene interval in BED format by reference GTF file
-# filter genes not found in reference GTF file
-# invalid case: user should use same GTF file for space-ranger and genotyping.
 gene_id_colname = str(sm.params["gene_id_colname"])
 genes_gtf = read_genes_gtf_file(sm.input["gtf_file"], id_col=gene_id_colname)[
     [gene_id_colname, "#CHR", "START", "END"]
@@ -130,14 +124,10 @@ adata.var["#CHR"] = adata.var["#CHR"].astype(str)
 adata.var["START"] = adata.var["START"].astype(int)
 adata.var["END"] = adata.var["END"].astype(int)
 
-##################################################
-# filter genes
-## 0. filter complete zero counts
 adata.var["pseudobulk_counts"] = np.asarray(adata.X.sum(axis=0)).flatten()
 adata = adata[:, adata.var["pseudobulk_counts"] > 0].copy()
 logging.info(f"#genes after filtering by zero pseudobulk_counts: {adata.n_vars}")
 
-## 1. filter genes by blacklist file
 gene_blacklist_file = maybe_path(sm.input["gene_blacklist_file"])
 if gene_blacklist_file is not None:
     gene_blacklist = (
@@ -149,7 +139,6 @@ if gene_blacklist_file is not None:
     )
     adata = adata[:, ~ind_gene_blacklist]
 
-## 2. filter lowly expressed genes by counting #expressed barcodes
 sum_count_before_filtering = float(adata.X.sum())
 min_frac_barcodes = float(sm.params["min_frac_barcodes"])
 min_expressed_barcodes = round(min_frac_barcodes * num_total_barcodes)
@@ -168,8 +157,6 @@ if assay_type in SPATIAL_ASSAYS:
         f"Retaining {100.0 * np.mean(ind_sufficient_expressed_genes):.3f}% of genes with sufficient expression across spots ({100.0 * count_ratio:.2f}% of total UMIs) @ {min_frac_barcodes} fraction of barcodes."
     )
 
-## 3. filter genes by region file, e.g., centromeric and HLA regions.
-## each gene gets a feature_idx
 regions = read_region_file(sm.input["region_bed"])[["#CHR", "START", "END"]]
 regions["region_id"] = (
     regions["#CHR"].astype(str)
@@ -180,9 +167,6 @@ regions["region_id"] = (
 )
 adata = feature_to_blocks(adata, regions, assay_type)
 
-## 4. filter outlier genes by outlier detection algorithm TODO
-
-##################################################
 chs = sort_chroms(adata.var["#CHR"].unique().tolist())
 adata.var["#CHR"] = pd.Categorical(adata.var["#CHR"], categories=chs, ordered=True)
 
@@ -190,8 +174,6 @@ assert adata.var_names.is_unique, "var_names is not unique!"
 sort_index = adata.var.sort_values(by=["#CHR", "START"]).index
 adata = adata[:, sort_index].copy()
 
-##################################################
-# write cell_types.tsv.gz and conditionally keep ref_label in h5ad
 has_annotations = ref_label in adata.obs.columns
 if has_annotations:
     ct_df = adata.obs[[ref_label]].copy()

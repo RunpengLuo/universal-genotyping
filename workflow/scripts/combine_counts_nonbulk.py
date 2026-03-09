@@ -62,8 +62,6 @@ a_mtx = load_npz(a_mtx_snp)
 b_mtx = load_npz(b_mtx_snp)
 (nsnps, nsamples) = tot_mtx.shape
 
-##################################################
-# 1. Define aggregation boundaries
 assert "region_id" in snps.columns, "invalid SNP file"
 grp_cols = ["region_id"]
 if "PS" not in snps.columns:
@@ -75,8 +73,6 @@ num_phaseset = snps["PS"].nunique()
 logging.info(f"#phaseset={num_phaseset}")
 grp_cols.append("PS")
 
-##################################################
-# 2. Multi-SNP segmentation
 multi_snps = adaptive_binning(
     snps,
     0,
@@ -121,8 +117,6 @@ save_npz(sm.output["tot_mtx_multi"], tot_mtx_multi)
 save_npz(sm.output["a_mtx_multi"], a_mtx_multi)
 save_npz(sm.output["b_mtx_multi"], b_mtx_multi)
 
-##################################################
-# 3. Adaptive binning (MSR & MSPB)
 bbs = adaptive_binning(
     snps,
     int(sm.params["min_snp_reads"]),
@@ -151,8 +145,6 @@ plot_allele_freqs(
     run_id=run_id,
 )
 
-##################################################
-# 4. Compute bin-level switchprobs (last SNP of bin i → first SNP of bin i+1)
 bbs["bb_id"] = np.arange(len(bbs))
 
 logging.info("estimate bin-level switchprobs")
@@ -166,8 +158,6 @@ if gmap_file is not None:
 else:
     bbs["switchprobs"] = estimate_switchprobs_PS(bbs, switchprob_ps)
 
-##################################################
-# 5. Save
 bbs.to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
 bbs.to_csv(
     sm.output["bed_file"],
