@@ -16,7 +16,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-def correct_readcount(
+def correct_readcount_lowess(
     reads,
     gc,
     mappability=None,
@@ -228,7 +228,7 @@ def correct_readcount(
     return cor.astype(np.float32), gc_rmse
 
 
-def correct_readcount_median(
+def correct_readcount_quadreg(
     reads,
     gc,
     mappability=None,
@@ -237,12 +237,12 @@ def correct_readcount_median(
     min_mappability=0.9,
     eps_quantile=0.01,
 ):
-    """Quadratic median quantile regression GC correction.
+    """Quadratic median quantile regression bias correction.
 
     Fits RD ~ GC + GC**2 via median quantile regression on valid bins,
     then divides raw depth by predicted and rescales to preserve median.
+    When ``repliseq`` is provided, RT + RT**2 terms are added to the model.
     Mappability is used as a filter (not a covariate).
-    Replication timing correction is not yet implemented (TODO).
 
     Returns
     -------
@@ -266,12 +266,17 @@ def correct_readcount_median(
         valid &= mappability >= min_mappability
 
     if repliseq is not None:
-        logging.info("    MEDIAN: RT correction not yet implemented; ignoring repliseq")
+        valid &= np.isfinite(repliseq)
 
-    # Build fitting DataFrame — GC-only regression
-    fit_df = pd.DataFrame({"RD": reads[valid], "GC": gc[valid]})
-    pred_df = pd.DataFrame({"GC": gc})
-    formula = "RD ~ GC + I(GC**2)"
+    # Build fitting DataFrame and formula
+    if repliseq is not None:
+        fit_df = pd.DataFrame({"RD": reads[valid], "GC": gc[valid], "RT": repliseq[valid]})
+        pred_df = pd.DataFrame({"GC": gc, "RT": np.nan_to_num(repliseq, nan=0.0)})
+        formula = "RD ~ GC + I(GC**2) + RT + I(RT**2)"
+    else:
+        fit_df = pd.DataFrame({"RD": reads[valid], "GC": gc[valid]})
+        pred_df = pd.DataFrame({"GC": gc})
+        formula = "RD ~ GC + I(GC**2)"
 
     n_fit = len(fit_df)
     logging.info(f"    MEDIAN  {n_fit:>8d}/{n} fitting bins, formula: {formula}")

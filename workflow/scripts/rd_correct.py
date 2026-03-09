@@ -1,7 +1,7 @@
 """Per-window LOWESS bias correction for bulk samples.
 
 Loads mosdepth fixed-window depth, joins with pre-filtered window BED
-(GC/MAP/REPLI/region_id/is_target), applies correct_readcount() per
+(GC/MAP/REPLI/region_id/is_target), applies correct_readcount_lowess() per
 sample, and saves corrected depth matrix + filtered window dataframe.
 
 The window BED is expected to be pre-filtered by region and blacklist
@@ -30,8 +30,8 @@ from count_reads_utils import (
     plot_rd_gc,
 )
 from rd_correct_utils import (
-    correct_readcount,
-    correct_readcount_median,
+    correct_readcount_lowess,
+    correct_readcount_quadreg,
     correct_readcount_wes,
     plot_gc_correction_pdf,
 )
@@ -201,10 +201,10 @@ if gc_correct:
             )
             gc_rmse_list.append(gc_rmse)
     elif gc_correct_method == "median":
-        logging.info("applying correct_readcount_median per sample")
+        logging.info("applying correct_readcount_quadreg per sample")
         for i, rep_id in enumerate(rep_ids):
             logging.info(f"correcting {rep_id}")
-            dp_corrected[:, i], gc_rmse = correct_readcount_median(
+            dp_corrected[:, i], gc_rmse = correct_readcount_quadreg(
                 dp_raw[:, i],
                 gc_vals,
                 mappability=map_vals,
@@ -214,10 +214,10 @@ if gc_correct:
             )
             gc_rmse_list.append(gc_rmse)
     else:
-        logging.info("applying correct_readcount per sample")
+        logging.info("applying correct_readcount_lowess per sample")
         for i, rep_id in enumerate(rep_ids):
             logging.info(f"correcting {rep_id}")
-            dp_corrected[:, i], gc_rmse = correct_readcount(
+            dp_corrected[:, i], gc_rmse = correct_readcount_lowess(
                 dp_raw[:, i],
                 gc_vals,
                 mappability=map_vals,
