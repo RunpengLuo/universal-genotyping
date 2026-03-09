@@ -363,29 +363,25 @@ logging.info(
 )
 log_nan_summary("cnvkit corrected depth", dp_corrected, rep_ids, n_windows)
 
-if region_bed is not None:
-    region_df = read_region_file(region_bed)
-    midpoints = ((win_df["START"] + win_df["END"]) // 2).values
-    chroms = win_df["#CHR"].values
+region_df = read_region_file(region_bed)
+midpoints = ((win_df["START"] + win_df["END"]) // 2).values
+chroms = win_df["#CHR"].values
 
-    r_chrs = region_df["#CHR"].values
-    r_starts = region_df["START"].values
-    r_ends = region_df["END"].values
+r_chrs = region_df["#CHR"].values
+r_starts = region_df["START"].values
+r_ends = region_df["END"].values
 
-    region_ids = np.full(n_windows, None, dtype=object)
-    for k in range(len(region_df)):
-        rid = f"{r_chrs[k]}:{r_starts[k]}-{r_ends[k]}"
-        mask = (chroms == r_chrs[k]) & (midpoints >= r_starts[k]) & (midpoints < r_ends[k])
-        region_ids[mask] = rid
-    win_df["region_id"] = region_ids
-    n_assigned = int((region_ids != None).sum())  # noqa: E711
-    logging.info(
-        f"region_id assigned to {n_assigned}/{n_windows} "
-        f"({n_assigned / max(n_windows, 1) * 100:.1f}%) windows"
-    )
-else:
-    win_df["region_id"] = 0
-    logging.info("no region_bed; setting region_id=0 for all windows")
+region_ids = np.full(n_windows, None, dtype=object)
+for k in range(len(region_df)):
+    rid = f"{r_chrs[k]}:{r_starts[k]}-{r_ends[k]}"
+    mask = (chroms == r_chrs[k]) & (midpoints >= r_starts[k]) & (midpoints < r_ends[k])
+    region_ids[mask] = rid
+win_df["region_id"] = region_ids
+n_assigned = int((region_ids != None).sum())  # noqa: E711
+logging.info(
+    f"region_id assigned to {n_assigned}/{n_windows} "
+    f"({n_assigned / max(n_windows, 1) * 100:.1f}%) windows"
+)
 
 np.savez_compressed(sm.output["dp_corrected"], mat=dp_corrected)
 
