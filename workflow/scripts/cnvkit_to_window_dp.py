@@ -253,12 +253,14 @@ if has_gc:
             logging.info(f"  {prefix}: no windows, skipping")
             return None, None
         ylim = max(np.nanquantile(sub_dp, 0.99), 1.0) * 1.1
+        min_ylim = min(np.nanquantile(sub_dp, 0.01), 0.0) * 1.1
         gc_corr, gc_std = compute_gc_rd_stats(sub_dp, sub_gc, rep_ids)
         plot_rd_gc(
             sub_win, sub_dp, rep_ids, genome_size, qc_dir,
             prefix, "window", "RD", ylim,
             gc_corr=gc_corr, gc_bin_median_std=gc_std,
             run_id=run_id, region_bed=region_bed, blacklist_bed=blacklist_bed,
+            min_ylim=min_ylim,
         )
         return gc_corr, gc_std
 
@@ -278,10 +280,12 @@ if has_gc:
 else:
     logging.info("no GC data; skipping GC-related QC plots")
     ylim = max(np.nanquantile(dp_corr_ref, 0.99), 1.0) * 1.1
+    min_ylim = min(np.nanquantile(dp_corr_ref, 0.01), 0.0) * 1.1
     plot_rd_gc(
         win_df, dp_corr_ref, rep_ids, genome_size, qc_dir,
         "depth_corrected", "window", "RD", ylim,
         run_id=run_id, region_bed=region_bed, blacklist_bed=blacklist_bed,
+        min_ylim=min_ylim,
     )
 
 del dp_raw_ref  # free memory before subdivision
