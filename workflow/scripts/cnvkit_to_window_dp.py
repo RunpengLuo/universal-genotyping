@@ -140,27 +140,30 @@ for i, df in enumerate(cnr_dfs):
 log_nan_summary("cnvkit corrected depth", dp_corrected, rep_ids, n_windows)
 
 dp_raw = None
+cnr_coords = win_df[["#CHR", "START", "END"]]
 try:
-    raw_dfs = []
-    for rep_id in rep_ids:
+    dp_raw = np.full((n_windows, nsamples), np.nan, dtype=np.float32)
+    for i, rep_id in enumerate(rep_ids):
         tgt_file = os.path.join(cnvkit_dir, f"{rep_id}.targetcoverage.cnn")
         anti_file = os.path.join(cnvkit_dir, f"{rep_id}.antitargetcoverage.cnn")
         tgt_df = pd.read_table(tgt_file, sep="\t")
         anti_df = pd.read_table(anti_file, sep="\t")
         raw_df = pd.concat([tgt_df, anti_df], ignore_index=True)
         raw_df = raw_df[raw_df["chromosome"].isin(target_chroms)].reset_index(drop=True)
-        raw_df = raw_df.sort_values(["chromosome", "start"], ignore_index=True)
-        raw_dfs.append(raw_df)
-
-    if all(len(rdf) == n_windows for rdf in raw_dfs):
-        dp_raw = np.zeros((n_windows, nsamples), dtype=np.float32)
-        for i, rdf in enumerate(raw_dfs):
-            dp_raw[:, i] = rdf["depth"].to_numpy(dtype=np.float32)
-        logging.info("loaded raw coverage from .cnn files for QC comparison")
-    else:
-        logging.warning(
-            "raw .cnn bin count differs from .cnr; skipping before/after comparison"
+        raw_df = raw_df.rename(columns={"chromosome": "#CHR", "start": "START", "end": "END"})
+        merged = cnr_coords.merge(
+            raw_df[["#CHR", "START", "END", "depth"]],
+            on=["#CHR", "START", "END"],
+            how="left",
         )
+        dp_raw[:, i] = merged["depth"].to_numpy(dtype=np.float32)
+    n_matched = int(np.isfinite(dp_raw[:, 0]).sum())
+    logging.info(
+        f"loaded raw coverage from .cnn files: {n_matched}/{n_windows} "
+        f"({n_matched / max(n_windows, 1) * 100:.1f}%) bins matched"
+    )
+    if n_matched == 0:
+        dp_raw = None
 except Exception as e:
     logging.warning(
         f"could not load raw .cnn files: {e}; skipping before/after comparison"
