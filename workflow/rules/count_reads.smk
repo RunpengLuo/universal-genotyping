@@ -286,6 +286,6 @@ rule cnvkit_to_window_dp:
     log:
         config["log_dir"] + "/cnvkit_to_window_dp.{assay_type}.log",
     conda:
-        "../envs/cnvkit.yaml"
+        "../envs/base.yaml"
     script:
         """../scripts/cnvkit_to_window_dp.py"""
