@@ -116,15 +116,16 @@ if region_bed is not None:
     midpoints = ((win_df["START"] + win_df["END"]) // 2).values
     chroms = win_df["#CHR"].values
 
-    region_ids = np.full(n_windows, -1, dtype=np.int64)
-    for region_idx, (_, row) in enumerate(region_df.iterrows()):
+    region_ids = np.full(n_windows, None, dtype=object)
+    for _, row in region_df.iterrows():
         r_chr = row["#CHR"] if "#CHR" in region_df.columns else row["Chromosome"]
         r_start = row["START"] if "START" in region_df.columns else row["Start"]
         r_end = row["END"] if "END" in region_df.columns else row["End"]
+        rid = f"{r_chr}:{r_start}-{r_end}"
         mask = (chroms == r_chr) & (midpoints >= r_start) & (midpoints < r_end)
-        region_ids[mask] = region_idx
+        region_ids[mask] = rid
     win_df["region_id"] = region_ids
-    n_assigned = int((region_ids >= 0).sum())
+    n_assigned = int((region_ids != None).sum())  # noqa: E711
     logging.info(
         f"region_id assigned to {n_assigned}/{n_windows} "
         f"({n_assigned / max(n_windows, 1) * 100:.1f}%) windows"
