@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 from io_utils import get_chr_sizes, read_region_file
+from utils import adaptive_dot_size
 
 
 def compute_overlap_weights(win_s, win_e, bb_starts, bb_ends):
@@ -210,17 +211,6 @@ def plot_rd_gc(
     )
 
 
-def _adaptive_dot_size(n_points, s_base=4, s_min=0.5, s_max=10, n_ref=5000):
-    """Scale dot size inversely with point count.
-
-    At *n_ref* points the size equals *s_base*; fewer points → bigger dots,
-    more points → smaller dots, clamped to [s_min, s_max].
-    """
-    if n_points <= 0:
-        return s_base
-    return float(np.clip(s_base * n_ref / n_points, s_min, s_max))
-
-
 def plot_1d_multi_sample(
     pos_df: pd.DataFrame,
     mat: np.ndarray,
@@ -288,7 +278,7 @@ def plot_1d_multi_sample(
 
         x = pos[lo:hi]
         n_chr_pts = hi - lo
-        s_chr = _adaptive_dot_size(n_chr_pts, s_base=s)
+        s_chr = adaptive_dot_size(n_chr_pts, s_base=s)
 
         fig, axes = plt.subplots(
             nrows=n_samples,
@@ -398,7 +388,7 @@ def plot_1d_sample(
         mask_chr = mask[lo:hi] if mask is not None else None
 
         n_plot = int(m.sum())
-        s_chr = _adaptive_dot_size(n_plot, s_base=s)
+        s_chr = adaptive_dot_size(n_plot, s_base=s)
         if n_plot == 0:
             logging.warning(f"{chrom}: all {val_type} values are non-finite")
             continue

@@ -85,6 +85,17 @@ def sort_chroms(chromosomes: list):
     return sorted(chromosomes, key=lambda x: chr2ord[x])
 
 
+def adaptive_dot_size(n_points, s_base=4, s_min=0.5, s_max=10, n_ref=5000):
+    """Scale dot size inversely with point count.
+
+    At *n_ref* points the size equals *s_base*; fewer points -> bigger dots,
+    more points -> smaller dots, clamped to [s_min, s_max].
+    """
+    if n_points <= 0:
+        return s_base
+    return float(np.clip(s_base * n_ref / n_points, s_min, s_max))
+
+
 def sort_df_chr(df: pd.DataFrame, ch="#CHR", pos="POS"):
     """Sort a DataFrame by chromosome (genomic order) then by position, in-place.
 
