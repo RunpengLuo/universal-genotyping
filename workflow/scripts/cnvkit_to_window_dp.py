@@ -89,8 +89,19 @@ if "gc" in ref_cnr.columns:
     win_df["GC"] = ref_cnr["gc"].values
     logging.info("GC column found in .cnr")
 else:
-    win_df["GC"] = np.nan
-    logging.info("no GC column in .cnr; setting GC=NaN")
+    # Load GC from reference.cnn (cnvkit fix drops gc/rmask columns from .cnr)
+    ref_cnn_file = sm.input["reference_cnn"]
+    ref_cnn = pd.read_table(ref_cnn_file, sep="\t")
+    ref_cnn = ref_cnn[ref_cnn["chromosome"].isin(target_chroms)].reset_index(drop=True)
+    if "gc" in ref_cnn.columns and len(ref_cnn) == n_windows:
+        win_df["GC"] = ref_cnn["gc"].values
+        logging.info(f"GC loaded from reference.cnn ({ref_cnn_file})")
+    else:
+        win_df["GC"] = np.nan
+        logging.warning(
+            f"no GC in .cnr or reference.cnn; setting GC=NaN "
+            f"(ref_cnn cols={ref_cnn.columns.tolist()}, rows={len(ref_cnn)} vs {n_windows})"
+        )
 
 if region_bed is not None:
     region_df = read_region_file(region_bed)

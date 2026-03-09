@@ -269,6 +269,7 @@ rule cnvkit_to_window_dp:
             config["bb_dir"] + f"/{wc.assay_type}/cnvkit/{rep_id}.cnr"
             for rep_id in assay2rep_ids[wc.assay_type]
         ],
+        reference_cnn=config["bb_dir"] + "/{assay_type}/cnvkit/reference.cnn",
         sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
         region_bed=config["region_bed"],
         blacklist_bed=config.get("blacklist_bed") or [],
