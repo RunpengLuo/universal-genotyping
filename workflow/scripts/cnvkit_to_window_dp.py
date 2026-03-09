@@ -94,24 +94,16 @@ logging.info(
 
 def _build_depth_map(df):
     """Build (chromosome, start, end) → depth dict."""
-    return {
-        (row["chromosome"], int(row["start"]), int(row["end"])): float(row["depth"])
-        for _, row in df.iterrows()
-    }
+    keys = zip(df["chromosome"], df["start"].astype(int), df["end"].astype(int))
+    return dict(zip(keys, df["depth"].astype(float)))
 
 
 def _fill_depth_matrix(depth_maps, win, fill=0.0):
     """Fill (n_windows, n_samples) matrix from depth maps keyed by coordinates."""
-    n = len(win)
-    mat = np.full((n, len(depth_maps)), fill, dtype=np.float32)
-    chrs = win["#CHR"].values
-    starts = win["START"].values.astype(int)
-    ends = win["END"].values.astype(int)
+    keys = list(zip(win["#CHR"], win["START"].astype(int), win["END"].astype(int)))
+    mat = np.full((len(keys), len(depth_maps)), fill, dtype=np.float32)
     for i, dmap in enumerate(depth_maps):
-        for j in range(n):
-            val = dmap.get((chrs[j], starts[j], ends[j]))
-            if val is not None:
-                mat[j, i] = val
+        mat[:, i] = [dmap.get(k, fill) for k in keys]
     return mat
 
 
@@ -208,6 +200,8 @@ def _extend_windows_to_midpoints(win_df, blacklist_bed, region_bed, genome_size)
     return win_df
 
 
+win_keys = set(zip(win_df["#CHR"], win_df["START"].astype(int), win_df["END"].astype(int)))
+
 cnr_depth_maps = []
 for rep_id in rep_ids:
     cnr_file = os.path.join(cnvkit_dir, f"{rep_id}.cnr")
@@ -215,10 +209,7 @@ for rep_id in rep_ids:
     df = df[df["chromosome"].isin(target_chroms)].reset_index(drop=True)
     dmap = _build_depth_map(df)
     cnr_depth_maps.append(dmap)
-    n_matched = sum(
-        1 for _, r in win_df.iterrows()
-        if (r["#CHR"], int(r["START"]), int(r["END"])) in dmap
-    )
+    n_matched = len(win_keys & dmap.keys())
     logging.info(
         f"  {rep_id}: {len(df)} .cnr bins, {n_matched}/{n_ref} matched to reference.cnn"
     )
@@ -310,23 +301,24 @@ logging.info(
 )
 
 if min_window_length > 0:
-    rows = []
-    for _, row in win_df.iterrows():
-        size = int(row["END"] - row["START"])
-        if size >= min_window_length:
-            n_pieces = max(size // min_window_length, 1)
-            start = int(row["START"])
-            for j in range(n_pieces):
-                sub_start = start + j * min_window_length
-                sub_end = int(row["END"]) if j == n_pieces - 1 else sub_start + min_window_length
-                new_row = row.copy()
-                new_row["START"] = sub_start
-                new_row["END"] = sub_end
-                rows.append(new_row)
-        else:
-            rows.append(row)
+    sizes = (win_df["END"] - win_df["START"]).values
+    n_pieces = np.where(
+        sizes >= min_window_length, np.maximum(sizes // min_window_length, 1), 1
+    ).astype(int)
 
-    win_df = pd.DataFrame(rows).reset_index(drop=True)
+    parent_idx = np.repeat(np.arange(len(win_df)), n_pieces)
+    offsets = np.concatenate([np.arange(p) for p in n_pieces])
+    orig_starts = win_df["START"].values[parent_idx]
+    orig_ends = win_df["END"].values[parent_idx]
+
+    new_starts = orig_starts + offsets * min_window_length
+    is_last = np.zeros(len(parent_idx), dtype=bool)
+    is_last[np.cumsum(n_pieces) - 1] = True
+    new_ends = np.where(is_last, orig_ends, new_starts + min_window_length)
+
+    win_df = win_df.iloc[parent_idx].reset_index(drop=True)
+    win_df["START"] = new_starts
+    win_df["END"] = new_ends
     logging.info(
         f"subdivision (min_window_length={min_window_length}): "
         f"{n_ref} → {len(win_df)} windows"
@@ -355,15 +347,12 @@ win_df = win_df.drop(columns=["_chrom_rank"])
 n_windows = len(win_df)
 logging.info(f"{n_windows} final windows after filtering and sorting")
 
-dp_corrected = np.zeros((n_windows, nsamples), dtype=np.float32)
-for i, depth_map in enumerate(cnr_depth_maps):
-    for j in range(n_windows):
-        key = (
-            win_df.iloc[j]["_parent_chr"],
-            int(win_df.iloc[j]["_parent_start"]),
-            int(win_df.iloc[j]["_parent_end"]),
-        )
-        dp_corrected[j, i] = depth_map.get(key, 0.0)
+parent_win = pd.DataFrame({
+    "#CHR": win_df["_parent_chr"],
+    "START": win_df["_parent_start"],
+    "END": win_df["_parent_end"],
+})
+dp_corrected = _fill_depth_matrix(cnr_depth_maps, parent_win, fill=0.0)
 
 win_df = win_df.drop(columns=["_parent_chr", "_parent_start", "_parent_end"])
 
@@ -379,13 +368,14 @@ if region_bed is not None:
     midpoints = ((win_df["START"] + win_df["END"]) // 2).values
     chroms = win_df["#CHR"].values
 
+    r_chrs = region_df["#CHR"].values
+    r_starts = region_df["START"].values
+    r_ends = region_df["END"].values
+
     region_ids = np.full(n_windows, None, dtype=object)
-    for _, row in region_df.iterrows():
-        r_chr = row["#CHR"] if "#CHR" in region_df.columns else row["Chromosome"]
-        r_start = row["START"] if "START" in region_df.columns else row["Start"]
-        r_end = row["END"] if "END" in region_df.columns else row["End"]
-        rid = f"{r_chr}:{r_start}-{r_end}"
-        mask = (chroms == r_chr) & (midpoints >= r_start) & (midpoints < r_end)
+    for k in range(len(region_df)):
+        rid = f"{r_chrs[k]}:{r_starts[k]}-{r_ends[k]}"
+        mask = (chroms == r_chrs[k]) & (midpoints >= r_starts[k]) & (midpoints < r_ends[k])
         region_ids[mask] = rid
     win_df["region_id"] = region_ids
     n_assigned = int((region_ids != None).sum())  # noqa: E711
