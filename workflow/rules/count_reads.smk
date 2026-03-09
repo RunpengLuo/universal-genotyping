@@ -131,6 +131,7 @@ rule cnvkit_autobin:
     params:
         cnvkit=_cnvkit_exe,
         reference=config["reference"],
+        chroms="|".join(f"chr{c}" for c in config["chromosomes"]),
         extra_flags=cli_flags_str(
             _cnvkit_cfg,
             ("method", "--method"),
@@ -155,6 +156,11 @@ rule cnvkit_autobin:
             --target-output-bed {output.target_bed} \
             --antitarget-output-bed {output.antitarget_bed} \
             {params.extra_flags} > {log} 2>&1
+        # Filter to standard chromosomes (remove alt/random/Un contigs)
+        grep -E '^({params.chroms})\b' {output.target_bed} > {output.target_bed}.tmp \
+            && mv {output.target_bed}.tmp {output.target_bed}
+        grep -E '^({params.chroms})\b' {output.antitarget_bed} > {output.antitarget_bed}.tmp \
+            && mv {output.antitarget_bed}.tmp {output.antitarget_bed}
         """
 
 
