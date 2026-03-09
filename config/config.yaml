@@ -158,6 +158,9 @@ params_cnvkit:
   male_reference: null
   cluster: null
 
+  # post-process cnvkit autobin+fix corrected windows.
+  min_window_length: 1000
+
 ##################################################
 threads:
   genotype: 4

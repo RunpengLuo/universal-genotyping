@@ -285,6 +285,7 @@ rule cnvkit_to_window_dp:
         sample_name=SAMPLE_ID,
         cnvkit_dir=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/cnvkit",
         chromosomes=config["chromosomes"],
+        min_window_length=_cnvkit_cfg.get("min_window_length", 1000),
         run_id=_run_id,
     log:
         config["log_dir"] + f"/cnvkit_to_window_dp.{{assay_type}}.{_run_id}.log",
