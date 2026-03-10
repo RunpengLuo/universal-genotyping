@@ -179,13 +179,16 @@ if use_normal:
         bb_rdr = bb_dp[:, tumor_sidx:] / normal_bb_dp[:, None]
         bb_rdr *= library_correction[None, :]
 else:
-    bb_rdr = np.full((num_bbs, nsamples), np.nan, dtype=np.float32)
-    for i in range(nsamples):
-        col = bb_dp[:, i]
+    rdr_dp = bb_dp[:, tumor_sidx:]
+    rdr_reps = rep_ids[tumor_sidx:]
+    n_rdr = rdr_dp.shape[1]
+    bb_rdr = np.full((num_bbs, n_rdr), np.nan, dtype=np.float32)
+    for i in range(n_rdr):
+        col = rdr_dp[:, i]
         valid_i = np.isfinite(col) & (col > 0)
         if valid_i.any():
             med = np.median(col[valid_i])
-            logging.info(f"  bb median-centering {rep_ids[i]}: median={med:.4f}")
+            logging.info(f"  bb median-centering {rdr_reps[i]}: median={med:.4f}")
             with np.errstate(invalid="ignore", divide="ignore"):
                 bb_rdr[valid_i, i] = col[valid_i] / med
 
