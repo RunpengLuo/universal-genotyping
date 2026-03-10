@@ -166,7 +166,7 @@ log_nan_summary("bb depth", bb_dp, rep_ids, num_bbs)
 
 skip_normal = bool(getattr(sm.params, "skip_normal_normalization", False))
 use_normal = has_normal and not skip_normal
-logging.info(f"compute bb RDR, has_normal={has_normal}, skip_normal_normalization={skip_normal}, use_normal={use_normal}")
+logging.info(f"compute bb RDR, use_normal={use_normal}")
 
 if use_normal:
     window_sizes = (window_df["END"] - window_df["START"]).to_numpy(dtype=np.float64)
