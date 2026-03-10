@@ -44,6 +44,7 @@ rule combine_counts:
         switchprob_ps=config["params_combine_counts"]["switchprob_ps"],
         min_snp_reads=config["params_combine_counts"]["min_snp_reads"],
         min_snp_per_block=config["params_combine_counts"]["min_snp_per_block"],
+        skip_normal_normalization=config["params_combine_counts"].get("skip_normal_normalization", False),
         chromosomes=config["chromosomes"],
         run_id=_run_id,
     threads: 1
