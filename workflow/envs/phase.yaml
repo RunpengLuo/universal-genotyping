@@ -1,0 +1,10 @@
+name: genotyping-phase
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - eagle2
+  - shapeit5
+  - longphase
+  - bcftools>=1.19
+  - tabix

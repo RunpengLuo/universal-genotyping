@@ -16,7 +16,6 @@ rule pileup_snps_bulk_mode1b:
         assay_type="(bulkWGS|bulkWES)",
     threads: config["threads"]["pileup"]
     params:
-        cellsnp_lite=config["cellsnp_lite"],
         minMAF=config["params_cellsnp_lite"]["minMAF_pileup"],
         minCOUNT=config["params_cellsnp_lite"]["minCOUNT_pileup"],
     log:
@@ -26,7 +25,7 @@ rule pileup_snps_bulk_mode1b:
         "../envs/tools.yaml"
     shell:
         r"""
-        {params.cellsnp_lite} \
+        cellsnp-lite \
             -s "{input.bam}" \
             -R "{input.snp_vcf}" \
             -O "{output.out_dir}" \
@@ -58,7 +57,6 @@ rule pileup_snps_single_cell_mode1a:
         assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
     threads: config["threads"]["pileup"]
     params:
-        cellsnp_lite=config["cellsnp_lite"],
         UMItag=lambda wc: branch(
             wc.assay_type == "scATAC",
             then="None",
@@ -67,7 +65,6 @@ rule pileup_snps_single_cell_mode1a:
         cellTAG=config["params_cellsnp_lite"]["cellTAG"],
         minMAF=config["params_cellsnp_lite"]["minMAF_pileup"],
         minCOUNT=config["params_cellsnp_lite"]["minCOUNT_pileup"],
-        bcftools=config["bcftools"],
     log:
         config["log_dir"]
         + f"/pileup_snps_single_cell_mode1a/pileup_snps.{{assay_type}}_{{rep_id}}.{_run_id}.log",
@@ -75,7 +72,7 @@ rule pileup_snps_single_cell_mode1a:
         "../envs/tools.yaml"
     shell:
         r"""
-        {params.cellsnp_lite} \
+        cellsnp-lite \
             -b "{input.barcode}" \
             -s "{input.bam}" \
             -R "{input.snp_vcf}" \

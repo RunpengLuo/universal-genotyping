@@ -57,7 +57,7 @@ routlier = float(sm.params["routlier"])
 doutlier = float(sm.params["doutlier"])
 min_mappability = float(sm.params["min_mappability"])
 gc_correct = bool(sm.params["gc_correct"])
-gc_correct_method = str(sm.params.get("gc_correct_method", "lowess"))
+gc_correct_method = str(sm.params.get("gc_correct_method", "median"))
 rt_correct = bool(sm.params["rt_correct"])
 
 qc_dir = sm.output["qc_dir"]

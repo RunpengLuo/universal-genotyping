@@ -25,7 +25,6 @@ if workflow_mode == "bulk_genotyping":
         threads: config["threads"]["genotype"]
         params:
             chrom="chr{chrname}",
-            bcftools=config["bcftools"],
             min_mapq=config["params_bcftools"]["min_mapq"],
             min_baseq=config["params_bcftools"]["min_baseq"],
             min_dp=config["params_bcftools"]["min_dp"],
@@ -35,7 +34,7 @@ if workflow_mode == "bulk_genotyping":
             "../envs/tools.yaml"
         shell:
             r"""
-            {params.bcftools} mpileup {input.bams} \
+            bcftools mpileup {input.bams} \
                 -f "{input.reference}" \
                 -Ou \
                 --threads {threads} \
@@ -45,16 +44,16 @@ if workflow_mode == "bulk_genotyping":
                 -Q {params.min_baseq} \
                 -d {params.max_depth} \
                 -T {input.target_pos} \
-            | {params.bcftools} call -m \
+            | bcftools call -m \
                 -Oz -o {output.unfiltered_vcf} 2> {log}
 
-            TOTAL=$({params.bcftools} view -H {output.unfiltered_vcf} | wc -l | tr -d ' ')
+            TOTAL=$(bcftools view -H {output.unfiltered_vcf} | wc -l | tr -d ' ')
 
-            {params.bcftools} view {output.unfiltered_vcf} -v snps -m2 -M2 \
+            bcftools view {output.unfiltered_vcf} -v snps -m2 -M2 \
                 -i 'QUAL>={params.min_qual} && GT="alt" && FMT/DP>={params.min_dp}' \
                 -Oz -o {output.snp_vcf} 2>> {log}
 
-            PASS=$({params.bcftools} view -H {output.snp_vcf} | wc -l | tr -d ' ')
+            PASS=$(bcftools view -H {output.snp_vcf} | wc -l | tr -d ' ')
             echo "Total called: $TOTAL, Passed filters: $PASS, Filtered: $((TOTAL - PASS))" >> {log}
 
             tabix -p vcf {output.snp_vcf}
@@ -78,8 +77,6 @@ if workflow_mode == "single_cell_genotyping":
             config["log_dir"] + f"/genotype_snps_pseudobulk.{{modality}}.{_run_id}.log",
         threads: config["threads"]["genotype"]
         params:
-            bcftools=config["bcftools"],
-            cellsnp_lite=config["cellsnp_lite"],
             UMItag=lambda wc: branch(
                 wc.modality == "RNA",
                 then=config["params_cellsnp_lite"]["UMItag"],
@@ -92,7 +89,7 @@ if workflow_mode == "single_cell_genotyping":
         shell:
             r"""
             printf "%s\n" {input.bams} > "{output.bam_lst}"
-            {params.cellsnp_lite} \
+            cellsnp-lite \
                 -S "{output.bam_lst}" \
                 -R "{input.snp_panel}" \
                 -O "{output.out_dir}" \

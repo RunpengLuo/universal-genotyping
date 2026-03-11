@@ -1,14 +1,6 @@
 ##################################################
 # Genotyping YAML configuration file
 ##################################################
-# Path to executables
-bcftools: /path/to/bcftools
-cellsnp_lite: /path/to/cellsnp-lite
-eagle: /path/to/eagle2
-shapeit: /path/to/phase_common_static
-longphase: /path/to/longphase_linux-x64
-mosdepth: /path/to/mosdepth
-cnvkit: /path/to/cnvkit.py
 
 # Output paths, relative to snakemake --directory
 snp_dir: "snps"
@@ -30,9 +22,8 @@ sample_id: sample_id
 sample_file: /path/to/sample.tsv
 chromosomes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
 
-# Skip genotyping & phasing when provided
+# Input for copy-typing preprocess mode.
 het_snp_vcf: null
-# HATCHet CNV profiles and block phased haplotypes
 seg_ucn: null
 bbc_ucn: null
 bbc_phases: null
@@ -53,10 +44,8 @@ ref_label: "cell_type"
 
 ##################################################
 # Population Panel
-snp_panel_version: null
 snp_panel: null
 snp_targets: null
-phasing_panel_version: null
 phasing_panel: null
 
 ##################################################
@@ -94,8 +83,6 @@ params_annotate_snps:
 phaser: "eagle"
 eagle_dir:
 shapeit_dir:
-params_eagle:
-params_shapeit:
 params_longphase:
   min_mapq: 20
   extra_params: "--pb"
@@ -131,7 +118,6 @@ params_count_reads:
 params_combine_counts:
   min_switchprob: 1e-6
   nu: 1
-  max_switchprob: 0.1
   switchprob_ps: 5e-2
   nsnp_multi: 2
   min_snp_reads: 200
@@ -167,6 +153,5 @@ threads:
   genotype: 4
   phase: 4
   pileup: 8
-  postprocess: 2
   mosdepth: 4
   cnvkit: 4

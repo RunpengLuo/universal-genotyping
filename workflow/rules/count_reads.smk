@@ -49,7 +49,6 @@ rule run_mosdepth:
     wildcard_constraints:
         assay_type="bulkWGS",
     params:
-        mosdepth=config["mosdepth"],
         out_prefix=config["pileup_dir"] + "/{assay_type}/out_mosdepth/{rep_id}",
         read_quality=config["params_mosdepth"]["read_quality"],
         extra_params=config["params_mosdepth"].get("extra_params", ""),
@@ -59,7 +58,7 @@ rule run_mosdepth:
         "../envs/tools.yaml"
     shell:
         r"""
-        {params.mosdepth} \
+        mosdepth \
             -t {threads} \
             -Q {params.read_quality} \
             --by {input.windows_bed} \
@@ -99,7 +98,7 @@ rule rd_correct:
         doutlier=_rdr_cfg.get("doutlier", 0.001),
         min_mappability=_rdr_cfg.get("min_mappability", 0.9),
         gc_correct=_rdr_cfg.get("gc_correct", True),
-        gc_correct_method=_rdr_cfg.get("gc_correct_method", "lowess"),
+        gc_correct_method=_rdr_cfg.get("gc_correct_method", "median"),
         rt_correct=_rdr_cfg.get("rt_correct", False),
         assay_type=lambda wc: wc.assay_type,
         run_id=_run_id,
@@ -112,7 +111,6 @@ rule rd_correct:
 
 
 _cnvkit_cfg = config.get("params_cnvkit", {})
-_cnvkit_exe = config.get("cnvkit", "cnvkit.py")
 _cnvkit_threads = config.get("threads", {}).get("cnvkit", 4)
 
 
@@ -130,7 +128,6 @@ rule cnvkit_autobin:
     wildcard_constraints:
         assay_type="bulkWES",
     params:
-        cnvkit=_cnvkit_exe,
         reference=config["reference"],
         chroms="|".join(f"chr{c}" for c in config["chromosomes"]),
         extra_flags=cli_flags_str(
@@ -150,7 +147,7 @@ rule cnvkit_autobin:
         "../envs/cnvkit.yaml"
     shell:
         r"""
-        {params.cnvkit} autobin {input.bam} \
+        cnvkit.py autobin {input.bam} \
             -t {input.targets_bed} \
             -g {input.access_bed} \
             -f {params.reference} \
@@ -176,7 +173,6 @@ rule cnvkit_coverage:
         assay_type="bulkWES",
         region_type="(target|antitarget)",
     params:
-        cnvkit=_cnvkit_exe,
         extra_flags=cli_flags_str(_cnvkit_cfg, ("min_mapq", "-q")),
     threads: _cnvkit_threads
     log:
@@ -185,7 +181,7 @@ rule cnvkit_coverage:
         "../envs/cnvkit.yaml"
     shell:
         r"""
-        {params.cnvkit} coverage {input.bam} {input.interval} \
+        cnvkit.py coverage {input.bam} {input.interval} \
             -o {output.cnn} \
             -p {threads} \
             {params.extra_flags} > {log} 2>&1
@@ -209,7 +205,6 @@ rule cnvkit_reference:
     wildcard_constraints:
         assay_type="bulkWES",
     params:
-        cnvkit=_cnvkit_exe,
         reference=config["reference"],
         extra_flags=cli_flags_str(
             _cnvkit_cfg,
@@ -225,7 +220,7 @@ rule cnvkit_reference:
         "../envs/cnvkit.yaml"
     shell:
         r"""
-        {params.cnvkit} reference {input.normal_cnn} \
+        cnvkit.py reference {input.normal_cnn} \
             -f {params.reference} \
             -o {output.reference_cnn} \
             {params.extra_flags} > {log} 2>&1
@@ -244,7 +239,6 @@ rule cnvkit_fix:
     wildcard_constraints:
         assay_type="bulkWES",
     params:
-        cnvkit=_cnvkit_exe,
         extra_flags=cli_flags_str(
             _cnvkit_cfg,
             ("no_gc", "--no-gc", True),
@@ -257,7 +251,7 @@ rule cnvkit_fix:
         "../envs/cnvkit.yaml"
     shell:
         r"""
-        {params.cnvkit} fix {input.target_cnn} {input.antitarget_cnn} {input.reference_cnn} \
+        cnvkit.py fix {input.target_cnn} {input.antitarget_cnn} {input.reference_cnn} \
             -o {output.cnr} \
             {params.extra_flags} > {log} 2>&1
         """

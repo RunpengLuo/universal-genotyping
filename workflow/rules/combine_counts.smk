@@ -36,11 +36,9 @@ rule combine_counts:
     wildcard_constraints:
         assay_type="(bulkWGS|bulkWES)",
     params:
-        sample_name=SAMPLE_ID,
         assay_type=lambda wc: wc.assay_type,
         nu=config["params_combine_counts"]["nu"],
         min_switchprob=config["params_combine_counts"]["min_switchprob"],
-        max_switchprob=config["params_combine_counts"]["max_switchprob"],
         switchprob_ps=config["params_combine_counts"]["switchprob_ps"],
         min_snp_reads=config["params_combine_counts"]["min_snp_reads"],
         min_snp_per_block=config["params_combine_counts"]["min_snp_per_block"],
@@ -91,11 +89,9 @@ rule combine_counts_nonbulk:
     wildcard_constraints:
         assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
     params:
-        sample_name=SAMPLE_ID,
         assay_type=lambda wc: wc.assay_type,
         nu=config["params_combine_counts"]["nu"],
         min_switchprob=config["params_combine_counts"]["min_switchprob"],
-        max_switchprob=config["params_combine_counts"]["max_switchprob"],
         switchprob_ps=config["params_combine_counts"]["switchprob_ps"],
         nsnp_multi=config["params_combine_counts"]["nsnp_multi"],
         min_snp_reads=config["params_combine_counts"]["min_snp_reads"],

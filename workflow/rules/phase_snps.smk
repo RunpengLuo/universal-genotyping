@@ -12,22 +12,20 @@ if config["phaser"] == "shapeit":
         threads: config["threads"]["phase"]
         params:
             chrom="chr{chrname}",
-            shapeit=config["shapeit"],
-            bcftools=config["bcftools"],
         log:
             config["log_dir"] + f"/phase_snps_shapeit/phase_snps.chr{{chrname}}.{_run_id}.log",
         conda:
-            "../envs/tools.yaml"
+            "../envs/phase.yaml"
         shell:
             r"""
-            {params.shapeit} \
+            phase_common \
                 --input "{input.snp_vcf}" \
                 --map "{input.gmap_file}" \
                 --reference "{input.phasing_panel_file}" \
                 --region "{params.chrom}" \
                 --thread "{threads}" \
                 --output "{output.bcf_file}" > {log} 2>&1
-            
+
             bcftools view -Ov "{output.bcf_file}" | bgzip > "{output.phased_file}"
             tabix -f -p vcf "{output.phased_file}"
             """
@@ -45,16 +43,14 @@ if config["phaser"] == "eagle":
         threads: config["threads"]["phase"]
         params:
             chrom="chr{chrname}",
-            eagle=config["eagle"],
-            bcftools=config["bcftools"],
             out_prefix=config["phase_dir"] + "/chr{chrname}",
         log:
             config["log_dir"] + f"/phase_snps_eagle/phase_snps.chr{{chrname}}.{_run_id}.log",
         conda:
-            "../envs/tools.yaml"
+            "../envs/phase.yaml"
         shell:
             r"""
-            {params.eagle} \
+            eagle \
                 --vcfTarget "{input.snp_vcf}" \
                 --geneticMapFile "{input.gmap_file}" \
                 --vcfRef "{input.phasing_panel_file}" \
@@ -78,19 +74,17 @@ if config["phaser"] == "longphase":
             phased_file=config["phase_dir"] + "/chr{chrname}.vcf.gz",
         params:
             chrom="chr{chrname}",
-            longphase=config["longphase"],
             min_mapq=config["params_longphase"]["min_mapq"],
             extra_params=config["params_longphase"].get("extra_params", ""),
-            bcftools=config["bcftools"],
             out_prefix=config["phase_dir"] + "/chr{chrname}",
         threads: config["threads"]["phase"]
         log:
             config["log_dir"] + f"/phase_snps_longphase/phase_snps.chr{{chrname}}.{_run_id}.log",
         conda:
-            "../envs/tools.yaml"
+            "../envs/phase.yaml"
         shell:
             r"""
-            {params.longphase} phase \
+            longphase phase \
                 --bam-file={input.bams} \
                 --reference={input.reference} \
                 --snp-file={input.snp_vcf} \
@@ -112,15 +106,13 @@ rule concat_and_extract_phased_het_snps:
         phased_vcf_tbi=config["phase_dir"] + "/phased_het_snps.vcf.gz.tbi",
         lst_file=temp(config["phase_dir"] + "/phased_snps.lst"),
     threads: 1
-    params:
-        bcftools=config["bcftools"],
     conda:
         "../envs/tools.yaml"
     shell:
         r"""
         printf "%s\n" {input.vcf_files} > "{output.lst_file}"
-        {params.bcftools} concat -f "{output.lst_file}" -Ou \
-        | {params.bcftools} view -Oz -m2 -M2 -i 'GT="0|1" || GT="1|0"' \
+        bcftools concat -f "{output.lst_file}" -Ou \
+        | bcftools view -Oz -m2 -M2 -i 'GT="0|1" || GT="1|0"' \
             -o "{output.phased_vcf}"
         tabix -f -p vcf "{output.phased_vcf}"
         """
