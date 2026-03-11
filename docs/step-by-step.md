@@ -8,9 +8,11 @@ All tool dependencies are managed via conda environments under `workflow/envs/`:
 
 | Env file | Tools |
 |----------|-------|
+| `base.yaml` | Python scientific stack (scipy, numpy, pandas, numba, anndata, scanpy, etc.) |
 | `tools.yaml` | bcftools, cellsnp-lite, mosdepth, samtools, tabix |
 | `phase.yaml` | eagle2, shapeit5, longphase, bcftools, tabix |
 | `cnvkit.yaml` | cnvkit (WES only) |
+| `snapatac2.yaml` | snapatac2, scanpy (scATAC only) |
 
 Pre-create conda envs before running:
 
@@ -46,7 +48,7 @@ Bulk WGS/WES. Genotypes SNPs (bcftools), phases, computes allele counts and bias
 2. Set `workflow_mode: bulk_genotyping` in config.
 3. **WGS:** Set `window_bed` to a pre-filtered window BED (e.g., from `resources/scripts/build_window_bed.py`).
 4. **WES:** Set `wes_targets_bed` and configure `params_cnvkit`. CNVkit handles all bias correction internally; `window_bed`/mosdepth are not used.
-5. Outputs in `bb_dir/{assay_type}/`: `bb.tsv.gz`, `bb.{Tallele,Aallele,Ballele,baf,depth,rdr}.npz`.
+5. Outputs in `bb_dir/{assay_type}/`: `bb.tsv.gz`, `bb.bed.gz`, `bb.{Tallele,Aallele,Ballele,baf,depth,rdr}.npz`, `sample_ids.tsv`.
 
 ---
 
@@ -56,7 +58,7 @@ scRNA, scATAC, VISIUM, or VISIUM3prime. Pseudobulk genotyping via cellsnp-lite, 
 
 1. Sample sheet with non-bulk samples. Multiome: same `REP_ID` for scRNA + scATAC. Fill in `PATH_to_barcodes` and `PATH_to_10x_ranger`.
 2. Set `workflow_mode: single_cell_genotyping` in config.
-3. Outputs in `bb_dir/{assay_type}/`: `bb.tsv.gz`, `bb.{Tallele,Aallele,Ballele}.npz`.
+3. Outputs in `bb_dir/{assay_type}/`: `bb.tsv.gz`, `bb.bed.gz`, `bb.{Tallele,Aallele,Ballele,baf}.npz`, `multi_snp.tsv.gz`, `multi_snp.{Tallele,Aallele,Ballele}.npz`, `sample_ids.tsv`.
 
 To reuse bulk genotyping results, set `het_snp_vcf` to a prior run's `phase/phased_het_snps.vcf.gz`.
 
@@ -67,8 +69,8 @@ To reuse bulk genotyping results, set `het_snp_vcf` to a prior run's `phase/phas
 Skips genotyping. Aggregates per-cell allele counts onto pre-computed CNV segments.
 
 1. Sample sheet with non-bulk samples.
-2. Set `workflow_mode: copytyping_preprocess`. Provide `het_snp_vcf` and `seg_ucn` in config.
-3. Outputs in `bb_dir/{assay_type}/`: `cnv_segments.tsv`, `{X,Y,D}_count.npz`.
+2. Set `workflow_mode: copytyping_preprocess`. Provide `het_snp_vcf`, `seg_ucn`, `bbc_ucn`, and `bbc_phases` in config.
+3. Outputs in `bb_dir/{assay_type}/`: `cnv_segments.tsv`, `{X,Y,D}_count.npz`, `barcodes.tsv.gz`, `sample_ids.tsv`.
 
 ---
 
@@ -82,4 +84,4 @@ Set `phaser` in config to one of:
 | `shapeit` | `shapeit_dir` — path to SHAPEIT5 directory (must contain `resources/maps/`) |
 | `longphase` | `params_longphase` — `min_mapq`, `extra_params` (e.g., `"--pb"` for PacBio) |
 
-Eagle and shapeit require a phasing reference panel (`phasing_panel` in config). Longphase does not use a genetic map.
+Eagle and shapeit require a phasing reference panel (`phasing_panel` in config). Longphase does not use a genetic map or phasing panel.
