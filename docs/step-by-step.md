@@ -1,5 +1,28 @@
 # Step-by-Step Guide
 
+## Installation
+
+Requires [conda](https://docs.conda.io/en/latest/) or [mamba](https://mamba.readthedocs.io/) and [Snakemake](https://snakemake.readthedocs.io/) >= 7.0.
+
+All tool dependencies are managed via conda environments under `workflow/envs/`:
+
+| Env file | Tools |
+|----------|-------|
+| `tools.yaml` | bcftools, cellsnp-lite, mosdepth, samtools, tabix |
+| `phase.yaml` | eagle2, shapeit5, longphase, bcftools, tabix |
+| `cnvkit.yaml` | cnvkit (WES only) |
+
+Pre-create conda envs before running:
+
+```sh
+snakemake --profile profile/ \
+    --conda-create-envs-only --cores 1 \
+    -s /path/to/workflow/Snakefile \
+    --configfile config/config.yaml
+```
+
+---
+
 ## Running the pipeline
 
 ```sh
@@ -46,3 +69,17 @@ Skips genotyping. Aggregates per-cell allele counts onto pre-computed CNV segmen
 1. Sample sheet with non-bulk samples.
 2. Set `workflow_mode: copytyping_preprocess`. Provide `het_snp_vcf` and `seg_ucn` in config.
 3. Outputs in `bb_dir/{assay_type}/`: `cnv_segments.tsv`, `{X,Y,D}_count.npz`.
+
+---
+
+## Phasing
+
+Set `phaser` in config to one of:
+
+| Phaser | Config keys needed |
+|--------|--------------------|
+| `eagle` | `eagle_dir` — path to Eagle2 directory (must contain `tables/` with genetic map files) |
+| `shapeit` | `shapeit_dir` — path to SHAPEIT5 directory (must contain `resources/maps/`) |
+| `longphase` | `params_longphase` — `min_mapq`, `extra_params` (e.g., `"--pb"` for PacBio) |
+
+Eagle and shapeit require a phasing reference panel (`phasing_panel` in config). Longphase does not use a genetic map.

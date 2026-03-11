@@ -5,3 +5,7 @@ HT001	U1	scRNA	tumor	s1.bam	/path/to/barcodes.tsv.gz	/path/to/outs	/path/to/cell
 HT001	U1	scATAC	tumor	s2.bam	/path/to/barcodes.tsv.gz	/path/to/outs	/path/to/celltypes.tsv
 HT001	U2	VISIUM	tumor	s3.bam	/path/to/barcodes.tsv.gz	/path/to/outs	/path/to/celltypes.tsv
 HT001	U3	VISIUM	tumor	s4.bam	/path/to/barcodes.tsv.gz	/path/to/outs	/path/to/celltypes.tsv
+HT002	N1	bulkWGS	normal	s5.bam
+HT002	T1	bulkWES	tumor	s6.bam
+HT003	T1	bulkWGS	tumor	s7.bam
+HT003	U1	scRNA	tumor	s8.bam	/path/to/barcodes.tsv.gz	/path/to/outs	/path/to/celltypes.tsv
