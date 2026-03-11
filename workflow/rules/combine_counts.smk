@@ -7,8 +7,8 @@
 
 rule combine_counts:
     input:
-        dp_corrected=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/window.dp.npz",
-        window_df=lambda wc: config["bb_dir"] + f"/{wc.assay_type}/window.tsv.gz",
+        dp_corrected=lambda wc: config["pileup_dir"] + f"/{wc.assay_type}/window.dp.npz",
+        window_df=lambda wc: config["pileup_dir"] + f"/{wc.assay_type}/window.tsv.gz",
         snp_info=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snps.tsv.gz",
         tot_mtx_snp=lambda wc: config["allele_dir"]
         + f"/{wc.assay_type}/snp.Tallele.npz",
