@@ -53,6 +53,8 @@ HT001	T1	bulkWGS	tumor	/data/HT001/tumor.bam
 - `sample_type` — `normal` or `tumor`
 - `PATH_to_bam` — absolute path to the BAM file (must be indexed)
 
+You may specify data from multiple patients in same sample sheet, but the workflow will only process one patient at a time depends on specified `sample_id` (see below).
+
 ## 3. Config (`config/config.yaml`)
 
 Copy the template config and edit the sections below. Only the fields that need changing from defaults are shown.
