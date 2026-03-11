@@ -1,6 +1,6 @@
 # Unified Genotyping Pipeline
 
-A Snakemake pipeline for unified SNP genotyping, phasing, and allele counting across multiple assay types (bulk WGS/WES, scRNA, scATAC, VISIUM, VISIUM HD 3prime) from the same patient. Supports bulk genotyping, single-cell genotyping, and copy-typing preprocessing modes.
+Unified Genotyping pipeline inputs BAMs from various assay types (bulk WGS/WES, scRNA, scATAC, VISIUM, VISIUM HD 3prime), performs SNP genotyping, phasing, allele counting, bias correction, and segmentation, and outputs segment-level allele count and feature count matrices.
 
 ---
 
@@ -8,15 +8,16 @@ A Snakemake pipeline for unified SNP genotyping, phasing, and allele counting ac
 
 Requires [conda](https://docs.conda.io/en/latest/) or [mamba](https://mamba.readthedocs.io/) and [Snakemake](https://snakemake.readthedocs.io/) >= 7.0.
 
-Modify `profile/config.yaml` for system configuration and conda path, etc., and run the workflow:
+Modify `profile/config.yaml` for system configuration and conda path, etc.,
 
 ```sh
-snakemake --profile profile/ --conda-create-envs-only --cores 1 \
-    -s workflow/Snakefile
+# install necessary conda environment.
+snakemake --profile /path/to/profile/ \
+    --conda-create-envs-only --cores 1 \
+    -s /path/to/workflow/Snakefile
 
 # use `--dry-run` to check input files are formatted properly
-snakemake --cores <num_cores> \
-    --profile profile/ \
+snakemake --profile /path/to/profile/ \
     -s /path/to/workflow/Snakefile \
     --configfile config/config.yaml \
     --directory <output> \
