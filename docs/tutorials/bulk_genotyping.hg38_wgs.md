@@ -35,7 +35,7 @@ The following are already included in `resources/data/` and do not need to be do
 
 - `windows.1kbp.hg38.bed.gz` — 1 kb window BED with GC, mappability, and replication timing
 - `hg38-blacklist.v2.bed.gz` — ENCODE blacklist v2
-- `hg38.regions.bed` — chromosome region definitions
+- `hg38.regions.bed` — chromosome region definitions, excluded centromeric region and acrocentric short arms (13/14/15/21/22 p-arm)
 
 ## 2. Sample sheet
 
