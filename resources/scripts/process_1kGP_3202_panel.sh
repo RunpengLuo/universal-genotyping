@@ -3,6 +3,11 @@ set -euo pipefail
 
 BASE="https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV"
 
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $0 <output_dir>" >&2
+  exit 1
+fi
+
 OUT=$1
 mkdir -p "${OUT}"/{raw,snps,target_positions,phasing_panel}
 

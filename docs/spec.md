@@ -55,12 +55,10 @@ Common outputs across all modes:
 
 **Bulk (`bulk_genotyping`):**
 - `bb.tsv.gz` — bin annotations.
-- `bb.bed.gz` — bin coordinates in BED format.
 - `bb.{Tallele,Aallele,Ballele,baf,depth,rdr}.npz` — allele, depth, and RDR matrices.
 
 **Single-cell (`single_cell_genotyping`):**
 - `bb.tsv.gz` — bin annotations.
-- `bb.bed.gz` — bin coordinates in BED format.
 - `bb.{Tallele,Aallele,Ballele,baf}.npz` — allele count and BAF matrices.
 - `multi_snp.tsv.gz` — multi-SNP group annotations.
 - `multi_snp.{Tallele,Aallele,Ballele}.npz` — multi-SNP allele count matrices.
@@ -88,9 +86,11 @@ Plots from bias correction and binning steps:
 
 ### `bb.tsv.gz`
 
-**Bulk:** `#CHR`, `START`, `END`, `region_id`, `PS`, `#SNPS`, `BLOCKSIZE`, `bb_id`, `switchprobs`.
+`#CHR`, `START`, `END`, `#SNPS`, `region_id`, `switchprobs`.
 
-**Non-bulk:** `#CHR`, `START`, `END`, `START0`, `END0`, `region_id`, `PS`, `feature_id`, `feature_type`, `#SNPS`, `BLOCKSIZE`, `bb_id`, `switchprobs`.
+### `multi_snp.tsv.gz`
+
+`#CHR`, `START`, `END`, `START0`, `END0`, `region_id`, `feature_id`, `feature_type`, `#SNPS`, `BLOCKSIZE`, `multi_id`, `switchprobs`.
 
 ### `sample_ids.tsv`
 

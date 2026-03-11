@@ -4,17 +4,6 @@ External data required by the pipeline.
 
 ---
 
-## Reference Genome
-
-| Version | Use case | Download |
-|---------|----------|----------|
-| 10x GRCh38 | Single-cell (Cell Ranger) | `curl -O https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2024-A.tar.gz` → `fasta/genome.fa` |
-| NCBI GRCh38 analysis set | Bulk WGS/WES | `wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz` |
-
-The pipeline only uses chr1-22, X, Y for SNP calling and phasing.
-
----
-
 ## SNP Panels
 
 VCF format. Set via `snp_panel` or `snp_targets` in config.

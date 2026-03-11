@@ -4,28 +4,6 @@ Unified Genotyping pipeline inputs BAMs from various assay types (bulk WGS/WES, 
 
 ---
 
-## Quick-Start
-
-Requires [conda](https://docs.conda.io/en/latest/) or [mamba](https://mamba.readthedocs.io/) and [Snakemake](https://snakemake.readthedocs.io/) >= 7.0.
-
-Modify `profile/config.yaml` for system configuration and conda path, etc.,
-
-```sh
-# install necessary conda environment.
-snakemake --profile /path/to/profile/ \
-    --conda-create-envs-only --cores 1 \
-    -s /path/to/workflow/Snakefile
-
-# use `--dry-run` to check input files are formatted properly
-snakemake --profile /path/to/profile/ \
-    -s /path/to/workflow/Snakefile \
-    --configfile config/config.yaml \
-    --directory <output> \
-    --config sample_file=/path/to/sample_file.tsv sample_id=<PATIENT_ID>
-```
-
----
-
 ## Documentation
 
 | Document | Description |

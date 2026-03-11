@@ -120,7 +120,7 @@ params_combine_counts:
   nu: 1
   switchprob_ps: 5e-2
   nsnp_multi: 2
-  min_snp_reads: 200
+  min_snp_reads: 1000
   min_snp_per_block: 10
   skip_normal_normalization: false  # true = always median-center (ignore matched normal)
 

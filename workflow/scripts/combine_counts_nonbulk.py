@@ -158,14 +158,7 @@ if gmap_file is not None:
 else:
     bbs["switchprobs"] = estimate_switchprobs_PS(bbs, switchprob_ps)
 
-bbs.to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
-bbs.to_csv(
-    sm.output["bed_file"],
-    columns=["#CHR", "START", "END"],
-    sep="\t",
-    header=False,
-    index=False,
-)
+bbs[["#CHR", "START", "END", "#SNPS", "region_id", "switchprobs"]].to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
 save_npz(sm.output["tot_mtx_bb"], tot_mtx_bb)
 save_npz(sm.output["a_mtx_bb"], a_mtx_bb)
 save_npz(sm.output["b_mtx_bb"], b_mtx_bb)

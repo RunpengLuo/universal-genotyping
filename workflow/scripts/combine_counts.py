@@ -255,14 +255,7 @@ else:
     switchprob_ps = float(sm.params["switchprob_ps"])
     bbs["switchprobs"] = estimate_switchprobs_PS(bbs, switchprob_ps)
 
-bbs.to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
-bbs.to_csv(
-    sm.output["bed_file"],
-    columns=["#CHR", "START", "END"],
-    sep="\t",
-    header=False,
-    index=False,
-)
+bbs[["#CHR", "START", "END", "#SNPS", "region_id", "switchprobs"]].to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
 np.savez_compressed(sm.output["tot_mtx_bb"], mat=tot_mtx_bb)
 np.savez_compressed(sm.output["a_mtx_bb"], mat=a_mtx_bb)
 np.savez_compressed(sm.output["b_mtx_bb"], mat=b_mtx_bb)

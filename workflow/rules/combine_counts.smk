@@ -30,7 +30,6 @@ rule combine_counts:
         baf_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.baf.npz",
         dp_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.depth.npz",
         rdr_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.rdr.npz",
-        bed_file=config["bb_dir"] + "/{assay_type}/bb.bed.gz",
         sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
         qc_dir=directory(config["qc_dir"] + "/{assay_type}/combine_counts/"),
     wildcard_constraints:
@@ -83,7 +82,6 @@ rule combine_counts_nonbulk:
         a_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Aallele.npz",
         b_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Ballele.npz",
         baf_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.baf.npz",
-        bed_file=config["bb_dir"] + "/{assay_type}/bb.bed.gz",
         sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
         qc_dir=directory(config["qc_dir"] + "/{assay_type}/combine_counts/"),
     wildcard_constraints:
