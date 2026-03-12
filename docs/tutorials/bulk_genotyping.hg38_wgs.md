@@ -6,37 +6,6 @@ This tutorial walks through running the `bulk_genotyping` pipeline on paired nor
 
 Install [conda](https://github.com/conda-forge/miniforge) and [Snakemake](https://snakemake.readthedocs.io/) (>= 7.0). We recommend using the [libmamba solver](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community) for faster dependency resolution (`conda config --set solver libmamba`).
 
-### External data
-
-| Resource | Description |
-|----------|-------------|
-| **SNP panel + targets + phasing panel** | 1000 Genomes phase 3 VCF — we recommend the [1kGP n=3,202 high-coverage](https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/) panel |
-| **Eagle2** | Phasing tool ([download](https://storage.googleapis.com/broad-alkesgroup-public/Eagle/downloads/Eagle_v2.4.1.tar.gz)) — includes genetic maps in `tables/` |
-| **SHAPEIT5** | Phasing tool ([GitHub](https://github.com/odelaneau/shapeit5)) — includes genetic maps in `resources/maps/` |
-| **GTF annotation** | GENCODE v38 ([download](https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz)) |
-
-Download and prepare the 1kGP n=3,202 panel (requires bcftools, bgzip, tabix):
-
-```bash
-bash resources/scripts/process_1kGP_3202_panel.sh /path/to/1kGP_3202
-```
-
-This downloads the raw VCFs and produces three directories under the output path:
-
-| Output | Config key | Contents |
-|--------|------------|----------|
-| `snps.vcf.gz` | `snp_panel` | Merged SNP-only VCF |
-| `target_positions/` | `snp_targets` | `target.chr{1..22,X}.pos.gz` + `.tbi` |
-| `phasing_panel/` | `phasing_panel` | `chr{1..22,X}.genotypes.bcf` + `.csi` |
-
-### Pre-built files
-
-The following are already included in `resources/data/` and do not need to be downloaded:
-
-- `windows.1kbp.hg38.bed.gz` — 1 kb window BED with GC, mappability, and replication timing
-- `hg38-blacklist.v2.bed.gz` — ENCODE blacklist v2
-- `hg38.regions.bed` — chromosome region definitions, excluded centromeric region and acrocentric short arms (13/14/15/21/22 p-arm)
-
 ## 2. Sample sheet
 
 Create a TSV file (e.g., `samples.tsv`) with one row per BAM. For bulk WGS you need five columns:
@@ -47,13 +16,7 @@ HT001	N1	bulkWGS	normal	/data/HT001/normal.bam
 HT001	T1	bulkWGS	tumor	/data/HT001/tumor.bam
 ```
 
-- `SAMPLE` — patient identifier (must match `sample_id` in config)
-- `REP_ID` — unique per row
-- `assay_type` — `bulkWGS`
-- `sample_type` — `normal` or `tumor`
-- `PATH_to_bam` — absolute path to the BAM file (must be indexed)
-
-You may specify data from multiple patients in same sample sheet, but the workflow will only process one patient at a time depends on specified `sample_id` (see below).
+You may specify data from multiple patients in same sample sheet, but the workflow will only process one patient at a time depends on specified `sample_id` in config file. See [docs/spec.md](../spec.md) for detailed format.
 
 ## 3. Config (`config/config.yaml`)
 
@@ -76,6 +39,13 @@ chromosomes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
 
 ### Reference
 
+| Resource | Description |
+|----------|-------------|
+| `windows.1kbp.hg38.bed.gz` | Pre-built 1 kb window BED with GC, mappability, and replication timing (included in `resources/data/`) |
+| `hg38-blacklist.v2.bed.gz` | ENCODE blacklist v2 (included in `resources/data/`) |
+| `hg38.regions.bed` | Chromosome region definitions, excluded centromeric region and acrocentric short arms (13/14/15/21/22 p-arm) (included in `resources/data/`) |
+| **GTF annotation** | GENCODE v38 ([download](https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz)) |
+
 ```yaml
 reference_version: hg38
 reference: /path/to/reference.fasta
@@ -86,19 +56,28 @@ blacklist_bed: resources/data/hg38-blacklist.v2.bed.gz
 gtf_file: /path/to/gencode.v38.annotation.gtf.gz
 ```
 
-### Population panels
+### SNP and Phasing panels
+We recommend the [1kGP n=3,202 high-coverage](https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/) panel. Download and prepare the 1kGP n=3,202 panel (requires bcftools, bgzip, tabix):
+
+```bash
+bash resources/scripts/process_1kGP_3202_panel.sh /path/to/1kGP_3202
+```
+
+This script will produce three directories under the output path:
 
 ```yaml
-snp_panel: /path/to/snp_panel.vcf.gz
-snp_targets: /path/to/snp_targets
+snp_panel: /path/to/snps.vcf.gz
+snp_targets: /path/to/target_positions
 phasing_panel: /path/to/phasing_panel
 ```
 
-The `phasing_panel` directory should contain per-chromosome BCF files.
-
 ### Phasing
+| Resource | Description |
+|----------|-------------|
+| **Eagle2** | Phasing tool ([download](https://storage.googleapis.com/broad-alkesgroup-public/Eagle/downloads/Eagle_v2.4.1.tar.gz)) — includes genetic maps in `tables/` |
+| **SHAPEIT5** | Phasing tool ([GitHub](https://github.com/odelaneau/shapeit5)) — includes genetic maps in `resources/maps/` |
 
-Pick one of Eagle2 or SHAPEIT5. Both require a genetic map (gmap) bundled with the tool distribution.
+Pick one of Eagle2 or SHAPEIT5. Both require a genetic map (gmap) bundled with the tool distribution. SHAPEIT5 is recommended.
 
 **Eagle2** — set `eagle_dir` to the extracted Eagle2 directory. The pipeline looks for the gmap at `{eagle_dir}/tables/genetic_map_hg38_withX.txt.gz`.
 
@@ -115,11 +94,11 @@ shapeit_dir: /path/to/shapeit5
 ```
 
 ### Count reads
-For bulk WGS data, by default we apply quadratic median regression to correct GC content and replication timing biases while being robust to copy-number signals. Refer to `<qc_dir>/<assay_type>/rd_correction/*`, check read-depth plots and KDE scatter plot for diagonstic purpose.
+By default, we apply quadratic median regression to correct GC content and replication timing biases while being robust to copy-number signals. Use read-depth plots and KDE scatter plot for diagnostic purpose under `<qc_dir>/<assay_type>/rd_correction/*`.
 
 ### Combine counts
 
-For bulk WGS, `min_snp_reads` and `min_snp_per_block` balanced the bin size and phase-switch errors from reference phasing, we recommend to leave them as default, but if the number of bins are pretty small due to low coverage, you may decrease them accordingly.
+`min_snp_reads` and `min_snp_per_block` balanced the bin size and phase-switch errors from reference phasing. Use bb BAF and RDR genome-level plot for diagnostic purpose under `<qc_dir>/<assay_type>/combine_counts/*`. If the bins are pretty sparse or noisy, please decrease or increase the parameters accordingly. We recommend leaving them as default.
 
 ```yaml
 params_combine_counts:
@@ -128,38 +107,23 @@ params_combine_counts:
 ```
 
 ## 4. Profile and running
-
-### Create the Snakemake profile
-
-The repository includes a profile at `profile/config.yaml`. You may ddjust `cores` to match your machine.
-
-```yaml
-cores: 16
-use-conda: true
-conda-prefix: .snakemake/conda
-printshellcmds: true
-show-failed-logs: true
-verbose: true
-rerun-triggers:
-  - mtime
-  - input
-```
+You may use the profile at `profile/config.yaml` to adjust snakemake parameters like `cores` to match your machine.
 
 ### Pre-create conda environments
 
 ```bash
-snakemake --profile profile/ \
+snakemake --profile /path/to/profile/ \
     --conda-create-envs-only --cores 1 \
-    -s workflow/Snakefile \
-    --configfile config/config.yaml
+    -s /path/to/workflow/Snakefile \
+    --configfile /path/to/config/config.yaml
 ```
 
 ### Run the pipeline
 
 ```bash
-snakemake --profile profile/ \
-    -s workflow/Snakefile \
-    --configfile config/config.yaml \
+snakemake --profile /path/to/profile/ \
+    -s /path/to/workflow/Snakefile \
+    --configfile /path/to/config/config.yaml \
     --directory /path/to/output_dir \
     --config sample_file=/path/to/samples.tsv sample_id=HT001
 ```
