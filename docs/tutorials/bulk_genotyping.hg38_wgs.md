@@ -16,7 +16,7 @@ HT001	N1	bulkWGS	normal	/data/HT001/normal.bam
 HT001	T1	bulkWGS	tumor	/data/HT001/tumor.bam
 ```
 
-You may specify data from multiple patients in same sample sheet, but the workflow will only process one patient at a time depends on specified `sample_id` in config file. See [docs/spec.md](../spec.md) for detailed format.
+You may specify data from multiple patients in same sample sheet, but the workflow will only process one patient at a time depends on specified `sample_id` in config file. See [docs/reference.md](../reference.md) for detailed format.
 
 ## 3. Config (`config/config.yaml`)
 
@@ -110,12 +110,10 @@ params_combine_counts:
 You may use the profile at `profile/config.yaml` to adjust snakemake parameters like `cores` to match your machine.
 
 ### Pre-create conda environments
-
 ```bash
 snakemake --profile /path/to/profile/ \
     --conda-create-envs-only --cores 1 \
-    -s /path/to/workflow/Snakefile \
-    --configfile /path/to/config/config.yaml
+    -s /path/to/workflow/Snakefile
 ```
 
 ### Run the pipeline
@@ -132,4 +130,4 @@ The `--config` flags on the command line override values in `config.yaml`, so yo
 
 ## 5. Results
 
-Final outputs required by HATCHet3 can be found in `<out_dir>/<bb_dir>/bulkWGS/`. See [docs/spec.md](../spec.md) for the full output specification including intermediate files.
+Final outputs required by HATCHet3 can be found in `<out_dir>/<bb_dir>/bulkWGS/`. See [docs/reference.md](../reference.md) for the full output specification including intermediate files.

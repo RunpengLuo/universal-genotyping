@@ -27,8 +27,13 @@ assay_type2feature_type = {
     "VISIUM3prime": "gene",
 }
 
-# Allow parsing rule files without a real config (e.g., --conda-create-envs-only)
-_has_config = "workflow_mode" in config
+# Skip validation when no real config is provided (e.g., --conda-create-envs-only).
+# Detected by checking that sample_file points to an existing file.
+_has_config = (
+    "workflow_mode" in config
+    and config.get("sample_file") is not None
+    and os.path.isfile(config["sample_file"])
+)
 
 if _has_config:
     ##################################################
@@ -275,6 +280,14 @@ else:
         shell:
             "touch {output}"
 
+    rule _conda_env_phase:
+        output:
+            temp(".conda_env_phase"),
+        conda:
+            "envs/phase.yaml"
+        shell:
+            "touch {output}"
+
     rule _conda_env_cnvkit:
         output:
             temp(".conda_env_cnvkit"),
@@ -295,6 +308,7 @@ else:
         input:
             ".conda_env_base",
             ".conda_env_tools",
+            ".conda_env_phase",
             ".conda_env_cnvkit",
             ".conda_env_snapatac2",
         default_target: True

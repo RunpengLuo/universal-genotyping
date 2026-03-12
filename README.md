@@ -11,5 +11,6 @@ Unified Genotyping pipeline inputs BAMs from various assay types (bulk WGS/WES, 
 | [config/config.yaml](config/config.yaml) | Workflow configuration file. |
 | [config/samples.tsv](config/samples.tsv) | Template of sample file. |
 | [docs/step-by-step.md](docs/step-by-step.md) | Step-by-step guide for running all three workflow modes. |
-| [docs/spec.md](docs/spec.md) | Input/output reference. |
-| [resources/README.md](resources/README.md) | External data: SNP panels, phasing panels, GTF files, bias BEDs, phasing tools. |
+| [docs/tutorials/bulk_genotyping.hg38_wgs.md](docs/tutorials/bulk_genotyping.hg38_wgs.md) | Tutorial: bulk WGS genotyping on hg38. |
+| [docs/reference.md](docs/reference.md) | Input/output reference. |
+| [resources/README.md](resources/README.md) | External resources. |

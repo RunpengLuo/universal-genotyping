@@ -14,13 +14,11 @@ All tool dependencies are managed via conda environments under `workflow/envs/`:
 | `cnvkit.yaml` | cnvkit (WES only) |
 | `snapatac2.yaml` | snapatac2, scanpy (scATAC only) |
 
-Pre-create conda envs before running:
 
 ```sh
 snakemake --profile /path/to/workflow/profile/ \
     --conda-create-envs-only --cores 1 \
-    -s /path/to/workflow/Snakefile \
-    --configfile config/config.yaml
+    -s /path/to/workflow/Snakefile
 ```
 
 ---
