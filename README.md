@@ -1,4 +1,4 @@
-# Unified Genotyping Pipeline
+# Unified Genotyping Pipeline (Under development)
 
 Unified Genotyping pipeline inputs BAMs from various assay types (bulk WGS/WES, scRNA, scATAC, VISIUM, VISIUM HD 3prime), performs SNP genotyping, phasing, allele counting, bias correction, and segmentation, and outputs segment-level allele count and feature count matrices.
 
