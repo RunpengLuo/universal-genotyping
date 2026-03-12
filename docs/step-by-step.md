@@ -43,7 +43,7 @@ Bulk WGS/WES. Genotypes SNPs (bcftools), phases, computes allele counts and bias
 
 1. Sample sheet with `assay_type` = `bulkWGS` or `bulkWES`, including normal and tumor.
 2. Set `workflow_mode: bulk_genotyping` in config.
-3. **WGS:** Set `window_bed` to a pre-filtered window BED (e.g., build using `resources/scripts/build_window_bed.py` or use pre-built `resources/data/windows.1kbp.hg38.bed.gz`).
+3. **WGS:** Set `window_bed` to a pre-filtered window BED (e.g., build using `resources/scripts/build_wgs_window_bed.py` or use pre-built `resources/data/windows.1kbp.hg38.bed.gz`).
 4. **WES:** Set `wes_targets_bed` and configure `params_cnvkit`. CNVkit handles WES RD preprocessing and GC corrections. `wes_targets_bed` is target capture regions provided by the sequencing platform.
 5. Outputs in `bb_dir/{assay_type}/`:
    - `bb.tsv.gz` — bin annotations.
