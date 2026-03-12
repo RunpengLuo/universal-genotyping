@@ -18,7 +18,7 @@ if config["phaser"] == "shapeit":
             "../envs/phase.yaml"
         shell:
             r"""
-            phase_common \
+            phase_common_static \
                 --input "{input.snp_vcf}" \
                 --map "{input.gmap_file}" \
                 --reference "{input.phasing_panel_file}" \
