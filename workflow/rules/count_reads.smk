@@ -99,6 +99,7 @@ rule rd_correct:
         gc_correct=_rdr_cfg.get("gc_correct", True),
         gc_correct_method=_rdr_cfg.get("gc_correct_method", "median"),
         rt_correct=_rdr_cfg.get("rt_correct", False),
+        min_window_size=_rdr_cfg.get("min_window_size", 0),
         assay_type=lambda wc: wc.assay_type,
         run_id=_run_id,
     log:
