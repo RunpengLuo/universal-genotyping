@@ -29,6 +29,7 @@ import pyranges as pr
 
 from window_bed_utils import (
     _sort_windows,
+    _tile_region,
     assign_region_id,
     compute_gc,
     compute_mappability,
@@ -41,26 +42,6 @@ from window_bed_utils import (
 # ---------------------------------------------------------------------------
 # Window generation
 # ---------------------------------------------------------------------------
-
-
-def _tile_region(chrom, start, end, window_size):
-    """Tile a single region into fixed-size windows, merging last short bin.
-
-    If the last window is shorter than window_size // 2 and there is a previous
-    window, it is merged into the previous window (extending its END).  Regions
-    smaller than window_size // 2 still emit one window.
-    """
-    rows = []
-    pos = start
-    while pos < end:
-        w_end = min(pos + window_size, end)
-        rows.append([chrom, pos, w_end])
-        pos = w_end
-    # Merge last bin into previous if undersized
-    if len(rows) > 1 and (rows[-1][2] - rows[-1][1]) < window_size // 2:
-        rows[-2][2] = rows[-1][2]
-        rows.pop()
-    return rows
 
 
 def generate_wgs_windows(genome_size_file, window_size, standard_chroms,

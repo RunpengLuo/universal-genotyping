@@ -314,166 +314,6 @@ def correct_readcount_quadreg(
     return corrected.astype(np.float32), rmse
 
 
-def _rolling_median(x, fraction):
-    """Rolling median with mirrored edge padding.
-
-    Reimplements the smoothing approach from CNVkit (cnvlib/smoothing.py).
-    """
-    import pandas as pd
-
-    x = np.asarray(x, dtype=float)
-    wing = max(3, int(np.ceil(len(x) * fraction * 0.5)))
-    wing = min(wing, len(x) - 1)
-    padded = np.concatenate((x[wing - 1 :: -1], x, x[: -wing - 1 : -1]))
-    rolled = pd.Series(padded).rolling(2 * wing + 1, 1, center=True).median()
-    return np.asarray(rolled[wing:-wing], dtype=float)
-
-
-def _center_by_window(log2_vals, sort_key, fraction=None, seed=0xA5EED):
-    """CNVkit-style bias correction via rolling median on shuffled+sorted data.
-
-    Reimplements cnvlib/fix.py:center_by_window. The key insight is:
-    1. Shuffle bins randomly to break spatial clustering of same-GC bins
-       (prevents re-centering of real CNV regions)
-    2. Sort by the bias covariate (e.g. GC content)
-    3. Rolling median to estimate the bias trend
-    4. Subtract bias from log2 values
-
-    Reference: https://cnvkit.readthedocs.io/en/stable/bias.html
-
-    Parameters
-    ----------
-    log2_vals : np.ndarray
-        Log2 depth values.
-    sort_key : np.ndarray
-        Per-bin bias covariate (e.g. GC fraction).
-    fraction : float or None
-        Rolling window fraction. If None, uses max(0.01, n^-0.5) following
-        the CNVkit default.
-    seed : int
-        Random seed for shuffling (CNVkit uses 0xA5EED).
-
-    Returns
-    -------
-    np.ndarray
-        Corrected log2 values (same length, original order).
-    """
-    n = len(log2_vals)
-    if n < 10:
-        return log2_vals.copy()
-
-    if fraction is None:
-        fraction = max(0.01, n**-0.5)
-
-    log2 = log2_vals.copy()
-
-    rng = np.random.default_rng(seed)
-    shuffle_order = rng.permutation(n)
-    log2_shuf = log2[shuffle_order]
-    key_shuf = sort_key[shuffle_order]
-
-    sort_order = np.argsort(key_shuf, kind="mergesort")
-    log2_sorted = log2_shuf[sort_order]
-
-    biases = _rolling_median(log2_sorted, fraction)
-
-    log2_sorted -= biases
-
-    # Reverse sort and shuffle to restore original order
-    unsort = np.empty_like(sort_order)
-    unsort[sort_order] = np.arange(n)
-    log2_unshuf = log2_sorted[unsort]
-
-    unshuffle = np.empty_like(shuffle_order)
-    unshuffle[shuffle_order] = np.arange(n)
-    return log2_unshuf[unshuffle]
-
-
-def correct_readcount_wes(reads, gc, is_target, mappability=None, min_mappability=0.9):
-    """WES-specific bias correction using CNVkit-style rolling median.
-
-    Applies GC correction separately to target and antitarget windows using
-    the center_by_window approach from CNVkit (cnvlib/fix.py). Works in log2
-    space and corrects for GC bias via rolling median on shuffled+sorted data.
-
-    Optionally applies a second pass for mappability correction.
-
-    Parameters
-    ----------
-    reads : np.ndarray
-        Raw read counts per window (1-D).
-    gc : np.ndarray
-        Per-window GC fraction in [0, 1].
-    is_target : np.ndarray
-        Boolean mask indicating target (True) vs antitarget (False) windows.
-    mappability : np.ndarray or None
-        Per-window mappability values in [0, 1]. If provided, a second
-        correction pass is applied for mappability bias.
-    min_mappability : float
-        Minimum mappability for valid bins (bins below are set to NaN).
-
-    Returns
-    -------
-    np.ndarray
-        Corrected read counts (same length as *reads*).
-    float
-        RMSE from the GC correction (root mean squared error between raw
-        and corrected depth at valid bins, combined across target and
-        antitarget groups).
-    """
-    corrected = np.full(len(reads), np.nan, dtype=np.float64)
-    gc_rmse_parts = []
-
-    for label, mask in [("target", is_target), ("antitarget", ~is_target)]:
-        idx = np.where(mask)[0]
-        if len(idx) < 10:
-            continue
-
-        r = reads[idx].astype(np.float64)
-        g = gc[idx]
-
-        valid = (r > 0) & np.isfinite(g)
-        if mappability is not None:
-            valid &= mappability[idx] >= min_mappability
-
-        if valid.sum() < 10:
-            logging.warning(
-                f"    {label}: only {valid.sum()} valid bins; skipping correction"
-            )
-            continue
-
-        with np.errstate(divide="ignore", invalid="ignore"):
-            log2_r = np.where(valid, np.log2(np.maximum(r, 1e-10)), np.nan)
-
-        median_log2 = np.nanmedian(log2_r[valid])
-        log2_centered = log2_r - median_log2
-
-        valid_log2 = log2_centered[valid]
-        valid_gc = g[valid]
-        corrected_log2 = _center_by_window(valid_log2, valid_gc)
-
-        if mappability is not None:
-            valid_map = mappability[idx][valid]
-            corrected_log2 = _center_by_window(corrected_log2, valid_map)
-
-        corrected_log2 += median_log2
-        out = np.full(len(idx), np.nan)
-        out[valid] = 2.0**corrected_log2
-        corrected[idx] = out
-
-        gc_rmse_parts.append(r[valid] - out[valid])
-
-        n_valid = int(valid.sum())
-        n_nan = int(np.isnan(out).sum())
-        logging.info(
-            f"    {label:<12s}  {n_valid:>8d}/{len(idx)} valid,  "
-            f"{n_nan:>8d}/{len(idx)} NaN"
-        )
-
-    gc_rmse = float(np.sqrt(np.mean(np.concatenate(gc_rmse_parts) ** 2))) if gc_rmse_parts else 0.0
-    return corrected.astype(np.float32), gc_rmse
-
-
 def _plot_cov_panel(ax, covariate, reads, xlabel, show_ylabel, rep_id,
                     rmse=None, is_before=False, xlim=None, xticks=None):
     """KDE density scatter of readcov vs a covariate on a single axes."""
@@ -526,7 +366,7 @@ def _plot_cov_panel(ax, covariate, reads, xlabel, show_ylabel, rep_id,
 
 
 def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf, gc_rmse=None,
-                           mappability=None, repliseq=None):
+                           mappability=None, repliseq=None, title_prefix=""):
     """Two-page PDF: before/after correction KDE density plots.
 
     Each page has up to 3 rows (GC, MAP, RT) x nsamples columns.
@@ -539,6 +379,8 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf, gc_rmse=None,
         Per-window mappability values. If provided, a MAP row is added.
     repliseq : np.ndarray or None
         Per-window replication timing values. If provided, an RT row is added.
+    title_prefix : str
+        Optional prefix for page titles (e.g. ``"target — "``).
     """
     nsamples = len(rep_ids)
     panel_w = max(5, 5 * nsamples)
@@ -576,7 +418,7 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf, gc_rmse=None,
                     is_before=is_before,
                     **kw,
                 )
-        fig.suptitle(title, fontsize=14)
+        fig.suptitle(f"{title_prefix}{title}", fontsize=14)
         plt.tight_layout()
         pdf.savefig(fig, dpi=150)
         plt.close(fig)

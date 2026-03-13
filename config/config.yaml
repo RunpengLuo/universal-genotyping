@@ -37,7 +37,6 @@ genome_size: null
 region_bed: null
 window_bed: null
 blacklist_bed: null
-wes_targets_bed: null
 gene_blacklist_file: null
 gtf_file: null
 ref_label: "cell_type"
@@ -122,31 +121,8 @@ params_combine_counts:
   nsnp_multi: 2
   min_snp_reads: 1000
   min_snp_per_block: 10
-  skip_normal_normalization: false  # true = always median-center (ignore matched normal)
-
-##################################################
-# CNVkit parameters (bulkWES only)
-params_cnvkit:
-  # autobin
-  method: "hybrid"
-  bp_per_bin: null
-  target_max_size: null
-  target_min_size: null
-  antitarget_max_size: null
-  antitarget_min_size: null
-  annotate: null
-  short_names: null
-  # coverage
-  min_mapq: null
-  # reference + fix
-  no_gc: null
-  no_edge: null
-  no_rmask: null
-  male_reference: null
-  cluster: null
-
-  # post-process cnvkit autobin+fix corrected windows.
-  min_window_length: 1000
+  min_total_bases: 100
+  skip_normal_normalization: false  # true = median-center (ignore matched normal)
 
 ##################################################
 threads:
@@ -154,4 +130,3 @@ threads:
   phase: 4
   pileup: 8
   mosdepth: 4
-  cnvkit: 4

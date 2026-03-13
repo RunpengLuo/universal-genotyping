@@ -56,7 +56,7 @@ Set via `window_bed` in config. A pre-built file is at `data/windows.1kbp.hg38.b
 
 To build from scratch:
 - **WGS:** [`scripts/build_wgs_window_bed.py`](scripts/build_wgs_window_bed.py) — fixed-size tiling with region/blacklist filtering.
-- **WES:** [`scripts/build_wes_window_bed.py`](scripts/build_wes_window_bed.py) — target+antitarget splitting via `--wes_targets_bed`.
+- **WES:** [`scripts/build_wes_window_bed.py`](scripts/build_wes_window_bed.py) — adaptive tiling of WES capture targets via `--wes_targets_bed`.
 
 ### Mappability track
 

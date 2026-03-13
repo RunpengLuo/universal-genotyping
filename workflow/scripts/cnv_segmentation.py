@@ -1,4 +1,4 @@
-import os, sys, gzip, logging, shutil
+import os, logging, shutil
 from snakemake.script import snakemake as sm
 
 t = int(getattr(sm, "threads", 1))
@@ -11,7 +11,6 @@ os.environ["NUMEXPR_NUM_THREADS"] = str(t)
 import numpy as np
 import pandas as pd
 from scipy.sparse import save_npz, load_npz
-import anndata
 import scanpy as sc
 from utils import *
 from io_utils import *

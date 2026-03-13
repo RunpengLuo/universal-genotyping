@@ -1,10 +1,9 @@
 ##################################################
 # Read depth computation and bias correction (bulk only)
 #
-# bulkWGS: mosdepth fixed-window depth + HMMcopy-style LOWESS correction
-# bulkWES: CNVkit autobin/coverage/reference/fix pipeline
+# bulkWGS/bulkWES: mosdepth fixed-window depth + HMMcopy-style LOWESS correction
 #
-# Both produce window.dp.npz + window.tsv.gz consumed by combine_counts.
+# Produces window.dp.npz + window.tsv.gz consumed by combine_counts.
 ##################################################
 
 _rdr_cfg = config.get("params_count_reads", {})
@@ -47,7 +46,7 @@ rule run_mosdepth:
         + "/{assay_type}/out_mosdepth/{rep_id}.regions.bed.gz",
     threads: config["threads"]["mosdepth"]
     wildcard_constraints:
-        assay_type="bulkWGS",
+        assay_type="(bulkWGS|bulkWES)",
     params:
         out_prefix=config["pileup_dir"] + "/{assay_type}/out_mosdepth/{rep_id}",
         read_quality=config["params_mosdepth"]["read_quality"],
@@ -88,7 +87,7 @@ rule rd_correct:
         window_df=config["pileup_dir"] + "/{assay_type}/window.tsv.gz",
         qc_dir=directory(config["qc_dir"] + "/{assay_type}/rd_correction/"),
     wildcard_constraints:
-        assay_type="bulkWGS",
+        assay_type="(bulkWGS|bulkWES)",
     params:
         sample_name=SAMPLE_ID,
         mosdepth_dir=lambda wc: config["pileup_dir"] + f"/{wc.assay_type}/out_mosdepth",
@@ -110,180 +109,3 @@ rule rd_correct:
         """../scripts/rd_correct.py"""
 
 
-_cnvkit_cfg = config.get("params_cnvkit", {})
-_cnvkit_threads = config.get("threads", {}).get("cnvkit", 4)
-
-
-rule cnvkit_autobin:
-    """Estimate bin sizes from a representative BAM; produce target/antitarget BEDs."""
-    input:
-        bam=lambda wc: branch(
-            len(normal_bams) > 0, then=normal_bams[0], otherwise=tumor_bams[0]
-        ),
-        targets_bed=config.get("wes_targets_bed") or [],
-        access_bed=config["region_bed"],
-    output:
-        target_bed=config["pileup_dir"] + "/{assay_type}/cnvkit/targets.bed",
-        antitarget_bed=config["pileup_dir"] + "/{assay_type}/cnvkit/antitargets.bed",
-    wildcard_constraints:
-        assay_type="bulkWES",
-    params:
-        reference=config["reference"],
-        chroms="|".join(f"chr{c}" for c in config["chromosomes"]),
-        extra_flags=cli_flags_str(
-            _cnvkit_cfg,
-            ("method", "--method"),
-            ("bp_per_bin", "--bp-per-bin"),
-            ("target_max_size", "--target-max-size"),
-            ("target_min_size", "--target-min-size"),
-            ("antitarget_max_size", "--antitarget-max-size"),
-            ("antitarget_min_size", "--antitarget-min-size"),
-            ("annotate", "--annotate"),
-            ("short_names", "--short-names", True),
-        ),
-    log:
-        config["log_dir"] + f"/cnvkit_autobin.{{assay_type}}.{_run_id}.log",
-    conda:
-        "../envs/cnvkit.yaml"
-    shell:
-        r"""
-        cnvkit.py autobin {input.bam} \
-            -t {input.targets_bed} \
-            -g {input.access_bed} \
-            -f {params.reference} \
-            --target-output-bed {output.target_bed} \
-            --antitarget-output-bed {output.antitarget_bed} \
-            {params.extra_flags} > {log} 2>&1
-        # Filter to standard chromosomes (remove alt/random/Un contigs)
-        grep -E '^({params.chroms})\b' {output.target_bed} > {output.target_bed}.tmp \
-            && mv {output.target_bed}.tmp {output.target_bed}
-        grep -E '^({params.chroms})\b' {output.antitarget_bed} > {output.antitarget_bed}.tmp \
-            && mv {output.antitarget_bed}.tmp {output.antitarget_bed}
-        """
-
-
-rule cnvkit_coverage:
-    """Compute read coverage over target or antitarget regions per replicate."""
-    input:
-        bam=lambda wc: get_data[(wc.assay_type, wc.rep_id)][1],
-        interval=config["pileup_dir"] + "/{assay_type}/cnvkit/{region_type}s.bed",
-    output:
-        cnn=config["pileup_dir"] + "/{assay_type}/cnvkit/{rep_id}.{region_type}coverage.cnn",
-    wildcard_constraints:
-        assay_type="bulkWES",
-        region_type="(target|antitarget)",
-    params:
-        extra_flags=cli_flags_str(_cnvkit_cfg, ("min_mapq", "-q")),
-    threads: _cnvkit_threads
-    log:
-        config["log_dir"] + f"/cnvkit_coverage.{{assay_type}}_{{rep_id}}.{{region_type}}.{_run_id}.log",
-    conda:
-        "../envs/cnvkit.yaml"
-    shell:
-        r"""
-        cnvkit.py coverage {input.bam} {input.interval} \
-            -o {output.cnn} \
-            -p {threads} \
-            {params.extra_flags} > {log} 2>&1
-        """
-
-
-rule cnvkit_reference:
-    """Build a pooled reference from normal-sample coverage files."""
-    input:
-        normal_cnn=lambda wc: [
-            config["pileup_dir"] + f"/{wc.assay_type}/cnvkit/{rep_id}.{rt}coverage.cnn"
-            for rep_id, st in zip(
-                assay2rep_ids[wc.assay_type],
-                assay2sample_types[wc.assay_type],
-            )
-            if st == "normal"
-            for rt in ["target", "antitarget"]
-        ],
-    output:
-        reference_cnn=config["pileup_dir"] + "/{assay_type}/cnvkit/reference.cnn",
-    wildcard_constraints:
-        assay_type="bulkWES",
-    params:
-        reference=config["reference"],
-        extra_flags=cli_flags_str(
-            _cnvkit_cfg,
-            ("no_gc", "--no-gc", True),
-            ("no_edge", "--no-edge", True),
-            ("no_rmask", "--no-rmask", True),
-            ("male_reference", "--male-reference", True),
-            ("cluster", "--cluster", True),
-        ),
-    log:
-        config["log_dir"] + f"/cnvkit_reference.{{assay_type}}.{_run_id}.log",
-    conda:
-        "../envs/cnvkit.yaml"
-    shell:
-        r"""
-        cnvkit.py reference {input.normal_cnn} \
-            -f {params.reference} \
-            -o {output.reference_cnn} \
-            {params.extra_flags} > {log} 2>&1
-        """
-
-
-rule cnvkit_fix:
-    """Correct each replicate's coverage against the pooled reference."""
-    input:
-        target_cnn=config["pileup_dir"] + "/{assay_type}/cnvkit/{rep_id}.targetcoverage.cnn",
-        antitarget_cnn=config["pileup_dir"]
-        + "/{assay_type}/cnvkit/{rep_id}.antitargetcoverage.cnn",
-        reference_cnn=config["pileup_dir"] + "/{assay_type}/cnvkit/reference.cnn",
-    output:
-        cnr=config["pileup_dir"] + "/{assay_type}/cnvkit/{rep_id}.cnr",
-    wildcard_constraints:
-        assay_type="bulkWES",
-    params:
-        extra_flags=cli_flags_str(
-            _cnvkit_cfg,
-            ("no_gc", "--no-gc", True),
-            ("no_edge", "--no-edge", True),
-            ("no_rmask", "--no-rmask", True),
-        ),
-    log:
-        config["log_dir"] + f"/cnvkit_fix.{{assay_type}}_{{rep_id}}.{_run_id}.log",
-    conda:
-        "../envs/cnvkit.yaml"
-    shell:
-        r"""
-        cnvkit.py fix {input.target_cnn} {input.antitarget_cnn} {input.reference_cnn} \
-            -o {output.cnr} \
-            {params.extra_flags} > {log} 2>&1
-        """
-
-
-rule cnvkit_to_window_dp:
-    """Convert .cnr files to window.dp.npz + window.tsv.gz for combine_counts."""
-    input:
-        cnr_files=lambda wc: [
-            config["pileup_dir"] + f"/{wc.assay_type}/cnvkit/{rep_id}.cnr"
-            for rep_id in assay2rep_ids[wc.assay_type]
-        ],
-        reference_cnn=config["pileup_dir"] + "/{assay_type}/cnvkit/reference.cnn",
-        sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
-        region_bed=config["region_bed"],
-        blacklist_bed=config.get("blacklist_bed") or [],
-        genome_size=config["genome_size"],
-    output:
-        dp_corrected=config["pileup_dir"] + "/{assay_type}/window.dp.npz",
-        window_df=config["pileup_dir"] + "/{assay_type}/window.tsv.gz",
-        qc_dir=directory(config["qc_dir"] + "/{assay_type}/rd_correction/"),
-    wildcard_constraints:
-        assay_type="bulkWES",
-    params:
-        sample_name=SAMPLE_ID,
-        cnvkit_dir=lambda wc: config["pileup_dir"] + f"/{wc.assay_type}/cnvkit",
-        chromosomes=config["chromosomes"],
-        min_window_length=_cnvkit_cfg.get("min_window_length", 1000),
-        run_id=_run_id,
-    log:
-        config["log_dir"] + f"/cnvkit_to_window_dp.{{assay_type}}.{_run_id}.log",
-    conda:
-        "../envs/base.yaml"
-    script:
-        """../scripts/cnvkit_to_window_dp.py"""

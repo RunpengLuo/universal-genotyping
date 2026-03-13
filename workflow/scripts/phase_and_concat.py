@@ -1,4 +1,4 @@
-import os, sys, gzip, logging
+import os, logging
 from snakemake.script import snakemake as sm
 
 t = int(getattr(sm, "threads", 1))

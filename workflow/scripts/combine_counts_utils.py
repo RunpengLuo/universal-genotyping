@@ -396,6 +396,69 @@ def assign_snp_bounderies(
 
 
 ##################################################
+def plot_snp_depth_histogram(
+    tot_mtx,
+    snp_indices,
+    rep_ids,
+    qc_dir,
+    run_id,
+):
+    """Plot per-sample histograms of total allele depth at SNP positions.
+
+    Parameters
+    ----------
+    tot_mtx : ndarray
+        Total depth matrix (all SNPs x samples).
+    snp_indices : array-like
+        Row indices into *tot_mtx* for SNPs assigned to windows.
+    rep_ids : list[str]
+        Sample / replicate identifiers.
+    qc_dir : str
+        Output directory for the PDF.
+    run_id : str
+        Run identifier used by :func:`stamp_path`.
+    """
+    import os
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    logging.info("QC analysis - plot SNP depth histogram")
+
+    nsamples = len(rep_ids)
+    fig, axes = plt.subplots(
+        nrows=nsamples, ncols=1, figsize=(5, 3 * nsamples), squeeze=False
+    )
+
+    depths_all = tot_mtx[snp_indices]
+
+    def _stats_title(name, d):
+        if len(d) == 0:
+            return f"{name} (n=0)"
+        return (
+            f"{name}\n"
+            f"mean={d.mean():.1f}, median={np.median(d):.1f}, "
+            f"min={d.min()}, max={d.max()}"
+        )
+
+    for si, rid in enumerate(rep_ids):
+        ax = axes[si, 0]
+        d = depths_all[:, si]
+        if len(d) > 0:
+            clip = np.percentile(d, 99)
+            ax.hist(d[d <= clip], bins=50, alpha=0.7)
+        ax.set_title(_stats_title(rid, d), fontsize=9)
+        ax.set_xlabel("Total allele depth")
+        ax.set_ylabel("# SNPs")
+
+    fig.tight_layout()
+    out_path = stamp_path(os.path.join(qc_dir, "snp_depth_hist.pdf"), run_id)
+    fig.savefig(out_path)
+    plt.close(fig)
+    logging.info(f"saved SNP depth histogram to {out_path}")
+
+
 def plot_allele_freqs(
     pos_df,
     rep_ids,

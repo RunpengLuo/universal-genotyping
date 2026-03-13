@@ -1,38 +1,38 @@
 #!/usr/bin/env python3
 """Build a per-window bias correction BED for WES data.
 
-Wraps ``cnvkit.py target`` and ``cnvkit.py antitarget`` to generate
-target + antitarget windows, then computes per-window GC content with
-optional mappability and replication timing columns.
+Reads a WES capture targets BED, merges overlapping intervals, adaptively
+tiles each target into windows of at least ``--window`` bp, then computes
+per-window GC content with optional mappability and replication timing columns.
 
 Pipeline:
-  1. cnvkit.py target --split  (subdivide exon targets)
-  2. cnvkit.py antitarget      (off-target bins in accessible regions)
-  3. Combine, filter standard chroms, subtract blacklist
-  4. Assign region_id, compute GC/MAP/REPLI
-  5. Sort and write output
+  1. Read & merge overlapping targets (PyRanges), filter to standard chroms
+  2. Tile each merged target into windows via _tile_region()
+  3. Assign gene name from parent target to each tiled window
+  4. Filter blacklist + outside regions (subtract_blacklist)
+  5. Assign region_id, compute GC/MAP/REPLI
+  6. Sort and write output
 
 Output is a gzipped TSV:
-  #CHR  START  END  region_id  GC  [MAP]  [REPLI]  is_target
+  #CHR  START  END  region_id  GC  [MAP]  [REPLI]  gene
 
 Dependencies:
-  - cnvkit.py (must be on PATH)
   - pybedtools, pyranges, pandas, numpy
   - bigWigToBedGraph, liftOver (UCSC tools) -- only if --repliseq
 """
 
 import argparse
 import os
-import shutil
-import subprocess
 import sys
-import tempfile
 import time
 
+import numpy as np
 import pandas as pd
+import pyranges as pr
 
 from window_bed_utils import (
     _sort_windows,
+    _tile_region,
     assign_region_id,
     compute_gc,
     compute_mappability,
@@ -44,45 +44,89 @@ from window_bed_utils import (
 
 
 # ---------------------------------------------------------------------------
-# Window generation (WES via CNVkit)
+# Window generation (WES via adaptive tiling)
 # ---------------------------------------------------------------------------
 
 
-def generate_wes_windows(wes_targets_bed, region_bed, blacklist_bed, standard_chroms):
-    """Generate target + antitarget windows for WES using cnvkit.py."""
-    if shutil.which("cnvkit.py") is None:
-        sys.exit("Error: cnvkit.py not found on PATH")
+def generate_wes_windows(wes_targets_bed, window_size, standard_chroms, blacklist_bed):
+    """Generate target windows for WES by merging and tiling capture targets.
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # cnvkit.py target (--split, default avg_size=267)
-        tgt_out = os.path.join(tmpdir, "targets.bed")
-        subprocess.check_call([
-            "cnvkit.py", "target", wes_targets_bed,
-            "--split", "-o", tgt_out,
-        ])
+    1. Read WES targets BED (BED4: chr/start/end/gene).
+    2. Merge overlapping intervals with PyRanges, concatenating gene names.
+    3. Filter to standard chromosomes.
+    4. Tile each merged target into windows of at least ``window_size`` bp.
+    5. Subtract blacklist regions.
+    """
+    # Read targets BED — support BED3 or BED4+
+    targets = pd.read_csv(
+        wes_targets_bed, sep="\t", header=None, comment="#",
+    )
+    if targets.shape[1] >= 4:
+        targets = targets.iloc[:, :4]
+        targets.columns = ["Chromosome", "Start", "End", "Name"]
+    else:
+        targets.columns = ["Chromosome", "Start", "End"]
+        targets["Name"] = "."
 
-        # cnvkit.py antitarget (default avg=150kb, min=auto ~9374bp)
-        anti_out = os.path.join(tmpdir, "antitargets.bed")
-        cmd = ["cnvkit.py", "antitarget", tgt_out, "-o", anti_out]
-        if region_bed:
-            cmd.extend(["-g", region_bed])
-        subprocess.check_call(cmd)
+    targets = targets[targets["Chromosome"].isin(standard_chroms)].reset_index(drop=True)
+    n_raw = len(targets)
+    raw_sizes = targets["End"] - targets["Start"]
+    print(f"  {n_raw} raw target intervals on standard chromosomes")
+    print(
+        f"  raw target size: min={raw_sizes.min()}, mean={raw_sizes.mean():.0f}, "
+        f"median={int(raw_sizes.median())}, max={raw_sizes.max()}"
+    )
 
-        # Read BED4 outputs, combine with is_target
-        targets = pd.read_csv(tgt_out, sep="\t", header=None,
-                              names=["#CHR", "START", "END", "gene"])
-        antitargets = pd.read_csv(anti_out, sep="\t", header=None,
-                                  names=["#CHR", "START", "END", "gene"])
+    targets_pr = pr.PyRanges(targets)
+    merged = targets_pr.merge(count_col="count")
+    merged_df = merged.df.copy()
+    merged_df["_midx"] = np.arange(len(merged_df))
 
-    targets["is_target"] = 1
-    antitargets["is_target"] = 0
-    windows = pd.concat([targets, antitargets], ignore_index=True)
-    windows = windows.drop(columns=["gene"])
-    windows = windows[windows["#CHR"].isin(standard_chroms)].reset_index(drop=True)
+    # Vectorized gene-name mapping via interval join
+    merged_pr = pr.PyRanges(merged_df)
+    joined = merged_pr.join(targets_pr, how="left").df
+    gene_by_midx = (
+        joined.groupby("_midx")["Name"]
+        .apply(lambda s: ",".join(sorted(set(g for g in s if g != "." and pd.notna(g)))) or ".")
+        .to_dict()
+    )
+    merged_df["gene"] = merged_df["_midx"].map(gene_by_midx).fillna(".")
 
-    n_tgt = int(windows["is_target"].sum())
-    n_anti = len(windows) - n_tgt
-    print(f"  {len(windows)} windows ({n_tgt} target, {n_anti} antitarget)")
+    merged_sizes = merged_df["End"] - merged_df["Start"]
+    print(f"  {len(merged_df)} merged target intervals")
+    print(
+        f"  merged target size: min={merged_sizes.min()}, mean={merged_sizes.mean():.0f}, "
+        f"median={int(merged_sizes.median())}, max={merged_sizes.max()}"
+    )
+
+    # Tile each merged target
+    rows = []
+    gene_labels = []
+    chroms = merged_df["Chromosome"].values
+    starts = merged_df["Start"].values.astype(int)
+    ends = merged_df["End"].values.astype(int)
+    genes = merged_df["gene"].values
+    for i in range(len(merged_df)):
+        tiled = _tile_region(chroms[i], starts[i], ends[i], window_size)
+        rows.extend(tiled)
+        gene_labels.extend([genes[i]] * len(tiled))
+
+    windows = pd.DataFrame(rows, columns=["#CHR", "START", "END"])
+    windows["gene"] = gene_labels
+
+    # Subtract blacklist
+    if blacklist_bed:
+        n_before = len(windows)
+        windows = subtract_blacklist(windows, blacklist_bed)
+        n_removed = n_before - len(windows)
+        print(f"  {len(windows)} windows after blacklist subtraction (removed {n_removed})")
+
+    sizes = windows["END"] - windows["START"]
+    print(f"  {len(windows)} windows across {windows['#CHR'].nunique()} chromosomes")
+    print(
+        f"  window size: min={sizes.min()}, mean={sizes.mean():.0f}, "
+        f"median={int(sizes.median())}, max={sizes.max()}"
+    )
     return windows
 
 
@@ -95,9 +139,8 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=(
             "Build a per-window bias correction BED for WES. "
-            "Uses cnvkit.py target + antitarget to generate windows, then "
-            "computes per-window GC content with optional mappability and "
-            "replication timing."
+            "Merges and tiles WES capture targets into windows, then computes "
+            "per-window GC content with optional mappability and replication timing."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
@@ -128,7 +171,9 @@ def parse_args():
                         help="Optional blacklist BED -- subtract these regions.")
     # WES options
     parser.add_argument("--wes_targets_bed", required=True,
-                        help="Vendor exon capture targets BED (required).")
+                        help="Vendor exon capture targets BED (BED3 or BED4 with gene name).")
+    parser.add_argument("--window", type=int, default=267,
+                        help="Window size in bp (default: 267).")
     # Covariate options
     parser.add_argument("--mappability_bed", default=None,
                         help="Optional BED-format mappability track (4th column = score).")
@@ -172,6 +217,7 @@ def main():
     print(f"  Region BED:  {args.region_bed}")
     print(f"  Blacklist:   {args.blacklist_bed or 'none'}")
     print(f"  WES targets: {args.wes_targets_bed}")
+    print(f"  Window:      {args.window} bp")
     print(f"  Mappability: {args.mappability_bed or 'none'}")
     print(f"  Repli-seq:   {'yes' if args.repliseq else 'no'}")
     print(f"  Output:      {args.out_file}")
@@ -180,35 +226,22 @@ def main():
     standard_chroms = get_standard_chroms(args.reference_version, args.genome_size)
     print(f"  {len(standard_chroms)} standard chromosomes")
 
-    # --- Step 1: Generate windows via cnvkit.py ---
-    print("[1/6] WES: generating target + antitarget windows via cnvkit.py ...")
+    # --- Step 1: Generate windows via adaptive tiling ---
+    print("[1/6] WES: merging targets and tiling windows ...")
     windows = generate_wes_windows(
-        args.wes_targets_bed, args.region_bed, args.blacklist_bed, standard_chroms,
+        args.wes_targets_bed, args.window, standard_chroms, args.blacklist_bed,
     )
-
-    # Subtract blacklist from combined target+antitarget windows
-    if args.blacklist_bed:
-        n_before = len(windows)
-        n_tgt_before = int(windows["is_target"].sum())
-        windows = subtract_blacklist(windows, args.blacklist_bed)
-        n_removed = n_before - len(windows)
-        n_tgt_after = int(windows["is_target"].sum())
-        n_tgt_rm = n_tgt_before - n_tgt_after
-        n_anti_rm = n_removed - n_tgt_rm
-        print(
-            f"  {len(windows)} after blacklist subtraction "
-            f"(removed {n_tgt_rm} target, {n_anti_rm} antitarget)"
-        )
 
     # --- Step 2: Assign region_id, drop windows outside regions ---
     print("[2/6] Assigning region_id ...")
     windows["region_id"] = assign_region_id(windows, args.region_bed)
     n_before = len(windows)
-    windows = windows[windows["region_id"].notna()].reset_index(drop=True)
-    n_dropped = n_before - len(windows)
-    assert n_dropped == 0, (
-        f"{n_dropped}/{n_before} windows could not be assigned a region_id"
-    )
+    unassigned_mask = windows["region_id"].isna()
+    n_dropped = int(unassigned_mask.sum())
+    if n_dropped > 0:
+        print(f"  WARNING: {n_dropped}/{n_before} windows could not be assigned a region_id")
+        print(windows.loc[unassigned_mask].head(30).to_string(index=False))
+        windows = windows[~unassigned_mask].reset_index(drop=True)
     print(f"  {len(windows)} assigned")
 
     # --- Step 3: Compute GC ---
@@ -238,7 +271,7 @@ def main():
     else:
         print("[5/6] Skipping repli-seq (--repliseq not set)")
 
-    out_cols.append("is_target")
+    out_cols.append("gene")
 
     # --- Summary ---
     print_summary(windows)

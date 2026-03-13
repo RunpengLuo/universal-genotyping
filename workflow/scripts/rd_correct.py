@@ -1,12 +1,11 @@
 """Per-window LOWESS bias correction for bulk samples.
 
 Loads mosdepth fixed-window depth, joins with pre-filtered window BED
-(GC/MAP/REPLI/region_id/is_target), applies correct_readcount_lowess() per
+(GC/MAP/REPLI/region_id), applies correct_readcount_lowess() per
 sample, and saves corrected depth matrix + filtered window dataframe.
 
 The window BED is expected to be pre-filtered by region and blacklist
-(produced by build_window_bed.py), with region_id and optional is_target
-columns already present.
+(produced by build_window_bed.py), with region_id column already present.
 """
 
 import os
@@ -32,7 +31,6 @@ from count_reads_utils import (
 from rd_correct_utils import (
     correct_readcount_lowess,
     correct_readcount_quadreg,
-    correct_readcount_wes,
     plot_gc_correction_pdf,
 )
 
@@ -134,17 +132,6 @@ plot_rd_gc(
 
 logging.info(f"{n_windows} windows for bias correction")
 
-if "is_target" in win_df.columns:
-    is_target = win_df["is_target"].astype(bool).to_numpy()
-    n_tgt = int(is_target.sum())
-    n_anti = n_windows - n_tgt
-    logging.info(
-        f"WES window labels from window BED: {n_tgt} target, {n_anti} antitarget"
-    )
-else:
-    is_target = np.ones(n_windows, dtype=bool)
-    win_df["is_target"] = True
-
 map_vals = win_df["MAP"].to_numpy() if gc_correct and "MAP" in win_df.columns else None
 repli_vals = (
     win_df["REPLI"].to_numpy(dtype=np.float64)
@@ -164,19 +151,7 @@ if gc_correct:
     dp_corrected = np.zeros_like(dp_raw, dtype=np.float32)
     gc_rmse_list = []
 
-    if assay_type == "bulkWES":
-        logging.info("applying correct_readcount_wes per sample")
-        for i, rep_id in enumerate(rep_ids):
-            logging.info(f"  correcting {rep_id}")
-            dp_corrected[:, i], gc_rmse = correct_readcount_wes(
-                dp_raw[:, i],
-                gc_vals,
-                is_target,
-                mappability=map_vals,
-                min_mappability=min_mappability,
-            )
-            gc_rmse_list.append(gc_rmse)
-    elif gc_correct_method == "median":
+    if gc_correct_method == "median":
         logging.info("applying correct_readcount_quadreg per sample")
         for i, rep_id in enumerate(rep_ids):
             logging.info(f"correcting {rep_id}")

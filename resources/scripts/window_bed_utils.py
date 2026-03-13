@@ -79,6 +79,26 @@ def _df_to_pyranges(df):
     return pr.PyRanges(pr_df)
 
 
+def _tile_region(chrom, start, end, window_size):
+    """Tile a single region into fixed-size windows, merging last short bin.
+
+    If the last window is shorter than window_size // 2 and there is a previous
+    window, it is merged into the previous window (extending its END).  Regions
+    smaller than window_size // 2 still emit one window.
+    """
+    rows = []
+    pos = start
+    while pos < end:
+        w_end = min(pos + window_size, end)
+        rows.append([chrom, pos, w_end])
+        pos = w_end
+    # Merge last bin into previous if undersized
+    if len(rows) > 1 and (rows[-1][2] - rows[-1][1]) < window_size // 2:
+        rows[-2][2] = rows[-1][2]
+        rows.pop()
+    return rows
+
+
 def _sort_windows(windows):
     """Sort windows by natural chromosome order, then by start position."""
     chrom_rank = {c: i for i, c in enumerate(CHROM_ORDER)}
@@ -340,7 +360,6 @@ def compute_repliseq(windows_df, standard_chroms, args):
 def print_summary(windows):
     """Print per-window and per-chromosome summary statistics."""
     sizes = windows["END"] - windows["START"]
-    has_target = "is_target" in windows.columns
 
     print()
     print("  Summary:")
@@ -353,22 +372,8 @@ def print_summary(windows):
     total_bp = int(sizes.sum())
     print(f"    total coverage: {total_bp:,} bp ({total_bp / 1e9:.2f} Gb)")
 
-    if has_target:
-        tgt_sizes = sizes[windows["is_target"].astype(bool)]
-        anti_sizes = sizes[~windows["is_target"].astype(bool)]
-        print(
-            f"    target size:     min={tgt_sizes.min()}, median={int(tgt_sizes.median())}, "
-            f"max={tgt_sizes.max()}"
-        )
-        print(
-            f"    antitarget size: min={anti_sizes.min()}, median={int(anti_sizes.median())}, "
-            f"max={anti_sizes.max()}"
-        )
-
     # Per-chromosome table
     header = f"    {'chrom':<8} {'windows':>8} {'regions':>8} {'coverage_Mb':>12} {'median_size':>12}"
-    if has_target:
-        header += f" {'target':>8} {'antitarget':>10}"
     print(header)
 
     for chrom in CHROM_ORDER:
@@ -381,9 +386,5 @@ def print_summary(windows):
             f"    {chrom:<8} {int(mask.sum()):>8} {ch_regions:>8} "
             f"{ch_sizes.sum() / 1e6:>12.2f} {int(ch_sizes.median()):>12}"
         )
-        if has_target:
-            n_tgt = int(windows.loc[mask, "is_target"].astype(bool).sum())
-            n_anti = int(mask.sum()) - n_tgt
-            row += f" {n_tgt:>8} {n_anti:>10}"
         print(row)
     print()

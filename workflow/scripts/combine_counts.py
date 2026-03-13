@@ -27,7 +27,7 @@ from aggregation_utils import (
     assign_pos_to_range,
     matrix_segmentation,
 )
-from combine_counts_utils import plot_allele_freqs
+from combine_counts_utils import plot_allele_freqs, plot_snp_depth_histogram
 from count_reads_utils import log_nan_summary, plot_1d_multi_sample
 from switchprobs import (
     interp_cM_blocks,
@@ -99,11 +99,25 @@ _snps_tmp = snps[["#CHR", "POS0", "PS"]].copy()
 _snps_tmp = assign_pos_to_range(_snps_tmp, window_df, ref_id="win_idx", pos_col="POS0")
 _snps_tmp = _snps_tmp.dropna(subset=["win_idx"])
 _snps_tmp["win_idx"] = _snps_tmp["win_idx"].astype(np.int64)
+snps_per_win = _snps_tmp.groupby("win_idx").size()
+n_win_with_snps = len(snps_per_win)
+n_win_total = len(window_df)
+logging.info(
+    f"SNPs per window: {n_win_with_snps}/{n_win_total} windows have SNPs, "
+    f"mean={snps_per_win.mean():.1f}, median={snps_per_win.median():.1f}, "
+    f"min={snps_per_win.min()}, max={snps_per_win.max()}"
+)
+plot_snp_depth_histogram(
+    tot_mtx, _snps_tmp.index, rep_ids, qc_dir, run_id,
+)
 win_ps = _snps_tmp.groupby("win_idx")["PS"].agg(lambda x: x.mode().iloc[0])
 window_df["PS"] = window_df["win_idx"].map(win_ps)
 # Windows with no SNPs inherit PS from previous window (forward-fill)
 if window_df["PS"].isna().any():
     window_df["PS"] = window_df["PS"].ffill()
+
+win_lengths = (window_df["END"] - window_df["START"]).to_numpy(dtype=np.float64)
+win_bases = np.ceil(dp_mtx * win_lengths[:, None]).astype(np.int64)
 
 bbs, snps = adaptive_binning_windows(
     window_df,
@@ -113,6 +127,8 @@ bbs, snps = adaptive_binning_windows(
     int(sm.params["min_snp_per_block"]),
     grp_cols=grp_cols,
     tumor_sidx=tumor_sidx,
+    win_bases=win_bases,
+    min_total_bases=int(sm.params["min_total_bases"]),
 )
 num_bbs = len(bbs)
 bb_ids = snps["bb_id"].to_numpy()

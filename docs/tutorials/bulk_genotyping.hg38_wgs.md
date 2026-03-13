@@ -116,6 +116,8 @@ snakemake --profile /path/to/profile/ \
     -s /path/to/workflow/Snakefile
 ```
 
+> **Note:** The default `conda-prefix` in `profile/config.yaml` is the relative path `.snakemake/conda`. After creating the environments, change it to an absolute path (e.g., `/path/to/workflow/.snakemake/conda`) so that conda environments are reused correctly when running with `--directory`.
+
 ### Run the pipeline
 
 ```bash

@@ -11,7 +11,6 @@ All tool dependencies are managed via conda environments under `workflow/envs/`:
 | `base.yaml` | Python scientific stack (scipy, numpy, pandas, numba, anndata, scanpy, etc.) |
 | `tools.yaml` | bcftools, cellsnp-lite, mosdepth, samtools, tabix |
 | `phase.yaml` | eagle2, shapeit5, longphase, bcftools, tabix |
-| `cnvkit.yaml` | cnvkit (WES only) |
 | `snapatac2.yaml` | snapatac2, scanpy (scATAC only) |
 
 
@@ -20,6 +19,8 @@ snakemake --profile /path/to/workflow/profile/ \
     --conda-create-envs-only --cores 1 \
     -s /path/to/workflow/Snakefile
 ```
+
+> **Note:** The default `conda-prefix` in `profile/config.yaml` is the relative path `.snakemake/conda`. After creating the environments, change it to an absolute path (e.g., `/path/to/workflow/.snakemake/conda`) so that conda environments are reused correctly when running with `--directory`.
 
 ---
 
@@ -44,7 +45,7 @@ Bulk WGS/WES. Genotypes SNPs (bcftools), phases, computes allele counts and bias
 1. Sample sheet with `assay_type` = `bulkWGS` or `bulkWES`, including normal and tumor.
 2. Set `workflow_mode: bulk_genotyping` in config.
 3. **WGS:** Set `window_bed` to a pre-filtered window BED (e.g., build using `resources/scripts/build_wgs_window_bed.py` or use pre-built `resources/data/windows.1kbp.hg38.bed.gz`).
-4. **WES:** Set `wes_targets_bed` and configure `params_cnvkit`. CNVkit handles WES RD preprocessing and GC corrections. `wes_targets_bed` is target capture regions provided by the sequencing platform.
+4. **WES:** Set `window_bed` to a WES window BED built using `resources/scripts/build_wes_window_bed.py` (requires `--wes_targets_bed` pointing to vendor capture targets). The pipeline uses the same mosdepth + rd_correct path as WGS.
 5. Outputs in `bb_dir/{assay_type}/`:
    - `bb.tsv.gz` — bin annotations.
    - `bb.{Tallele,Aallele,Ballele,baf,depth,rdr}.npz` — allele, depth, and RDR matrices.

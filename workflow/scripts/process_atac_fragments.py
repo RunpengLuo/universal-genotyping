@@ -1,4 +1,4 @@
-import os, sys, gzip, logging, subprocess
+import os, logging
 from snakemake.script import snakemake as sm
 
 t = int(getattr(sm, "threads", 1))
@@ -10,7 +10,6 @@ os.environ["NUMEXPR_NUM_THREADS"] = str(t)
 
 import numpy as np
 import pandas as pd
-import pyranges as pr
 import anndata
 from scanpy import AnnData
 import snapatac2 as snap

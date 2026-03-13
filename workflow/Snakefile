@@ -288,14 +288,6 @@ else:
         shell:
             "touch {output}"
 
-    rule _conda_env_cnvkit:
-        output:
-            temp(".conda_env_cnvkit"),
-        conda:
-            "envs/cnvkit.yaml"
-        shell:
-            "touch {output}"
-
     rule _conda_env_snapatac2:
         output:
             temp(".conda_env_snapatac2"),
@@ -309,6 +301,5 @@ else:
             ".conda_env_base",
             ".conda_env_tools",
             ".conda_env_phase",
-            ".conda_env_cnvkit",
             ".conda_env_snapatac2",
         default_target: True

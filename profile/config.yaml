@@ -3,7 +3,7 @@ use-conda: true
 conda-prefix: .snakemake/conda
 printshellcmds: true
 show-failed-logs: true
-verbose: true
+verbose: false
 rerun-triggers:
   - mtime
   - input

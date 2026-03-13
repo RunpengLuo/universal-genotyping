@@ -1,9 +1,7 @@
-import os
 import sys
 
 import pysam
 import pandas as pd
-from collections import defaultdict
 
 """
 This script convert visium HD 3' BAM files from <src_col> resolution to <tgt_col> resolution.

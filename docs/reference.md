@@ -71,7 +71,7 @@ Common outputs across all modes:
 ### QC (`qc_dir/{assay_type}/`)
 
 Plots from bias correction and binning steps:
-- `rd_correction/` — GC/mappability/RT bias correction plots (bulk WGS only).
+- `rd_correction/` — GC/mappability/RT bias correction plots (bulk WGS/WES).
 - `phase_and_concat/` — phasing and concatenation QC.
 - `combine_counts/` — adaptive binning QC.
 - `cnv_segmentation/` — segmentation QC (copytyping only).
