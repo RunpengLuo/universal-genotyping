@@ -15,6 +15,7 @@ import scanpy as sc
 from utils import *
 from io_utils import *
 from aggregation_utils import *
+from plot_utils import plot_allele_freqs
 
 ##################################################
 """

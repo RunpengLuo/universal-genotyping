@@ -23,16 +23,12 @@ import numpy as np
 import pandas as pd
 
 from utils import setup_logging, maybe_path, stamp_path
-from count_reads_utils import (
-    log_nan_summary,
-    compute_gc_rd_stats,
-    plot_rd_gc,
-)
+from count_reads_utils import compute_gc_rd_stats
 from rd_correct_utils import (
     correct_readcount_lowess,
     correct_readcount_quadreg,
-    plot_gc_correction_pdf,
 )
+from plot_utils import plot_rd_gc, plot_gc_correction_pdf
 
 import matplotlib
 
@@ -193,8 +189,6 @@ if gc_correct:
 else:
     logging.info("gc_correct=False; skipping bias correction")
     dp_corrected = dp_raw.copy()
-
-log_nan_summary("corrected depth", dp_corrected, rep_ids, n_windows)
 
 pdf = PdfPages(stamp_path(os.path.join(qc_dir, "rd_correct.pdf"), run_id))
 plot_gc_correction_pdf(

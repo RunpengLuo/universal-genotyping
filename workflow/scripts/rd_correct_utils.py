@@ -1,6 +1,6 @@
 """Utility functions for per-window read depth bias correction.
 
-Contains HMMcopy-style LOWESS correction and GC correction QC plots.
+Contains HMMcopy-style LOWESS correction.
 """
 
 import logging
@@ -8,13 +8,6 @@ import logging
 import numpy as np
 from scipy.interpolate import interp1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
-from scipy.stats import pearsonr, spearmanr, gaussian_kde
-
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-
 
 def correct_readcount_lowess(
     reads,
@@ -314,112 +307,3 @@ def correct_readcount_quadreg(
     return corrected.astype(np.float32), rmse
 
 
-def _plot_cov_panel(ax, covariate, reads, xlabel, show_ylabel, rep_id,
-                    rmse=None, is_before=False, xlim=None, xticks=None):
-    """KDE density scatter of readcov vs a covariate on a single axes."""
-    valid = (reads > 0) & np.isfinite(covariate)
-    if valid.sum() < 20:
-        ax.set_visible(False)
-        return
-    x, y = covariate[valid], reads[valid]
-    ylim = np.nanquantile(y, 0.99) * 1.1
-
-    n_pts = len(x)
-    rng = np.random.default_rng(0)
-    if n_pts > 20000:
-        idx = rng.choice(n_pts, size=20000, replace=False)
-        kde = gaussian_kde(np.vstack([x[idx], y[idx]]))
-    else:
-        kde = gaussian_kde(np.vstack([x, y]))
-
-    xlo = xlim[0] if xlim is not None else x.min()
-    xhi = xlim[1] if xlim is not None else x.max()
-    xgrid = np.linspace(xlo, xhi, 200)
-    ygrid = np.linspace(0, ylim * 1.5, 200)
-    xx, yy = np.meshgrid(xgrid, ygrid)
-    positions = np.vstack([xx.ravel(), yy.ravel()])
-    zz = kde(positions).reshape(xx.shape)
-
-    ax.pcolormesh(xx, yy, zz, shading="gouraud", cmap="Blues", rasterized=True)
-    ax.contour(
-        xx, yy, zz, levels=6, colors="steelblue", linewidths=0.5, alpha=0.5
-    )
-
-    mad = np.median(np.abs(y - np.median(y)))
-    r_pearson, _ = pearsonr(x, y)
-    r_spearman, _ = spearmanr(x, y)
-    metrics = f"MAD={mad:.2f}  r={r_pearson:.4f}  rho={r_spearman:.4f}"
-    if rmse is not None and is_before:
-        metrics = f"RMSE={rmse:.2f}  " + metrics
-    logging.info(f"  {xlabel:<8s} {rep_id:<8s}: {metrics}")
-    ax.set_xlabel(xlabel)
-    if show_ylabel:
-        ax.set_ylabel("Observed Readcov")
-    ax.set_title(f"{rep_id}\n{metrics}", fontsize=8)
-    if xlim is not None:
-        ax.set_xlim(*xlim)
-    else:
-        ax.set_xlim(x.min(), x.max())
-    if xticks is not None:
-        ax.set_xticks(xticks)
-    ax.set_ylim(0, ylim * 1.1)
-
-
-def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf, gc_rmse=None,
-                           mappability=None, repliseq=None, title_prefix=""):
-    """Two-page PDF: before/after correction KDE density plots.
-
-    Each page has up to 3 rows (GC, MAP, RT) x nsamples columns.
-
-    Parameters
-    ----------
-    gc_rmse : list of float or None
-        Per-sample RMSE from the GC fit. Shown on the "Before" panel only.
-    mappability : np.ndarray or None
-        Per-window mappability values. If provided, a MAP row is added.
-    repliseq : np.ndarray or None
-        Per-window replication timing values. If provided, an RT row is added.
-    title_prefix : str
-        Optional prefix for page titles (e.g. ``"target — "``).
-    """
-    nsamples = len(rep_ids)
-    panel_w = max(5, 5 * nsamples)
-
-    # Build list of (row_label, covariate, xlabel)
-    rows = [("GC", gc, "GC Content")]
-    if mappability is not None:
-        rows.append(("MAP", mappability, "Mappability"))
-    if repliseq is not None:
-        rows.append(("RT", repliseq, "Replication Timing"))
-    nrows = len(rows)
-
-    is_before = True
-    for title, dp_mat in [
-        ("Before Correction", dp_before),
-        ("After Correction", dp_after),
-    ]:
-        fig, axes = plt.subplots(
-            nrows, nsamples, figsize=(panel_w, 5 * nrows), squeeze=False,
-        )
-        for ri, (row_label, covariate, xlabel) in enumerate(rows):
-            for si, rep_id in enumerate(rep_ids):
-                rmse = gc_rmse[si] if (gc_rmse is not None and row_label == "GC") else None
-                kw = {}
-                if row_label == "MAP":
-                    kw = {"xlim": (-0.2, 1.2), "xticks": np.arange(0, 1.1, 0.2)}
-                _plot_cov_panel(
-                    axes[ri, si],
-                    covariate,
-                    dp_mat[:, si],
-                    xlabel,
-                    show_ylabel=(si == 0),
-                    rep_id=rep_id,
-                    rmse=rmse,
-                    is_before=is_before,
-                    **kw,
-                )
-        fig.suptitle(f"{title_prefix}{title}", fontsize=14)
-        plt.tight_layout()
-        pdf.savefig(fig, dpi=150)
-        plt.close(fig)
-        is_before = False

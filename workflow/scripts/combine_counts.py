@@ -27,8 +27,7 @@ from aggregation_utils import (
     assign_pos_to_range,
     matrix_segmentation,
 )
-from combine_counts_utils import plot_allele_freqs, plot_snp_depth_histogram
-from count_reads_utils import log_nan_summary, plot_1d_multi_sample
+from plot_utils import plot_allele_freqs, plot_snp_depth_histogram, plot_1d_multi_sample
 from switchprobs import (
     interp_cM_blocks,
     estimate_switchprobs_cM,
@@ -177,8 +176,6 @@ for s in range(nsamples):
     )
     with np.errstate(invalid="ignore"):
         bb_dp[:, s] = weighted_sums / total_len_per_bin
-
-log_nan_summary("bb depth", bb_dp, rep_ids, num_bbs)
 
 skip_normal = bool(getattr(sm.params, "skip_normal_normalization", False))
 use_normal = has_normal and not skip_normal

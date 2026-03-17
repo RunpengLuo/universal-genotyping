@@ -16,6 +16,7 @@ from utils import *
 from io_utils import *
 from combine_counts_utils import *
 from count_reads_utils import *
+from plot_utils import plot_allele_freqs, plot_1d_sample, plot_1d_multi_sample
 from aggregation_utils import *
 from switchprobs import *
 
