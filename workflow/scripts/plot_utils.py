@@ -288,7 +288,8 @@ def plot_1d_multi_sample(
 
             ax.set_ylabel(label, fontsize=10)
             ax.set_xlim(0, chr_end)
-            ax.grid(alpha=0.2)
+            if val_type not in ["AF", "BAF"]:
+                ax.grid(axis="y", alpha=0.2)
 
             if si == 0:
                 ax.set_title(f"{val_type} plot - {chrom}")
@@ -406,7 +407,8 @@ def plot_1d_sample(
 
         ax.set_xlabel(val_type)
         ax.set_xlim(0, chr_end)
-        ax.grid(alpha=0.2)
+        if val_type not in ["AF", "BAF"]:
+            ax.grid(axis="y", alpha=0.2)
         ax.set_title(f"{val_type} plot - {chrom}")
         pdf_fd.savefig(fig, dpi=dpi)
         plt.close(fig)
