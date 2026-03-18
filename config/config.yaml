@@ -113,7 +113,6 @@ params_count_reads:
   routlier: 0.01
   doutlier: 0.001
   min_mappability: 0.9
-  min_window_size: 1
 
 params_combine_counts:
   min_switchprob: 1e-6
@@ -122,8 +121,10 @@ params_combine_counts:
   nsnp_multi: 2
   min_snp_reads: 1000
   min_snp_per_block: 10
-  min_total_bases: 100
-  skip_normal_normalization: false  # true = median-center (ignore matched normal)
+  max_blocksize: 500000
+  # true = median-center (ignore matched normal)
+  skip_normal_normalization: false  
+  rdr_outlier_quantile: 0.002
 
 ##################################################
 threads:

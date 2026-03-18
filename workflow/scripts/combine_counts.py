@@ -112,9 +112,7 @@ window_df["PS"] = window_df["win_idx"].map(win_ps)
 if window_df["PS"].isna().any():
     window_df["PS"] = window_df["PS"].ffill()
 
-win_lengths = (window_df["END"] - window_df["START"]).to_numpy(dtype=np.float64)
-win_bases = np.ceil(dp_mtx * win_lengths[:, None]).astype(np.int64)
-
+max_blocksize = int(sm.params["max_blocksize"])
 bbs, snps = adaptive_binning_windows(
     window_df,
     snps,
@@ -123,8 +121,7 @@ bbs, snps = adaptive_binning_windows(
     int(sm.params["min_snp_per_block"]),
     grp_cols=grp_cols,
     tumor_sidx=tumor_sidx,
-    win_bases=win_bases,
-    min_total_bases=int(sm.params["min_total_bases"]),
+    max_blocksize=max_blocksize,
 )
 num_bbs = len(bbs)
 bb_ids = snps["bb_id"].to_numpy()
@@ -201,6 +198,16 @@ else:
             logging.info(f"  bb median-centering {rdr_reps[i]}: median={med:.4f}")
             with np.errstate(invalid="ignore", divide="ignore"):
                 bb_rdr[valid_i, i] = col[valid_i] / med
+
+rdr_outlier_quantile = float(sm.params["rdr_outlier_quantile"])
+if rdr_outlier_quantile > 0:
+    rdr_upper = np.nanquantile(bb_rdr, 1 - rdr_outlier_quantile)
+    n_outlier = int(np.nansum(bb_rdr > rdr_upper))
+    logging.info(
+        f"RDR outlier filter: quantile={rdr_outlier_quantile}, "
+        f"threshold={rdr_upper:.4f}, {n_outlier} entries set to NaN"
+    )
+    bb_rdr[bb_rdr > rdr_upper] = np.nan
 
 n_nan_bb = int(np.isnan(bb_rdr[:, 0]).sum())
 _n_filled = num_bbs - n_nan_bb

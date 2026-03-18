@@ -53,8 +53,6 @@ min_mappability = float(sm.params["min_mappability"])
 gc_correct = bool(sm.params["gc_correct"])
 gc_correct_method = str(sm.params.get("gc_correct_method", "median"))
 rt_correct = bool(sm.params["rt_correct"])
-min_window_size = int(sm.params["min_window_size"])
-
 qc_dir = sm.output["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 run_id = getattr(sm.params, "run_id", "")
@@ -105,16 +103,6 @@ b_mtx_snp = np.load(sm.input["b_mtx_snp"])["mat"].astype(np.int32)
 logging.info(
     f"loaded {len(snps)} SNPs, allele matrices shape={tot_mtx_snp.shape}"
 )
-
-win_sizes = (win_df["END"] - win_df["START"]).to_numpy()
-size_mask = win_sizes >= min_window_size
-n_small = int((~size_mask).sum())
-logging.info(
-    f"filtering {n_small}/{n_windows} windows < {min_window_size} bp"
-)
-win_df = win_df.loc[size_mask].reset_index(drop=True)
-dp_raw = dp_raw[size_mask]
-n_windows = len(win_df)
 
 gc_vals = win_df["GC"].to_numpy()
 

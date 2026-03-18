@@ -41,8 +41,9 @@ rule combine_counts:
         switchprob_ps=config["params_combine_counts"]["switchprob_ps"],
         min_snp_reads=config["params_combine_counts"]["min_snp_reads"],
         min_snp_per_block=config["params_combine_counts"]["min_snp_per_block"],
-        min_total_bases=config["params_combine_counts"].get("min_total_bases", 0),
         skip_normal_normalization=config["params_combine_counts"].get("skip_normal_normalization", False),
+        rdr_outlier_quantile=config["params_combine_counts"].get("rdr_outlier_quantile", 0.002),
+        max_blocksize=config["params_combine_counts"].get("max_blocksize", 500000),
         chromosomes=config["chromosomes"],
         run_id=_run_id,
     threads: 1

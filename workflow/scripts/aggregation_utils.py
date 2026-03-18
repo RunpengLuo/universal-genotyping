@@ -82,7 +82,7 @@ def _bin_snps_numba(read_counts, min_snp_reads, min_snp_per_block):
 
 @numba.njit
 def _bin_windows_numba(win_reads, win_nsnps, min_snp_reads, min_snp_per_block,
-                       win_bases, min_total_bases):
+                       win_sizes, max_blocksize):
     """Greedy adaptive binning over consecutive windows.
 
     Parameters
@@ -95,10 +95,11 @@ def _bin_windows_numba(win_reads, win_nsnps, min_snp_reads, min_snp_per_block,
         Minimum total reads per sample for a bin to be complete.
     min_snp_per_block : int
         Minimum number of SNPs per bin.
-    win_bases : (W, M) contiguous int64
-        Per-window total bases (ceil(depth * window_length)) for tumor samples.
-    min_total_bases : int
-        Minimum total bases per sample for a bin to be complete.
+    win_sizes : (W,) int64
+        Genomic span (END - START) per window.
+    max_blocksize : int
+        Maximum genomic span for a bin. When exceeded, force a bin boundary.
+        Set to 0 to disable.
 
     Returns
     -------
@@ -116,7 +117,7 @@ def _bin_windows_numba(win_reads, win_nsnps, min_snp_reads, min_snp_per_block,
     prev_start = 0
     acc = win_reads[0].copy()
     acc_n = win_nsnps[0]
-    acc_bases = win_bases[0].copy()
+    acc_size = win_sizes[0]
 
     for i in range(1, W):
         meets_reads = True
@@ -125,24 +126,19 @@ def _bin_windows_numba(win_reads, win_nsnps, min_snp_reads, min_snp_per_block,
                 if acc[j] < min_snp_reads:
                     meets_reads = False
                     break
-        meets_bases = True
-        if min_total_bases > 0:
-            for j in range(M):
-                if acc_bases[j] < min_total_bases:
-                    meets_bases = False
-                    break
-        if meets_reads and meets_bases and acc_n >= min_snp_per_block:
+        exceeds_size = max_blocksize > 0 and acc_size >= max_blocksize
+        if (meets_reads and acc_n >= min_snp_per_block) or exceeds_size:
             bin_ids[prev_start:i] = bin_id
             bin_id += 1
             prev_start = i
             acc = win_reads[i].copy()
             acc_n = win_nsnps[i]
-            acc_bases = win_bases[i].copy()
+            acc_size = win_sizes[i]
         else:
             for j in range(M):
                 acc[j] += win_reads[i, j]
-                acc_bases[j] += win_bases[i, j]
             acc_n += win_nsnps[i]
+            acc_size += win_sizes[i]
 
     # last block: keep as own bin if it meets all criteria and isn't the only block
     last_meets_reads = True
@@ -151,13 +147,8 @@ def _bin_windows_numba(win_reads, win_nsnps, min_snp_reads, min_snp_per_block,
             if acc[j] < min_snp_reads:
                 last_meets_reads = False
                 break
-    last_meets_bases = True
-    if min_total_bases > 0:
-        for j in range(M):
-            if acc_bases[j] < min_total_bases:
-                last_meets_bases = False
-                break
-    if last_meets_reads and last_meets_bases and acc_n >= min_snp_per_block and prev_start > 0:
+    last_exceeds_size = max_blocksize > 0 and acc_size >= max_blocksize
+    if (last_meets_reads and acc_n >= min_snp_per_block and prev_start > 0) or (last_exceeds_size and prev_start > 0):
         bin_ids[prev_start:] = bin_id
         bin_id += 1
     else:
@@ -175,8 +166,7 @@ def adaptive_binning_windows(
     min_snp_per_block: int,
     grp_cols: list,
     tumor_sidx=0,
-    win_bases=None,
-    min_total_bases=0,
+    max_blocksize=0,
 ):
     """Window-based adaptive binning: merge consecutive windows until SNP thresholds are met.
 
@@ -196,11 +186,6 @@ def adaptive_binning_windows(
         Columns to group windows by (e.g. ``["region_id"]``).
     tumor_sidx : int
         Index of first tumor sample column.
-    win_bases : (W, M) ndarray or None
-        Per-window total bases (ceil(depth * window_length)) for all samples.
-        If None, the bases constraint is disabled.
-    min_total_bases : int
-        Minimum total bases per tumor sample for a bin to be complete.
 
     Returns
     -------
@@ -215,7 +200,8 @@ def adaptive_binning_windows(
 
     logging.info(
         f"adaptive_binning_windows: min_snp_reads={min_snp_reads}, "
-        f"min_snp_per_block={min_snp_per_block}, min_total_bases={min_total_bases}"
+        f"min_snp_per_block={min_snp_per_block}, "
+        f"max_blocksize={max_blocksize}"
     )
 
     # 1. Assign SNPs to windows
@@ -234,12 +220,6 @@ def adaptive_binning_windows(
     win_nsnps = np.zeros(W, dtype=np.int64)
     win_reads = np.zeros((W, M_tumor), dtype=np.float64)
 
-    # Slice win_bases to tumor columns; zeros if not provided
-    if win_bases is not None:
-        win_bases_tumor = np.ascontiguousarray(win_bases[:, tumor_sidx:])
-    else:
-        win_bases_tumor = np.zeros((W, M_tumor), dtype=np.int64)
-
     snp_win_idx = snps["win_idx"].to_numpy()
     snp_orig_idx = snps["_orig_idx"].to_numpy()
 
@@ -256,6 +236,7 @@ def adaptive_binning_windows(
     # 3. Group windows and run numba kernel
     bin_id = 0
     windows["bin_id"] = 0
+    all_win_sizes = (windows["END"] - windows["START"]).to_numpy(dtype=np.int64)
     win_grps = windows.groupby(by=grp_cols, sort=False)
     logging.info(f"#window groups={len(win_grps)}, grouper: {grp_cols}")
 
@@ -263,11 +244,11 @@ def adaptive_binning_windows(
         grp_idxs = grp_wins.index.to_numpy()
         grp_reads = np.ascontiguousarray(win_reads[grp_idxs])
         grp_nsnps = np.ascontiguousarray(win_nsnps[grp_idxs])
-        grp_bases = np.ascontiguousarray(win_bases_tumor[grp_idxs])
+        grp_sizes = np.ascontiguousarray(all_win_sizes[grp_idxs])
 
         local_bin_ids, n_bins = _bin_windows_numba(
             grp_reads, grp_nsnps, min_snp_reads, min_snp_per_block,
-            grp_bases, min_total_bases,
+            grp_sizes, max_blocksize,
         )
 
         local_bin_ids += bin_id
