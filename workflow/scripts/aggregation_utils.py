@@ -112,13 +112,13 @@ def detect_phase_flips(snps, a_mtx, b_mtx, grp_cols, tumor_sidx=0,
         for chrom, p1, p2, b1, b2, d in flip_records[:n_show]:
             b1s = ",".join(f"{v:.3f}" for v in b1)
             b2s = ",".join(f"{v:.3f}" for v in b2)
-            logging.info(f"  chr{chrom}:{p1}-{p2}  BAF=[{b1s}]→[{b2s}]  |Δ|={d:.3f}")
+            logging.info(f"  {chrom}:{p1}-{p2}  BAF=[{b1s}]→[{b2s}]  |Δ|={d:.3f}")
         if len(flip_records) > n_show:
             logging.info(f"bottom {n_show} flips by |ΔBAF| (smallest gap):")
             for chrom, p1, p2, b1, b2, d in flip_records[-n_show:]:
                 b1s = ",".join(f"{v:.3f}" for v in b1)
                 b2s = ",".join(f"{v:.3f}" for v in b2)
-                logging.info(f"  chr{chrom}:{p1}-{p2}  BAF=[{b1s}]→[{b2s}]  |Δ|={d:.3f}")
+                logging.info(f"  {chrom}:{p1}-{p2}  BAF=[{b1s}]→[{b2s}]  |Δ|={d:.3f}")
 
     return pd.Series(phase_group, index=snps.index, dtype=np.int64)
 
