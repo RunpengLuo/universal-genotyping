@@ -125,6 +125,9 @@ params_combine_counts:
   # true = median-center (ignore matched normal)
   skip_normal_normalization: false  
   rdr_outlier_quantile: 0.002
+  phase_flip_test: false
+  phase_flip_epsilon: 0.15
+  phase_flip_alpha: 0.05
 
 ##################################################
 threads:

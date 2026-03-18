@@ -25,6 +25,7 @@ from utils import setup_logging, maybe_path, stamp_path
 from aggregation_utils import (
     adaptive_binning_windows,
     assign_pos_to_range,
+    detect_phase_flips,
     matrix_segmentation,
 )
 from plot_utils import plot_allele_freqs, plot_rdr_baf
@@ -92,9 +93,23 @@ num_phaseset = snps["PS"].nunique()
 logging.info(f"#phaseset={num_phaseset}")
 grp_cols.append("PS")
 
+phase_flip_test = bool(sm.params["phase_flip_test"])
+if phase_flip_test:
+    snps["phase_group"] = detect_phase_flips(
+        snps, a_mtx, b_mtx, grp_cols=grp_cols, tumor_sidx=tumor_sidx,
+        epsilon=float(sm.params["phase_flip_epsilon"]),
+        alpha=float(sm.params["phase_flip_alpha"]),
+    )
+    grp_cols.append("phase_group")
+
 window_df["win_idx"] = np.arange(len(window_df))
-# Assign PS to window_df from SNPs: each window gets the majority-vote PS
-_snps_tmp = snps[["#CHR", "POS0", "PS"]].copy()
+# Assign PS (and phase_group if active) to window_df from SNPs via majority vote.
+# Only the columns needed for window annotation are extracted to avoid copying
+# the full SNP DataFrame.
+snp_window_cols = ["#CHR", "POS0", "PS"]
+if phase_flip_test:
+    snp_window_cols.append("phase_group")
+_snps_tmp = snps[snp_window_cols].copy()
 _snps_tmp = assign_pos_to_range(_snps_tmp, window_df, ref_id="win_idx", pos_col="POS0")
 _snps_tmp = _snps_tmp.dropna(subset=["win_idx"])
 _snps_tmp["win_idx"] = _snps_tmp["win_idx"].astype(np.int64)
@@ -111,6 +126,12 @@ window_df["PS"] = window_df["win_idx"].map(win_ps)
 # Windows with no SNPs inherit PS from previous window (forward-fill)
 if window_df["PS"].isna().any():
     window_df["PS"] = window_df["PS"].ffill()
+
+if phase_flip_test:
+    win_pg = _snps_tmp.groupby("win_idx")["phase_group"].agg(lambda x: x.mode().iloc[0])
+    window_df["phase_group"] = window_df["win_idx"].map(win_pg)
+    if window_df["phase_group"].isna().any():
+        window_df["phase_group"] = window_df["phase_group"].ffill()
 
 max_blocksize = int(sm.params["max_blocksize"])
 bbs, snps = adaptive_binning_windows(

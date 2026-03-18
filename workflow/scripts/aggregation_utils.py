@@ -6,6 +6,7 @@ import pandas as pd
 import numba
 
 from scipy.sparse import csr_matrix, hstack, issparse
+from scipy.stats import beta as beta_dist
 
 import pyranges as pr
 import scanpy as sc
@@ -13,6 +14,113 @@ import scanpy as sc
 from io_utils import *
 from combine_counts_utils import *
 from count_reads_utils import *
+
+
+def detect_phase_flips(snps, a_mtx, b_mtx, grp_cols, tumor_sidx=0,
+                       epsilon=0.15, alpha=0.05):
+    """Detect phase flips between consecutive SNPs using Beta credible intervals.
+
+    For each pair of consecutive SNPs within a group, compute a 95% Beta(b+1, a+1)
+    credible interval for the BAF. If any tumor sample shows the two intervals
+    confidently on opposite sides of a dead zone around 0.5, mark a phase boundary.
+
+    Parameters
+    ----------
+    snps : pd.DataFrame
+        SNP DataFrame with grouping columns.
+    a_mtx : (N, M) ndarray
+        A-allele counts (N SNPs, M samples).
+    b_mtx : (N, M) ndarray
+        B-allele counts (N SNPs, M samples).
+    grp_cols : list of str
+        Columns to group SNPs by (e.g. ["region_id", "PS"]).
+    tumor_sidx : int
+        Index of first tumor sample column.
+    epsilon : float
+        Half-width of dead zone around 0.5. Default 0.15 → dead zone [0.35, 0.65].
+    alpha : float
+        Significance level for credible intervals. Default 0.05 → 95% CI.
+
+    Returns
+    -------
+    pd.Series
+        Globally unique phase_group IDs aligned to snps index.
+    """
+    a_tumor = (a_mtx[:, tumor_sidx:].toarray() if issparse(a_mtx)
+               else a_mtx[:, tumor_sidx:]).astype(np.float64)
+    b_tumor = (b_mtx[:, tumor_sidx:].toarray() if issparse(b_mtx)
+               else b_mtx[:, tumor_sidx:]).astype(np.float64)
+
+    ci_lo = beta_dist.ppf(alpha / 2, b_tumor + 1, a_tumor + 1)
+    ci_hi = beta_dist.ppf(1 - alpha / 2, b_tumor + 1, a_tumor + 1)
+
+    # Observed BAF for logging
+    tot_tumor = a_tumor + b_tumor
+    baf = np.divide(b_tumor, tot_tumor,
+                    out=np.full_like(b_tumor, np.nan), where=tot_tumor > 0)
+
+    phase_group = np.zeros(len(snps), dtype=np.int64)
+    global_pg = 0
+    n_boundaries = 0
+    n_groups_split = 0
+    flip_records = []
+
+    for _, grp in snps.groupby(grp_cols, sort=False):
+        idx = grp.index.to_numpy()
+        if len(idx) < 2:
+            phase_group[idx] = global_pg
+            global_pg += 1
+            continue
+
+        # Vectorized: check all consecutive pairs × all samples at once
+        hi_prev, lo_curr = ci_hi[idx[:-1]], ci_lo[idx[1:]]
+        lo_prev, hi_curr = ci_lo[idx[:-1]], ci_hi[idx[1:]]
+        is_flip = (
+            ((hi_prev < 0.5 - epsilon) & (lo_curr > 0.5 + epsilon)) |
+            ((lo_prev > 0.5 + epsilon) & (hi_curr < 0.5 - epsilon))
+        ).any(axis=1)
+
+        local_pg = np.concatenate([[0], np.cumsum(is_flip)])
+        phase_group[idx] = global_pg + local_pg
+
+        n_flip = int(is_flip.sum())
+        n_boundaries += n_flip
+        if n_flip > 0:
+            n_groups_split += 1
+            for fp in np.where(is_flip)[0]:
+                pi, ci = idx[fp], idx[fp + 1]
+                mean_diff = np.nanmean(np.abs(baf[pi] - baf[ci]))
+                flip_records.append((
+                    snps.iat[pi, snps.columns.get_loc("#CHR")],
+                    snps.iat[pi, snps.columns.get_loc("POS0")],
+                    snps.iat[ci, snps.columns.get_loc("POS0")],
+                    baf[pi], baf[ci], mean_diff,
+                ))
+
+        global_pg += int(local_pg[-1]) + 1
+
+    logging.info(
+        f"detect_phase_flips: epsilon={epsilon}, alpha={alpha}, "
+        f"boundaries={n_boundaries}, groups_split={n_groups_split}, "
+        f"new_phase_groups={global_pg}"
+    )
+
+    if flip_records:
+        flip_records.sort(key=lambda r: r[5], reverse=True)
+        n_show = min(10, len(flip_records))
+        logging.info(f"top {n_show} flips by |ΔBAF| (largest gap):")
+        for chrom, p1, p2, b1, b2, d in flip_records[:n_show]:
+            b1s = ",".join(f"{v:.3f}" for v in b1)
+            b2s = ",".join(f"{v:.3f}" for v in b2)
+            logging.info(f"  chr{chrom}:{p1}-{p2}  BAF=[{b1s}]→[{b2s}]  |Δ|={d:.3f}")
+        if len(flip_records) > n_show:
+            logging.info(f"bottom {n_show} flips by |ΔBAF| (smallest gap):")
+            for chrom, p1, p2, b1, b2, d in flip_records[-n_show:]:
+                b1s = ",".join(f"{v:.3f}" for v in b1)
+                b2s = ",".join(f"{v:.3f}" for v in b2)
+                logging.info(f"  chr{chrom}:{p1}-{p2}  BAF=[{b1s}]→[{b2s}]  |Δ|={d:.3f}")
+
+    return pd.Series(phase_group, index=snps.index, dtype=np.int64)
 
 
 @numba.njit
