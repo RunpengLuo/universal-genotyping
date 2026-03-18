@@ -158,18 +158,7 @@ def plot_rd_gc(
     run_id="",
     **plot_kwargs,
 ):
-    """Generate a combined multi-sample 1-D chromosome scatter PDF.
-
-    Produces a single ``{prefix}.pdf`` with one page per chromosome.  Each page
-    contains vertically stacked subplots (one row per sample, shared x-axis).
-
-    Parameters
-    ----------
-    gc_corr : dict[str, tuple[float, float]] | None
-        {label: (pearson_r, spearman_r)} from ``compute_gc_rd_stats``.
-    gc_bin_median_std : dict[str, float] | None
-        {label: std of per-GC-bin median RD} from ``compute_gc_rd_stats``.
-    """
+    """Generate a genome-wide multi-sample 1-D scatter PDF."""
     plot_file = stamp_path(os.path.join(qc_dir, f"{prefix}.pdf"), run_id)
     plot_1d_multi_sample(
         pos_df,
@@ -182,6 +171,69 @@ def plot_rd_gc(
         max_ylim=ylim,
         **plot_kwargs,
     )
+
+
+def _genome_coords(pos_df, genome_size):
+    """Compute genome-wide x-coordinates, chromosome offsets, and boundaries.
+
+    Returns (genome_x, chrom_bounds, total_len) where chrom_bounds is a list
+    of (chrom_label, offset, chrom_size) tuples.
+    """
+    chrom_sizes = get_chr_sizes(genome_size)
+    ch = pos_df["#CHR"].to_numpy()
+    if "POS" in pos_df.columns:
+        pos = pos_df["POS"].to_numpy()
+    else:
+        pos = ((pos_df["START"].to_numpy() + pos_df["END"].to_numpy()) // 2).astype(
+            np.int64
+        )
+
+    # Determine chromosome order from data
+    seen = []
+    for c in ch:
+        if len(seen) == 0 or seen[-1] != c:
+            seen.append(c)
+
+    offsets = {}
+    cum = 0
+    chrom_bounds = []
+    for c in seen:
+        sz = chrom_sizes.get(c)
+        if sz is None:
+            continue
+        offsets[c] = cum
+        chrom_bounds.append((c, cum, sz))
+        cum += sz
+
+    genome_x = np.array([offsets.get(c, 0) + p for c, p in zip(ch, pos)], dtype=np.float64)
+    return genome_x, chrom_bounds, cum
+
+
+def _add_chrom_decorations(ax, chrom_bounds, total_len, region_by_chr, blacklist_by_chr):
+    """Add chromosome boundaries, labels, and region/blacklist shading to an axis."""
+    for chrom, offset, sz in chrom_bounds:
+        ax.axvline(offset, color="black", linewidth=0.5, alpha=0.3)
+        if chrom in region_by_chr:
+            for s, e in region_by_chr[chrom]:
+                ax.axvspan(offset + s, offset + e, color="lightblue", alpha=0.15, zorder=0)
+        if chrom in blacklist_by_chr:
+            for s, e in blacklist_by_chr[chrom]:
+                ax.axvspan(offset + s, offset + e, color="lightcoral", alpha=0.2, zorder=0)
+        label = chrom.replace("chr", "")
+        ax.text(offset + sz / 2, -0.06, label, ha="center", va="top", fontsize=7,
+                transform=ax.get_xaxis_transform())
+    ax.set_xlim(0, total_len)
+    ax.set_xticks([])
+
+
+def _parse_bed_by_chr(bed_path):
+    """Read a BED file and return {chrom: [(start, end), ...]}."""
+    result = {}
+    if bed_path is not None:
+        df = read_region_file(bed_path)
+        for ch, grp in df.groupby("#CHR", sort=False):
+            result[ch] = list(zip(grp["START"], grp["END"]))
+    return result
 
 
 def plot_1d_multi_sample(
@@ -200,8 +252,8 @@ def plot_1d_multi_sample(
     region_bed: str | None = None,
     blacklist_bed: str | None = None,
 ):
-    """Multi-sample 1-D chromosome scatter plot: one page per chromosome,
-    vertically stacked subplots (one row per sample, shared x-axis).
+    """Multi-sample 1-D genome-wide scatter plot: all chromosomes on one page,
+    one row per sample.
 
     Parameters
     ----------
@@ -212,93 +264,49 @@ def plot_1d_multi_sample(
     """
     n_samples = len(labels)
     logging.info(
-        f"chromosome wide {unit}-level {val_type} multi-sample plot "
+        f"genome-wide {unit}-level {val_type} multi-sample plot "
         f"({n_samples} samples), out_file={out_file}"
     )
-    chrom_sizes = get_chr_sizes(genome_size)
+    genome_x, chrom_bounds, total_len = _genome_coords(pos_df, genome_size)
+    region_by_chr = _parse_bed_by_chr(region_bed)
+    blacklist_by_chr = _parse_bed_by_chr(blacklist_bed)
 
-    _region_by_chr = {}
-    if region_bed is not None:
-        _region_df = read_region_file(region_bed)
-        for _ch, _grp in _region_df.groupby("#CHR", sort=False):
-            _region_by_chr[_ch] = list(zip(_grp["START"], _grp["END"]))
+    s_plot = adaptive_dot_size(len(pos_df), s_base=s)
 
-    _blacklist_by_chr = {}
-    if blacklist_bed is not None:
-        _bl_df = read_region_file(blacklist_bed)
-        for _ch, _grp in _bl_df.groupby("#CHR", sort=False):
-            _blacklist_by_chr[_ch] = list(zip(_grp["START"], _grp["END"]))
+    fig, axes = plt.subplots(
+        nrows=n_samples,
+        ncols=1,
+        figsize=(20, 3 * n_samples),
+        sharex=True,
+        squeeze=False,
+    )
+    axes = axes[:, 0]
 
-    ch = pos_df["#CHR"].to_numpy()
-    if "POS" in pos_df.columns:
-        pos = pos_df["POS"].to_numpy()
-    else:
-        pos = ((pos_df["START"].to_numpy() + pos_df["END"].to_numpy()) // 2).astype(
-            np.int64
-        )
-    num_bins = len(pos_df)
-    change = np.flatnonzero(ch[1:] != ch[:-1]) + 1
-    starts = np.r_[0, change]
-    ends = np.r_[change, num_bins]
-    chroms = ch[starts]
+    for si, (ax, label) in enumerate(zip(axes, labels)):
+        y = mat[:, si] if mat.ndim == 2 else mat
+        m = np.isfinite(y)
 
-    pdf_fd = PdfPages(out_file)
-    for chrom, lo, hi in zip(chroms, starts, ends):
-        chr_end = chrom_sizes.get(chrom)
-        if chr_end is None:
-            logging.warning(f"{chrom}: not found in {genome_size}")
-            continue
+        _add_chrom_decorations(ax, chrom_bounds, total_len, region_by_chr, blacklist_by_chr)
 
-        x = pos[lo:hi]
-        n_chr_pts = hi - lo
-        s_chr = adaptive_dot_size(n_chr_pts, s_base=s)
+        if m.any():
+            ax.scatter(genome_x[m], y[m], s=s_plot, alpha=alpha, rasterized=True)
 
-        fig, axes = plt.subplots(
-            nrows=n_samples,
-            ncols=1,
-            figsize=(40, 3 * n_samples),
-            sharex=True,
-            squeeze=False,
-        )
-        axes = axes[:, 0]
+        if val_type in ["AF", "BAF"]:
+            ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
+            ax.set_ylim(-0.05, 1.05)
+        elif max_ylim is not None:
+            ax.set_ylim(min_ylim, max_ylim)
 
-        for si, (ax, label) in enumerate(zip(axes, labels)):
-            y = mat[lo:hi, si] if mat.ndim == 2 else mat[lo:hi]
-            m = np.isfinite(y)
+        ax.set_ylabel(label, fontsize=10)
+        if val_type not in ["AF", "BAF"]:
+            ax.grid(axis="y", alpha=0.2)
 
-            if chrom in _region_by_chr:
-                for reg_start, reg_end in _region_by_chr[chrom]:
-                    ax.axvspan(
-                        reg_start, reg_end, color="lightblue", alpha=0.15, zorder=0
-                    )
-            if chrom in _blacklist_by_chr:
-                for bl_start, bl_end in _blacklist_by_chr[chrom]:
-                    ax.axvspan(
-                        bl_start, bl_end, color="lightcoral", alpha=0.2, zorder=0
-                    )
+        if si == 0:
+            ax.set_title(f"{val_type} ({unit})")
 
-            if m.any():
-                ax.scatter(x[m], y[m], s=s_chr, alpha=alpha, rasterized=True)
-
-            if val_type in ["AF", "BAF"]:
-                ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
-                ax.set_ylim(-0.05, 1.05)
-            elif max_ylim is not None:
-                ax.set_ylim(min_ylim, max_ylim)
-
-            ax.set_ylabel(label, fontsize=10)
-            ax.set_xlim(0, chr_end)
-            if val_type not in ["AF", "BAF"]:
-                ax.grid(axis="y", alpha=0.2)
-
-            if si == 0:
-                ax.set_title(f"{val_type} plot - {chrom}")
-
-        axes[-1].set_xlabel(f"Position ({unit})")
-        fig.tight_layout()
-        pdf_fd.savefig(fig, dpi=dpi)
-        plt.close(fig)
-    pdf_fd.close()
+    fig.tight_layout()
+    fig.savefig(out_file, dpi=dpi)
+    plt.close(fig)
 
 
 def plot_1d_sample(
@@ -311,109 +319,125 @@ def plot_1d_sample(
     s=4,
     dpi=72,
     alpha=0.6,
-    figsize=(40, 3),
+    figsize=(20, 3),
     min_ylim=0.0,
     max_ylim=None,
     mask: np.ndarray | None = None,
     region_bed: str | None = None,
     blacklist_bed: str | None = None,
 ):
-    """
-    plot any features like AF, RDR, etc., in 1d chromosome scatter plot.
-    """
-    logging.info(f"chromosome wide {unit}-level {val_type} plot, out_file={out_file}")
-    chrom_sizes = get_chr_sizes(genome_size)
+    """Single-sample 1-D genome-wide scatter plot: all chromosomes on one page."""
+    logging.info(f"genome-wide {unit}-level {val_type} plot, out_file={out_file}")
+    genome_x, chrom_bounds, total_len = _genome_coords(pos_df, genome_size)
+    region_by_chr = _parse_bed_by_chr(region_bed)
+    blacklist_by_chr = _parse_bed_by_chr(blacklist_bed)
 
-    _region_by_chr = {}
-    if region_bed is not None:
-        _region_df = read_region_file(region_bed)
-        for _ch, _grp in _region_df.groupby("#CHR", sort=False):
-            _region_by_chr[_ch] = list(zip(_grp["START"], _grp["END"]))
+    m = np.isfinite(val)
+    s_plot = adaptive_dot_size(int(m.sum()), s_base=s)
 
-    _blacklist_by_chr = {}
-    if blacklist_bed is not None:
-        _bl_df = read_region_file(blacklist_bed)
-        for _ch, _grp in _bl_df.groupby("#CHR", sort=False):
-            _blacklist_by_chr[_ch] = list(zip(_grp["START"], _grp["END"]))
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    _add_chrom_decorations(ax, chrom_bounds, total_len, region_by_chr, blacklist_by_chr)
 
-    ch = pos_df["#CHR"].to_numpy()
-    if "POS" in pos_df.columns:
-        pos = pos_df["POS"].to_numpy()
+    if mask is not None:
+        kept = m & mask
+        filt = m & ~mask
+        if filt.any():
+            ax.scatter(
+                genome_x[filt], val[filt], s=s_plot, alpha=0.8, color="red",
+                rasterized=True, label=f"filtered ({filt.sum()})",
+            )
+        if kept.any():
+            ax.scatter(
+                genome_x[kept], val[kept], s=s_plot, alpha=0.8, color="blue",
+                rasterized=True, label=f"kept ({kept.sum()})",
+            )
+        ax.legend(loc="upper right", fontsize=8, markerscale=2)
     else:
-        pos = ((pos_df["START"].to_numpy() + pos_df["END"].to_numpy()) // 2).astype(
-            np.int64
-        )
-    num_bins = len(pos_df)
-    change = np.flatnonzero(ch[1:] != ch[:-1]) + 1
-    starts = np.r_[0, change]
-    ends = np.r_[change, num_bins]
-    chroms = ch[starts]
+        if m.any():
+            ax.scatter(genome_x[m], val[m], s=s_plot, alpha=alpha, rasterized=True)
+
+    if val_type in ["AF", "BAF"]:
+        ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
+        ax.set_ylim(-0.05, 1.05)
+    elif max_ylim is not None:
+        ax.set_ylim(min_ylim, max_ylim)
+
+    ax.set_ylabel(val_type)
+    if val_type not in ["AF", "BAF"]:
+        ax.grid(axis="y", alpha=0.2)
+    ax.set_title(f"{val_type} ({unit})")
+    fig.tight_layout()
+    fig.savefig(out_file, dpi=dpi)
+    plt.close(fig)
+    return
+
+
+def plot_rdr_baf(
+    pos_df: pd.DataFrame,
+    rdr_mat: np.ndarray,
+    baf_mat: np.ndarray,
+    labels: list,
+    genome_size: str,
+    out_file: str,
+    unit="bb",
+    s=4,
+    dpi=72,
+    alpha=0.6,
+    rdr_ylim=None,
+    region_bed: str | None = None,
+    blacklist_bed: str | None = None,
+):
+    """Combined RDR + BAF genome-wide plot: one page per sample, two rows
+    (RDR on top, BAF on bottom).
+
+    Parameters
+    ----------
+    rdr_mat : (N, S) ndarray — RDR values per bin per sample.
+    baf_mat : (N, S) ndarray — BAF values per bin per sample.
+    labels : list[str] — sample labels, length S.
+    """
+    n_samples = len(labels)
+    logging.info(
+        f"genome-wide {unit}-level RDR+BAF plot "
+        f"({n_samples} samples), out_file={out_file}"
+    )
+    genome_x, chrom_bounds, total_len = _genome_coords(pos_df, genome_size)
+    region_by_chr = _parse_bed_by_chr(region_bed)
+    blacklist_by_chr = _parse_bed_by_chr(blacklist_bed)
+    s_plot = adaptive_dot_size(len(pos_df), s_base=s)
 
     pdf_fd = PdfPages(out_file)
-    for chrom, lo, hi in zip(chroms, starts, ends):
-        chr_end = chrom_sizes.get(chrom)
-        if chr_end is None:
-            logging.warning(f"{chrom}: not found in {genome_size}")
-            continue
+    for si, label in enumerate(labels):
+        fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(20, 6), sharex=True)
 
-        x = pos[lo:hi]
-        y = val[lo:hi]
-        m = np.isfinite(y)
-        mask_chr = mask[lo:hi] if mask is not None else None
+        # RDR
+        ax_rdr = axes[0]
+        y_rdr = rdr_mat[:, si] if rdr_mat.ndim == 2 else rdr_mat
+        m_rdr = np.isfinite(y_rdr)
+        _add_chrom_decorations(ax_rdr, chrom_bounds, total_len, region_by_chr, blacklist_by_chr)
+        if m_rdr.any():
+            ax_rdr.scatter(genome_x[m_rdr], y_rdr[m_rdr], s=s_plot, alpha=alpha, rasterized=True)
+        if rdr_ylim is not None:
+            ax_rdr.set_ylim(0, rdr_ylim)
+        ax_rdr.set_ylabel("RDR")
+        ax_rdr.grid(axis="y", alpha=0.2)
+        ax_rdr.set_title(f"{label} — RDR + BAF ({unit})")
 
-        n_plot = int(m.sum())
-        s_chr = adaptive_dot_size(n_plot, s_base=s)
-        if n_plot == 0:
-            logging.warning(f"{chrom}: all {val_type} values are non-finite")
-            continue
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
-        if chrom in _region_by_chr:
-            for reg_start, reg_end in _region_by_chr[chrom]:
-                ax.axvspan(reg_start, reg_end, color="lightblue", alpha=0.15, zorder=0)
-        if chrom in _blacklist_by_chr:
-            for bl_start, bl_end in _blacklist_by_chr[chrom]:
-                ax.axvspan(bl_start, bl_end, color="lightcoral", alpha=0.2, zorder=0)
-        if mask_chr is not None:
-            kept = m & mask_chr
-            filt = m & ~mask_chr
-            if filt.any():
-                ax.scatter(
-                    x[filt],
-                    y[filt],
-                    s=s_chr,
-                    alpha=0.8,
-                    color="red",
-                    rasterized=True,
-                    label=f"filtered ({filt.sum()})",
-                )
-            if kept.any():
-                ax.scatter(
-                    x[kept],
-                    y[kept],
-                    s=s_chr,
-                    alpha=0.8,
-                    color="blue",
-                    rasterized=True,
-                    label=f"kept ({kept.sum()})",
-                )
-            ax.legend(loc="upper right", fontsize=8, markerscale=2)
-        else:
-            ax.scatter(x[m], y[m], s=s_chr, alpha=alpha, rasterized=True)
-        if val_type in ["AF", "BAF"]:
-            ax.axhline(0.5, color="grey", linestyle=":", linewidth=1)
-            ax.set_ylim(-0.05, 1.05)
-        elif max_ylim is not None:
-            ax.set_ylim(min_ylim, max_ylim)
+        # BAF
+        ax_baf = axes[1]
+        y_baf = baf_mat[:, si] if baf_mat.ndim == 2 else baf_mat
+        m_baf = np.isfinite(y_baf)
+        _add_chrom_decorations(ax_baf, chrom_bounds, total_len, region_by_chr, blacklist_by_chr)
+        if m_baf.any():
+            ax_baf.scatter(genome_x[m_baf], y_baf[m_baf], s=s_plot, alpha=alpha, rasterized=True)
+        ax_baf.axhline(0.5, color="grey", linestyle=":", linewidth=1)
+        ax_baf.set_ylim(-0.05, 1.05)
+        ax_baf.set_ylabel("BAF")
 
-        ax.set_xlabel(val_type)
-        ax.set_xlim(0, chr_end)
-        if val_type not in ["AF", "BAF"]:
-            ax.grid(axis="y", alpha=0.2)
-        ax.set_title(f"{val_type} plot - {chrom}")
+        fig.tight_layout()
         pdf_fd.savefig(fig, dpi=dpi)
         plt.close(fig)
     pdf_fd.close()
-    return
 
 
 # ---------------------------------------------------------------------------
@@ -549,8 +573,7 @@ def plot_allele_freqs(
 ):
     """Generate genome-wide allele-frequency scatter plots.
 
-    Produces either one plot per sample or a single pseudobulk plot, saved as
-    multi-page PDFs (one page per chromosome).
+    Produces either a per-sample multi-row plot or a single pseudobulk plot.
 
     Parameters
     ----------

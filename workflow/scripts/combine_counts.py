@@ -27,7 +27,7 @@ from aggregation_utils import (
     assign_pos_to_range,
     matrix_segmentation,
 )
-from plot_utils import plot_allele_freqs, plot_1d_multi_sample
+from plot_utils import plot_allele_freqs, plot_rdr_baf
 from switchprobs import (
     interp_cM_blocks,
     estimate_switchprobs_cM,
@@ -218,15 +218,15 @@ logging.info(
 
 tumor_rep_ids = rep_ids[tumor_sidx:]
 rdr_ylim = (np.round(np.nanquantile(bb_rdr, 0.99)).astype(int) + 1) * 1.1
-plot_1d_multi_sample(
+plot_rdr_baf(
     bbs,
     bb_rdr,
+    baf_mtx_bb[:, tumor_sidx:],
     list(tumor_rep_ids),
     genome_size,
-    stamp_path(os.path.join(qc_dir, "rdr_bb.pdf"), run_id),
+    stamp_path(os.path.join(qc_dir, "rdr_baf_bb.pdf"), run_id),
     unit="bb",
-    val_type="RDR",
-    max_ylim=rdr_ylim,
+    rdr_ylim=rdr_ylim,
     region_bed=region_bed,
     blacklist_bed=blacklist_bed,
 )
