@@ -17,7 +17,7 @@ from count_reads_utils import *
 
 
 def detect_phase_flips(snps, a_mtx, b_mtx, grp_cols, tumor_sidx=0,
-                       epsilon=0.15, alpha=0.05):
+                       epsilon=0.05, alpha=0.05):
     """Detect phase flips between consecutive SNPs using Beta credible intervals.
 
     For each pair of consecutive SNPs within a group, compute a 95% Beta(b+1, a+1)
@@ -37,7 +37,7 @@ def detect_phase_flips(snps, a_mtx, b_mtx, grp_cols, tumor_sidx=0,
     tumor_sidx : int
         Index of first tumor sample column.
     epsilon : float
-        Half-width of dead zone around 0.5. Default 0.15 → dead zone [0.35, 0.65].
+        Half-width of dead zone around 0.5. Default 0.05 → dead zone [0.45, 0.55].
     alpha : float
         Significance level for credible intervals. Default 0.05 → 95% CI.
 

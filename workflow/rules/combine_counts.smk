@@ -45,7 +45,7 @@ rule combine_counts:
         rdr_outlier_quantile=config["params_combine_counts"].get("rdr_outlier_quantile", 0.002),
         max_blocksize=config["params_combine_counts"].get("max_blocksize", 500000),
         phase_flip_test=config["params_combine_counts"].get("phase_flip_test", False),
-        phase_flip_epsilon=config["params_combine_counts"].get("phase_flip_epsilon", 0.15),
+        phase_flip_epsilon=config["params_combine_counts"].get("phase_flip_epsilon", 0.05),
         phase_flip_alpha=config["params_combine_counts"].get("phase_flip_alpha", 0.05),
         chromosomes=config["chromosomes"],
         run_id=_run_id,
