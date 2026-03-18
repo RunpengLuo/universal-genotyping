@@ -82,7 +82,7 @@ def _bin_snps_numba(read_counts, min_snp_reads, min_snp_per_block):
 
 @numba.njit
 def _bin_windows_numba(win_reads, win_nsnps, min_snp_reads, min_snp_per_block,
-                       win_sizes, max_blocksize):
+                       win_starts, win_ends, max_blocksize):
     """Greedy adaptive binning over consecutive windows.
 
     Parameters
@@ -95,11 +95,13 @@ def _bin_windows_numba(win_reads, win_nsnps, min_snp_reads, min_snp_per_block,
         Minimum total reads per sample for a bin to be complete.
     min_snp_per_block : int
         Minimum number of SNPs per bin.
-    win_sizes : (W,) int64
-        Genomic span (END - START) per window.
+    win_starts : (W,) int64
+        START coordinate per window.
+    win_ends : (W,) int64
+        END coordinate per window.
     max_blocksize : int
-        Maximum genomic span for a bin. When exceeded, force a bin boundary.
-        Set to 0 to disable.
+        Maximum genomic span (END - START) for a bin. When exceeded, force
+        a bin boundary. Set to 0 to disable.
 
     Returns
     -------
@@ -117,7 +119,6 @@ def _bin_windows_numba(win_reads, win_nsnps, min_snp_reads, min_snp_per_block,
     prev_start = 0
     acc = win_reads[0].copy()
     acc_n = win_nsnps[0]
-    acc_size = win_sizes[0]
 
     for i in range(1, W):
         meets_reads = True
@@ -126,19 +127,18 @@ def _bin_windows_numba(win_reads, win_nsnps, min_snp_reads, min_snp_per_block,
                 if acc[j] < min_snp_reads:
                     meets_reads = False
                     break
-        exceeds_size = max_blocksize > 0 and acc_size >= max_blocksize
+        span = win_ends[i - 1] - win_starts[prev_start]
+        exceeds_size = max_blocksize > 0 and span >= max_blocksize
         if (meets_reads and acc_n >= min_snp_per_block) or exceeds_size:
             bin_ids[prev_start:i] = bin_id
             bin_id += 1
             prev_start = i
             acc = win_reads[i].copy()
             acc_n = win_nsnps[i]
-            acc_size = win_sizes[i]
         else:
             for j in range(M):
                 acc[j] += win_reads[i, j]
             acc_n += win_nsnps[i]
-            acc_size += win_sizes[i]
 
     # last block: keep as own bin if it meets all criteria and isn't the only block
     last_meets_reads = True
@@ -147,7 +147,8 @@ def _bin_windows_numba(win_reads, win_nsnps, min_snp_reads, min_snp_per_block,
             if acc[j] < min_snp_reads:
                 last_meets_reads = False
                 break
-    last_exceeds_size = max_blocksize > 0 and acc_size >= max_blocksize
+    last_span = win_ends[W - 1] - win_starts[prev_start]
+    last_exceeds_size = max_blocksize > 0 and last_span >= max_blocksize
     if (last_meets_reads and acc_n >= min_snp_per_block and prev_start > 0) or (last_exceeds_size and prev_start > 0):
         bin_ids[prev_start:] = bin_id
         bin_id += 1
@@ -236,7 +237,8 @@ def adaptive_binning_windows(
     # 3. Group windows and run numba kernel
     bin_id = 0
     windows["bin_id"] = 0
-    all_win_sizes = (windows["END"] - windows["START"]).to_numpy(dtype=np.int64)
+    all_win_starts = windows["START"].to_numpy(dtype=np.int64)
+    all_win_ends = windows["END"].to_numpy(dtype=np.int64)
     win_grps = windows.groupby(by=grp_cols, sort=False)
     logging.info(f"#window groups={len(win_grps)}, grouper: {grp_cols}")
 
@@ -244,11 +246,12 @@ def adaptive_binning_windows(
         grp_idxs = grp_wins.index.to_numpy()
         grp_reads = np.ascontiguousarray(win_reads[grp_idxs])
         grp_nsnps = np.ascontiguousarray(win_nsnps[grp_idxs])
-        grp_sizes = np.ascontiguousarray(all_win_sizes[grp_idxs])
+        grp_starts = np.ascontiguousarray(all_win_starts[grp_idxs])
+        grp_ends = np.ascontiguousarray(all_win_ends[grp_idxs])
 
         local_bin_ids, n_bins = _bin_windows_numba(
             grp_reads, grp_nsnps, min_snp_reads, min_snp_per_block,
-            grp_sizes, max_blocksize,
+            grp_starts, grp_ends, max_blocksize,
         )
 
         local_bin_ids += bin_id
