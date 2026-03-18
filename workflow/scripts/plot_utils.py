@@ -423,53 +423,106 @@ def plot_1d_sample(
 
 def plot_snp_depth_histogram(
     tot_mtx,
-    snp_indices,
     rep_ids,
     qc_dir,
     run_id,
+    ref_mtx=None,
+    is_bulk=True,
 ):
-    """Plot per-sample histograms of total allele depth at SNP positions.
+    """Plot per-sample histograms of total allele depth and ref-AF at SNP positions.
+
+    The caller is responsible for pre-slicing *tot_mtx* (and *ref_mtx*) to the
+    desired SNP rows before calling this function.
 
     Parameters
     ----------
-    tot_mtx : ndarray
-        Total depth matrix (all SNPs x samples).
-    snp_indices : array-like
-        Row indices into *tot_mtx* for SNPs assigned to windows.
+    tot_mtx : ndarray or sparse
+        Total depth matrix (SNPs x samples/cells), already filtered to the
+        SNPs of interest.
     rep_ids : list[str]
         Sample / replicate identifiers.
     qc_dir : str
         Output directory for the PDF.
     run_id : str
         Run identifier used by :func:`stamp_path`.
+    ref_mtx : ndarray or sparse, optional
+        Ref-allele count matrix (same shape as *tot_mtx*). When provided, a
+        second column of ref-AF histograms is added to the figure.
+    is_bulk : bool
+        If True, one row per sample. If False, aggregate across cells into a
+        single pseudobulk row.
     """
     logging.info("QC analysis - plot SNP depth histogram")
 
-    nsamples = len(rep_ids)
+    has_af = ref_mtx is not None
+    ncols = 2 if has_af else 1
+
+    if is_bulk:
+        nrows = len(rep_ids)
+        row_labels = list(rep_ids)
+    else:
+        nrows = 1
+        row_labels = ["pseudobulk"]
+
     fig, axes = plt.subplots(
-        nrows=nsamples, ncols=1, figsize=(5, 3 * nsamples), squeeze=False
+        nrows=nrows, ncols=ncols, figsize=(5 * ncols, 3 * nrows), squeeze=False
     )
 
-    depths_all = tot_mtx[snp_indices]
-
-    def _stats_title(name, d):
-        if len(d) == 0:
+    def _stats_title(name, depth_vals):
+        if len(depth_vals) == 0:
             return f"{name} (n=0)"
         return (
             f"{name}\n"
-            f"mean={d.mean():.1f}, median={np.median(d):.1f}, "
-            f"min={d.min()}, max={d.max()}"
+            f"mean={depth_vals.mean():.1f}, median={np.median(depth_vals):.1f}, "
+            f"min={depth_vals.min():.0f}, max={depth_vals.max():.0f}"
         )
 
-    for si, rid in enumerate(rep_ids):
-        ax = axes[si, 0]
-        d = depths_all[:, si]
-        if len(d) > 0:
-            clip = np.percentile(d, 99)
-            ax.hist(d[d <= clip], bins=50, alpha=0.7)
-        ax.set_title(_stats_title(rid, d), fontsize=9)
-        ax.set_xlabel("Total allele depth")
-        ax.set_ylabel("# SNPs")
+    def _get_col(mat, col_idx):
+        """Extract a single column as a 1-D numpy array."""
+        if issparse(mat):
+            return np.asarray(mat[:, col_idx].toarray()).ravel()
+        return np.asarray(mat[:, col_idx]).ravel()
+
+    def _pseudobulk_sum(mat):
+        """Sum across all columns (cells) to produce a 1-D pseudobulk array."""
+        if issparse(mat):
+            return np.asarray(mat.sum(axis=1)).ravel()
+        return np.asarray(mat.sum(axis=1)).ravel()
+
+    for ri, label in enumerate(row_labels):
+        # --- depth histogram ---
+        ax_depth = axes[ri, 0]
+        if is_bulk:
+            depth = _get_col(tot_mtx, ri)
+        else:
+            depth = _pseudobulk_sum(tot_mtx)
+        if len(depth) > 0:
+            clip_threshold = np.percentile(depth, 99)
+            ax_depth.hist(depth[depth <= clip_threshold], bins=50, alpha=0.7)
+        ax_depth.set_title(_stats_title(label, depth), fontsize=9)
+        ax_depth.set_xlabel("Total allele depth")
+        ax_depth.set_ylabel("# SNPs")
+
+        # --- ref-AF histogram ---
+        if has_af:
+            ax_af = axes[ri, 1]
+            if is_bulk:
+                total_depth = _get_col(tot_mtx, ri).astype(np.float64)
+                ref_depth = _get_col(ref_mtx, ri).astype(np.float64)
+            else:
+                total_depth = _pseudobulk_sum(tot_mtx).astype(np.float64)
+                ref_depth = _pseudobulk_sum(ref_mtx).astype(np.float64)
+            covered_mask = total_depth > 0
+            ref_af = np.full(len(total_depth), np.nan)
+            ref_af[covered_mask] = ref_depth[covered_mask] / total_depth[covered_mask]
+            ref_af_valid = ref_af[~np.isnan(ref_af)]
+            if len(ref_af_valid) > 0:
+                ax_af.hist(ref_af_valid, bins=50, range=(0, 1), alpha=0.7)
+            ax_af.axvline(0.5, color="red", linestyle="--", linewidth=0.8)
+            ax_af.set_xlim(0, 1)
+            ax_af.set_title(f"{label} ref-AF", fontsize=9)
+            ax_af.set_xlabel("Ref allele frequency")
+            ax_af.set_ylabel("# SNPs")
 
     fig.tight_layout()
     out_path = stamp_path(os.path.join(qc_dir, "snp_depth_hist.pdf"), run_id)

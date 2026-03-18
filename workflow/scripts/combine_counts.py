@@ -27,7 +27,7 @@ from aggregation_utils import (
     assign_pos_to_range,
     matrix_segmentation,
 )
-from plot_utils import plot_allele_freqs, plot_snp_depth_histogram, plot_1d_multi_sample
+from plot_utils import plot_allele_freqs, plot_1d_multi_sample
 from switchprobs import (
     interp_cM_blocks,
     estimate_switchprobs_cM,
@@ -105,9 +105,6 @@ logging.info(
     f"SNPs per window: {n_win_with_snps}/{n_win_total} windows have SNPs, "
     f"mean={snps_per_win.mean():.1f}, median={snps_per_win.median():.1f}, "
     f"min={snps_per_win.min()}, max={snps_per_win.max()}"
-)
-plot_snp_depth_histogram(
-    tot_mtx, _snps_tmp.index, rep_ids, qc_dir, run_id,
 )
 win_ps = _snps_tmp.groupby("win_idx")["PS"].agg(lambda x: x.mode().iloc[0])
 window_df["PS"] = window_df["win_idx"].map(win_ps)

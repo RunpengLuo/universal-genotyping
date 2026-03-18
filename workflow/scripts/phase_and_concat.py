@@ -16,7 +16,7 @@ from utils import *
 from io_utils import *
 from combine_counts_utils import *
 from count_reads_utils import *
-from plot_utils import plot_allele_freqs, plot_1d_sample, plot_1d_multi_sample
+from plot_utils import plot_allele_freqs, plot_snp_depth_histogram
 from aggregation_utils import *
 from switchprobs import *
 
@@ -226,6 +226,11 @@ ref_mtx = ref_mtx[snp_mask, :]
 alt_mtx = alt_mtx[snp_mask, :]
 a_mtx = a_mtx[snp_mask, :]
 b_mtx = b_mtx[snp_mask, :]
+
+plot_snp_depth_histogram(
+    tot_mtx, rep_ids, qc_dir, run_id,
+    ref_mtx=ref_mtx, is_bulk=is_bulk_assay,
+)
 
 ##################################################
 plot_allele_freqs(
