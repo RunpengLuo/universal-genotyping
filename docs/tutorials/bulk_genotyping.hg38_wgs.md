@@ -133,3 +133,18 @@ The `--config` flags on the command line override values in `config.yaml`, so yo
 ## 5. Results
 
 Final outputs required by HATCHet3 can be found in `<out_dir>/<bb_dir>/bulkWGS/`. See [docs/reference.md](../reference.md) for the full output specification including intermediate files.
+
+## 6. Rerunning from intermediate results
+
+Snakemake automatically skips rules whose outputs already exist. To resume after a crash, add `--rerun-incomplete` to rerun rules that left partial outputs. Adding `--keep-incomplete` to the initial run preserves partial outputs on failure instead of deleting them.
+
+```bash
+snakemake --profile /path/to/profile/ \
+    -s /path/to/workflow/Snakefile \
+    --configfile /path/to/config/config.yaml \
+    --directory /path/to/output_dir \
+    --config sample_file=/path/to/samples.tsv sample_id=HT001 \
+    --rerun-incomplete
+```
+
+Add `--dry-run` (`-n`) to preview what will be rerun before executing.
