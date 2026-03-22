@@ -115,6 +115,20 @@ y_count = matrix_segmentation(b_mtx_corr, seg_ids, num_segs)
 d_count = matrix_segmentation(tot_mtx, seg_ids, num_segs)
 assert y_count.shape[0] == num_segs
 
+plot_allele_freqs(
+    segs_df,
+    rep_ids,
+    d_count,
+    y_count,
+    genome_size,
+    qc_dir,
+    apply_pseudobulk=not is_bulk_assay,
+    allele="cnv-B",
+    unit="seg",
+    suffix=f"_{assay_type}",
+    run_id=run_id,
+)
+
 ##################################################
 if not is_bulk_assay:
     adata: sc.AnnData = sc.read_h5ad(h5ad_file)
