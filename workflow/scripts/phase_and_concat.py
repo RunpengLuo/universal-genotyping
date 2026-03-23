@@ -124,17 +124,18 @@ if is_bulk_assay:
     b_mtx = b_mtx.toarray()
 
     if has_normal:
-        ref_normal = ref_mtx[:, 0]
-        alt_normal = alt_mtx[:, 0]
-        alt_pos = alt_normal > 0
-        n_alt_pos = np.sum(alt_pos)
-        logging.info(f"Normal sample: {n_alt_pos}/{len(alt_normal)} SNPs with ALT > 0")
-        if n_alt_pos > 0:
-            ratio = np.abs(ref_normal[alt_pos] / alt_normal[alt_pos] - 1)
+        ref_normal = ref_mtx[:, 0].astype(float)
+        alt_normal = alt_mtx[:, 0].astype(float)
+        total_normal = ref_normal + alt_normal
+        pos = total_normal > 0
+        n_pos = np.sum(pos)
+        logging.info(f"Normal sample: {n_pos}/{len(total_normal)} SNPs with total > 0")
+        if n_pos > 0:
+            baf = ref_normal[pos] / total_normal[pos]
             logging.info(
-                f"Normal |REF/ALT - 1| stats: "
-                f"min={np.min(ratio):.4f}, max={np.max(ratio):.4f}, "
-                f"median={np.median(ratio):.4f}, mean={np.mean(ratio):.4f}"
+                f"Normal REF/(REF+ALT) stats: "
+                f"min={np.min(baf):.4f}, max={np.max(baf):.4f}, "
+                f"median={np.median(baf):.4f}, mean={np.mean(baf):.4f}"
             )
 
 ##################################################
