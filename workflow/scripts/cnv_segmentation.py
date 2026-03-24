@@ -12,10 +12,20 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import save_npz, load_npz
 import scanpy as sc
+from scipy.sparse import issparse
 from utils import *
 from io_utils import *
 from aggregation_utils import *
 from plot_utils import plot_allele_freqs
+
+
+def _sparsity(X):
+    """Return fraction of zero entries."""
+    size = X.shape[0] * X.shape[1]
+    if size == 0:
+        return 0.0
+    nnz = X.nnz if issparse(X) else np.count_nonzero(X)
+    return 1.0 - nnz / size
 
 ##################################################
 """
@@ -95,6 +105,12 @@ a_mtx = a_mtx[raw_snp_ids, :]
 b_mtx = b_mtx[raw_snp_ids, :]
 a_mtx_corr, b_mtx_corr = apply_phase_to_mat(tot_mtx, b_mtx, a_mtx, bbc_phases)
 
+logging.info(
+    f"SNP-level matrices: shape={tot_mtx.shape}, "
+    f"tot sparsity={_sparsity(tot_mtx):.4f}, "
+    f"B-corrected sparsity={_sparsity(b_mtx_corr):.4f}"
+)
+
 plot_allele_freqs(
     snps,
     rep_ids,
@@ -114,6 +130,12 @@ seg_ids = snps["seg_id"].to_numpy()
 y_count = matrix_segmentation(b_mtx_corr, seg_ids, num_segs)
 d_count = matrix_segmentation(tot_mtx, seg_ids, num_segs)
 assert y_count.shape[0] == num_segs
+
+logging.info(
+    f"Segment-level matrices: shape={d_count.shape}, "
+    f"D sparsity={_sparsity(d_count):.4f}, "
+    f"Y sparsity={_sparsity(y_count):.4f}"
+)
 
 plot_allele_freqs(
     segs_df,
@@ -145,6 +167,12 @@ if not is_bulk_assay:
     counts = adata.var["seg_id"].value_counts()
     segs_df[f"#{feature_type}"] = segs_df["seg_id"].map(counts).fillna(0).astype(int)
     x_count = matrix_segmentation(adata.X.T, adata.var["seg_id"].to_numpy(), num_segs)
+    logging.info(
+        f"Feature-level matrix: shape={adata.X.shape}, sparsity={_sparsity(adata.X):.4f}"
+    )
+    logging.info(
+        f"Segment-level X matrix: shape={x_count.shape}, sparsity={_sparsity(x_count):.4f}"
+    )
 
 if not is_bulk_assay:
     save_npz(sm.output["x_count"], x_count)
