@@ -28,6 +28,7 @@ from aggregation_utils import (
     detect_phase_flips,
     matrix_segmentation,
 )
+from matplotlib.backends.backend_pdf import PdfPages
 from plot_utils import plot_allele_freqs, plot_rdr_baf
 from switchprobs import (
     interp_cM_blocks,
@@ -156,20 +157,7 @@ a_mtx_bb = matrix_segmentation(a_mtx, bb_ids, num_bbs)
 b_mtx_bb = matrix_segmentation(b_mtx, bb_ids, num_bbs)
 tot_mtx_bb = matrix_segmentation(tot_mtx, bb_ids, num_bbs)
 
-plot_allele_freqs(
-    bbs,
-    rep_ids,
-    tot_mtx_bb,
-    b_mtx_bb,
-    genome_size,
-    qc_dir,
-    apply_pseudobulk=False,
-    allele="B",
-    unit="bb",
-    region_bed=region_bed,
-    blacklist_bed=blacklist_bed,
-    run_id=run_id,
-)
+pdf_path = stamp_path(os.path.join(qc_dir, "combine_counts.pdf"), run_id)
 
 baf_mtx_bb = np.divide(
     b_mtx_bb,
@@ -239,18 +227,37 @@ logging.info(
 
 tumor_rep_ids = rep_ids[tumor_sidx:]
 rdr_ylim = (np.round(np.nanquantile(bb_rdr, 0.99)).astype(int) + 1) * 1.1
-plot_rdr_baf(
-    bbs,
-    bb_rdr,
-    baf_mtx_bb[:, tumor_sidx:],
-    list(tumor_rep_ids),
-    genome_size,
-    stamp_path(os.path.join(qc_dir, "rdr_baf_bb.pdf"), run_id),
-    unit="bb",
-    rdr_ylim=rdr_ylim,
-    region_bed=region_bed,
-    blacklist_bed=blacklist_bed,
-)
+
+with PdfPages(pdf_path) as pdf:
+    plot_allele_freqs(
+        bbs,
+        rep_ids,
+        tot_mtx_bb,
+        b_mtx_bb,
+        genome_size,
+        qc_dir,
+        apply_pseudobulk=False,
+        allele="B",
+        unit="bb",
+        region_bed=region_bed,
+        blacklist_bed=blacklist_bed,
+        run_id=run_id,
+        pdf=pdf,
+    )
+    plot_rdr_baf(
+        bbs,
+        bb_rdr,
+        baf_mtx_bb[:, tumor_sidx:],
+        list(tumor_rep_ids),
+        genome_size,
+        pdf_path,
+        unit="bb",
+        rdr_ylim=rdr_ylim,
+        region_bed=region_bed,
+        blacklist_bed=blacklist_bed,
+        pdf=pdf,
+    )
+logging.info(f"saved QC PDF to {pdf_path}")
 
 nan_mask = (
     np.isnan(baf_mtx_bb).any(axis=1)

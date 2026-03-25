@@ -251,6 +251,7 @@ def plot_1d_multi_sample(
     max_ylim=None,
     region_bed: str | None = None,
     blacklist_bed: str | None = None,
+    pdf: PdfPages | None = None,
 ):
     """Multi-sample 1-D genome-wide scatter plot: all chromosomes on one page,
     one row per sample.
@@ -305,7 +306,10 @@ def plot_1d_multi_sample(
             ax.set_title(f"{val_type} ({unit})")
 
     fig.tight_layout()
-    fig.savefig(out_file, dpi=dpi)
+    if pdf is not None:
+        pdf.savefig(fig, dpi=dpi)
+    else:
+        fig.savefig(out_file, dpi=dpi)
     plt.close(fig)
 
 
@@ -325,6 +329,7 @@ def plot_1d_sample(
     mask: np.ndarray | None = None,
     region_bed: str | None = None,
     blacklist_bed: str | None = None,
+    pdf: PdfPages | None = None,
 ):
     """Single-sample 1-D genome-wide scatter plot: all chromosomes on one page."""
     logging.info(f"genome-wide {unit}-level {val_type} plot, out_file={out_file}")
@@ -367,7 +372,10 @@ def plot_1d_sample(
         ax.grid(axis="y", alpha=0.2)
     ax.set_title(f"{val_type} ({unit})")
     fig.tight_layout()
-    fig.savefig(out_file, dpi=dpi)
+    if pdf is not None:
+        pdf.savefig(fig, dpi=dpi)
+    else:
+        fig.savefig(out_file, dpi=dpi)
     plt.close(fig)
     return
 
@@ -386,15 +394,27 @@ def plot_rdr_baf(
     rdr_ylim=None,
     region_bed: str | None = None,
     blacklist_bed: str | None = None,
+    pdf: PdfPages | None = None,
 ):
-    """Combined RDR + BAF genome-wide plot: one page per sample, two rows
-    (RDR on top, BAF on bottom).
+    """Combined RDR + BAF genome-wide plot: one page per sample, two rows.
 
-    Parameters
-    ----------
-    rdr_mat : (N, S) ndarray — RDR values per bin per sample.
-    baf_mat : (N, S) ndarray — BAF values per bin per sample.
-    labels : list[str] — sample labels, length S.
+    Produces one figure page per sample with RDR on top and BAF on the bottom.
+
+    Args:
+        pos_df: Position DataFrame with ``#CHR`` and ``START``/``END`` columns.
+        rdr_mat: Array of shape (N, S) with RDR values per bin per sample.
+        baf_mat: Array of shape (N, S) with BAF values per bin per sample.
+        labels: Sample labels, length S.
+        genome_size: Path to chromosome sizes file.
+        out_file: Output PDF path. Used only when ``pdf`` is ``None``; ignored
+            when an external ``PdfPages`` object is supplied via ``pdf``.
+        unit: Feature unit label for axis titles (e.g. ``"bb"``).
+        rdr_ylim: Upper y-axis limit for the RDR panel. No limit if ``None``.
+        region_bed: Path to whitelist BED for background shading.
+        blacklist_bed: Path to blacklist BED for background shading.
+        pdf: External ``PdfPages`` object. When provided, pages are appended to
+            it and the caller is responsible for closing the object. When
+            ``None``, a new PDF is created at ``out_file`` and closed on return.
     """
     n_samples = len(labels)
     logging.info(
@@ -406,7 +426,8 @@ def plot_rdr_baf(
     blacklist_by_chr = _parse_bed_by_chr(blacklist_bed)
     s_plot = adaptive_dot_size(len(pos_df), s_base=s)
 
-    pdf_fd = PdfPages(out_file)
+    _own_pdf = pdf is None
+    pdf_pages = PdfPages(out_file) if _own_pdf else pdf
     for si, label in enumerate(labels):
         fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(20, 6), sharex=True)
 
@@ -435,9 +456,10 @@ def plot_rdr_baf(
         ax_baf.set_ylabel("BAF")
 
         fig.tight_layout()
-        pdf_fd.savefig(fig, dpi=dpi)
+        pdf_pages.savefig(fig, dpi=dpi)
         plt.close(fig)
-    pdf_fd.close()
+    if _own_pdf:
+        pdf_pages.close()
 
 
 # ---------------------------------------------------------------------------
@@ -570,6 +592,7 @@ def plot_allele_freqs(
     region_bed=None,
     blacklist_bed=None,
     run_id="",
+    pdf: PdfPages | None = None,
 ):
     """Generate genome-wide allele-frequency scatter plots.
 
@@ -616,6 +639,7 @@ def plot_allele_freqs(
             mask=snp_mask,
             region_bed=region_bed,
             blacklist_bed=blacklist_bed,
+            pdf=pdf,
         )
     else:
         _tot_mtx = tot_mtx.tocsc() if issparse(tot_mtx) else tot_mtx
@@ -634,5 +658,6 @@ def plot_allele_freqs(
             val_type="AF",
             region_bed=region_bed,
             blacklist_bed=blacklist_bed,
+            pdf=pdf,
         )
     return

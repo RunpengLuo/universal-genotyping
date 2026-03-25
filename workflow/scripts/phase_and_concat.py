@@ -16,7 +16,7 @@ from utils import *
 from io_utils import *
 from combine_counts_utils import *
 from count_reads_utils import *
-from plot_utils import plot_allele_freqs, plot_snp_depth_histogram
+from plot_utils import plot_snp_depth_histogram
 from aggregation_utils import *
 from switchprobs import *
 
@@ -200,23 +200,6 @@ if sm.params["exon_only"]:
     logging.info(f"exon filter: {np.sum(exon_mask)}/{len(snps)} SNPs passed")
     snp_mask &= exon_mask
 
-plot_allele_freqs(
-    snps,
-    rep_ids,
-    tot_mtx,
-    ref_mtx,
-    genome_size,
-    qc_dir,
-    apply_pseudobulk=not is_bulk_assay,
-    allele="ref",
-    unit="snp",
-    suffix=f"_{assay_type}_prefilter",
-    snp_mask=snp_mask,
-    region_bed=region_bed,
-    blacklist_bed=blacklist_bed,
-    run_id=run_id,
-)
-
 snps = snps.loc[snp_mask, :].reset_index(drop=True)
 if not is_bulk_assay:
     snps["feature_idx"] = snps["feature_idx"].astype(feature_df["feature_idx"].dtype)
@@ -248,22 +231,6 @@ plot_snp_depth_histogram(
 )
 
 ##################################################
-plot_allele_freqs(
-    snps,
-    rep_ids,
-    tot_mtx,
-    b_mtx,
-    genome_size,
-    qc_dir,
-    apply_pseudobulk=not is_bulk_assay,
-    allele="B",
-    unit="snp",
-    suffix=f"_{assay_type}",
-    region_bed=region_bed,
-    blacklist_bed=blacklist_bed,
-    run_id=run_id,
-)
-
 logging.info("saving output files")
 snps[
     [

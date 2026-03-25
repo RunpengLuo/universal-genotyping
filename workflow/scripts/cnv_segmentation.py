@@ -1,4 +1,12 @@
-import os, logging, shutil
+"""Aggregate allele/feature-level matrix into BBC block-level matrix.
+
+Input for Copy-typing.
+"""
+
+import os
+import logging
+import shutil
+
 from snakemake.script import snakemake as sm
 
 t = int(getattr(sm, "threads", 1))
@@ -16,6 +24,7 @@ from scipy.sparse import issparse
 from utils import *
 from io_utils import *
 from aggregation_utils import *
+from matplotlib.backends.backend_pdf import PdfPages
 from plot_utils import plot_allele_freqs
 
 
@@ -27,11 +36,7 @@ def _sparsity(X):
     nnz = X.nnz if issparse(X) else np.count_nonzero(X)
     return 1.0 - nnz / size
 
-##################################################
-"""
-Aggregate allele/feature-level matrix into BBC block-level matrix.
-Input for Copy-typing.
-"""
+
 setup_logging(sm.log[0])
 
 snp_info = sm.input["snp_info"]
@@ -60,7 +65,6 @@ bulk_assays = {"bulkWGS", "bulkWES"}
 is_bulk_assay = assay_type in bulk_assays
 assert not is_bulk_assay, "bulk sample CNV segmentation unsupported yet"
 
-##################################################
 logging.info(f"cnv segmentation, sample name={sample_name}, assay_type={assay_type}")
 logging.info(f"rep_ids={rep_ids}")
 snps = pd.read_table(snp_info, sep="\t")
@@ -98,23 +102,10 @@ logging.info(
     f"B-corrected sparsity={_sparsity(b_mtx_corr):.4f}"
 )
 
-plot_allele_freqs(
-    snps,
-    rep_ids,
-    tot_mtx,
-    b_mtx_corr,
-    genome_size,
-    qc_dir,
-    apply_pseudobulk=not is_bulk_assay,
-    allele="cnv-B",
-    unit="snp",
-    suffix=f"_{assay_type}",
-    run_id=run_id,
-)
-
 bbc_ids = snps["bbc_id"].to_numpy()
 y_count = matrix_segmentation(b_mtx_corr, bbc_ids, num_bbcs)
 d_count = matrix_segmentation(tot_mtx, bbc_ids, num_bbcs)
+y_count_raw = matrix_segmentation(b_mtx, bbc_ids, num_bbcs)
 assert y_count.shape[0] == num_bbcs
 
 logging.info(
@@ -123,21 +114,31 @@ logging.info(
     f"Y sparsity={_sparsity(y_count):.4f}"
 )
 
-plot_allele_freqs(
-    bbcs_df,
-    rep_ids,
-    d_count,
-    y_count,
-    genome_size,
-    qc_dir,
-    apply_pseudobulk=not is_bulk_assay,
-    allele="cnv-B",
-    unit="bbc",
-    suffix=f"_{assay_type}",
-    run_id=run_id,
-)
+pdf_path = stamp_path(os.path.join(qc_dir, f"af_cnv-B_{assay_type}.pdf"), run_id)
+_pseudobulk = not is_bulk_assay
+with PdfPages(pdf_path) as pdf:
+    plot_allele_freqs(
+        snps, rep_ids, tot_mtx, b_mtx, genome_size, qc_dir,
+        apply_pseudobulk=_pseudobulk, allele="cnv-B-raw", unit="snp",
+        suffix=f"_{assay_type}", run_id=run_id, pdf=pdf,
+    )
+    plot_allele_freqs(
+        snps, rep_ids, tot_mtx, b_mtx_corr, genome_size, qc_dir,
+        apply_pseudobulk=_pseudobulk, allele="cnv-B-corrected", unit="snp",
+        suffix=f"_{assay_type}", run_id=run_id, pdf=pdf,
+    )
+    plot_allele_freqs(
+        bbcs_df, rep_ids, d_count, y_count_raw, genome_size, qc_dir,
+        apply_pseudobulk=_pseudobulk, allele="cnv-B-raw", unit="bbc",
+        suffix=f"_{assay_type}", run_id=run_id, pdf=pdf,
+    )
+    plot_allele_freqs(
+        bbcs_df, rep_ids, d_count, y_count, genome_size, qc_dir,
+        apply_pseudobulk=_pseudobulk, allele="cnv-B-corrected", unit="bbc",
+        suffix=f"_{assay_type}", run_id=run_id, pdf=pdf,
+    )
+logging.info(f"saved 4-page BAF PDF to {pdf_path}")
 
-##################################################
 if not is_bulk_assay:
     adata: sc.AnnData = sc.read_h5ad(h5ad_file)
     barcodes = np.asarray(read_barcodes(all_barcodes), dtype=str)

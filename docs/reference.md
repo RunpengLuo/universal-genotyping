@@ -64,17 +64,17 @@ Common outputs across all modes:
 - `multi_snp.{Tallele,Aallele,Ballele}.npz` — multi-SNP allele count matrices.
 
 **Copytyping (`copytyping_preprocess`):**
-- `cnv_segments.tsv` — CNV segment annotations.
-- `{X,Y,D}_count.npz` — per-segment count matrices.
+- `cnv_segments.tsv` — BBC block annotations.
+- `{X,Y,D}_count.npz` — per-block count matrices.
 - `barcodes.tsv.gz` — cell barcode list.
 
 ### QC (`qc_dir/{assay_type}/`)
 
 Plots from bias correction and binning steps:
 - `rd_correction/` — GC/mappability/RT bias correction plots (bulk WGS/WES).
-- `phase_and_concat/` — phasing and concatenation QC.
-- `combine_counts/` — adaptive binning QC.
-- `cnv_segmentation/` — segmentation QC (copytyping only).
+- `phase_and_concat/` — SNP depth histogram QC.
+- `combine_counts/` — adaptive binning QC (`combine_counts.pdf`: bin-level BAF + per-sample RDR/BAF).
+- `cnv_segmentation/` — BBC block QC (`af_cnv-B_{assay_type}.pdf`: SNP and BBC-level BAF before/after phase correction; copytyping only).
 
 ---
 
