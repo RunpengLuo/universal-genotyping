@@ -122,8 +122,6 @@ rule cnv_segmentation:
         region_bed=lambda wc: config["region_bed"],
         genome_size=lambda wc: config["genome_size"],
         gtf_file=lambda wc: config["gtf_file"],
-        seg_ucn=lambda wc: config["seg_ucn"],
-        bbc_ucn=lambda wc: config["bbc_ucn"],
         bbc_phases=lambda wc: config["bbc_phases"],
     output:
         cnv_segments=config["bb_dir"] + "/{assay_type}/cnv_segments.tsv",

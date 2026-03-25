@@ -29,7 +29,7 @@ def _sparsity(X):
 
 ##################################################
 """
-Segment allele/feature-level matrix into CNV segment-level matrix.
+Aggregate allele/feature-level matrix into BBC block-level matrix.
 Input for Copy-typing.
 """
 setup_logging(sm.log[0])
@@ -74,36 +74,23 @@ else:
     a_mtx = load_npz(a_mtx_snp)
     b_mtx = load_npz(b_mtx_snp)
 
-segs_df, clones = read_ucn_file(sm.input["seg_ucn"])
-num_segs = len(segs_df)
-segs_df["seg_id"] = np.arange(len(segs_df))
-
-bbcs_df, _ = read_ucn_file(sm.input["bbc_ucn"])
+bbcs_df = pd.read_table(sm.input["bbc_phases"], sep="\t")
+bbcs_df = sort_df_chr(bbcs_df, pos="START")
+bbcs_df["bbc_id"] = np.arange(len(bbcs_df))
 num_bbcs = len(bbcs_df)
-logging.info(f"#CNV segments={num_segs}, #CNV blocks={num_bbcs}")
-
-bbcs_phases_df = pd.read_table(sm.input["bbc_phases"], sep="\t")
-bbcs_df = pd.merge(
-    left=bbcs_df,
-    right=bbcs_phases_df[["#CHR", "START", "END", "PHASE"]],
-    on=["#CHR", "START", "END"],
-    how="left",
-)
-assert bbcs_df["PHASE"].notna().all(), f"corrupted bbc* files, un-matched coordinates"
-bbcs_df.rename(columns={"PHASE": "PHASE-BBC"}, inplace=True)
-bbcs_df["bbc_id"] = bbcs_df.index
+logging.info(f"#BBC blocks={num_bbcs}")
 
 snps["RAW_SNP_IDX"] = np.arange(len(snps))
 snps = snp_to_region(snps, bbcs_df, assay_type, region_id="bbc_id")
-bbc_phases = pd.merge(
-    left=snps, right=bbcs_df[["bbc_id", "PHASE-BBC"]], on="bbc_id", how="left"
-)["PHASE-BBC"].to_numpy()
+phases = pd.merge(
+    left=snps, right=bbcs_df[["bbc_id", "PHASE"]], on="bbc_id", how="left"
+)["PHASE"].to_numpy()
 
 raw_snp_ids = snps["RAW_SNP_IDX"].to_numpy()
 tot_mtx = tot_mtx[raw_snp_ids, :]
 a_mtx = a_mtx[raw_snp_ids, :]
 b_mtx = b_mtx[raw_snp_ids, :]
-a_mtx_corr, b_mtx_corr = apply_phase_to_mat(tot_mtx, b_mtx, a_mtx, bbc_phases)
+a_mtx_corr, b_mtx_corr = apply_phase_to_mat(tot_mtx, b_mtx, a_mtx, phases)
 
 logging.info(
     f"SNP-level matrices: shape={tot_mtx.shape}, "
@@ -125,20 +112,19 @@ plot_allele_freqs(
     run_id=run_id,
 )
 
-snps = snp_to_region(snps, segs_df, assay_type, region_id="seg_id")
-seg_ids = snps["seg_id"].to_numpy()
-y_count = matrix_segmentation(b_mtx_corr, seg_ids, num_segs)
-d_count = matrix_segmentation(tot_mtx, seg_ids, num_segs)
-assert y_count.shape[0] == num_segs
+bbc_ids = snps["bbc_id"].to_numpy()
+y_count = matrix_segmentation(b_mtx_corr, bbc_ids, num_bbcs)
+d_count = matrix_segmentation(tot_mtx, bbc_ids, num_bbcs)
+assert y_count.shape[0] == num_bbcs
 
 logging.info(
-    f"Segment-level matrices: shape={d_count.shape}, "
+    f"BBC-level matrices: shape={d_count.shape}, "
     f"D sparsity={_sparsity(d_count):.4f}, "
     f"Y sparsity={_sparsity(y_count):.4f}"
 )
 
 plot_allele_freqs(
-    segs_df,
+    bbcs_df,
     rep_ids,
     d_count,
     y_count,
@@ -146,7 +132,7 @@ plot_allele_freqs(
     qc_dir,
     apply_pseudobulk=not is_bulk_assay,
     allele="cnv-B",
-    unit="seg",
+    unit="bbc",
     suffix=f"_{assay_type}",
     run_id=run_id,
 )
@@ -162,16 +148,16 @@ if not is_bulk_assay:
     adata = adata[barcodes, :].copy()
 
     adata = feature_to_blocks(
-        adata, segs_df, assay_type, block_idx="seg_id", drop_cols=False
+        adata, bbcs_df, assay_type, block_idx="bbc_id", drop_cols=False
     )
-    counts = adata.var["seg_id"].value_counts()
-    segs_df[f"#{feature_type}"] = segs_df["seg_id"].map(counts).fillna(0).astype(int)
-    x_count = matrix_segmentation(adata.X.T, adata.var["seg_id"].to_numpy(), num_segs)
+    counts = adata.var["bbc_id"].value_counts()
+    bbcs_df[f"#{feature_type}"] = bbcs_df["bbc_id"].map(counts).fillna(0).astype(int)
+    x_count = matrix_segmentation(adata.X.T, adata.var["bbc_id"].to_numpy(), num_bbcs)
     logging.info(
         f"Feature-level matrix: shape={adata.X.shape}, sparsity={_sparsity(adata.X):.4f}"
     )
     logging.info(
-        f"Segment-level X matrix: shape={x_count.shape}, sparsity={_sparsity(x_count):.4f}"
+        f"BBC-level X matrix: shape={x_count.shape}, sparsity={_sparsity(x_count):.4f}"
     )
 
 if not is_bulk_assay:
@@ -181,7 +167,7 @@ if not is_bulk_assay:
 else:
     np.savez_compressed(sm.output["y_count"], mat=y_count)
     np.savez_compressed(sm.output["d_count"], mat=d_count)
-segs_df.to_csv(sm.output["cnv_segments"], header=True, sep="\t", index=False)
+bbcs_df.to_csv(sm.output["cnv_segments"], header=True, sep="\t", index=False)
 shutil.copy2(all_barcodes, sm.output["barcodes_out"])
 shutil.copy2(sm.input["sample_file"], sm.output["sample_file"])
 logging.info("finished.")

@@ -114,7 +114,7 @@ if _has_config:
         ].reset_index(drop=True)
         assert len(sample_df) > 0, "no nonbulk for single_cell_genotyping mode"
         assert config.get("het_snp_vcf") is not None
-        assert config.get("seg_ucn") is not None
+        assert config.get("bbc_phases") is not None
         run_genotype_snps = False
     else:
         raise ValueError(f"unknown mode: {workflow_mode}")

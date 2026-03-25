@@ -72,13 +72,13 @@ To reuse genotyped and phased SNPs from bulk data, set `het_snp_vcf` to a prior 
 
 ## Mode 3: `copytyping_preprocess`
 
-Skips genotyping. Aggregates per-cell allele counts onto pre-computed CNV segments.
+Skips genotyping. Aggregates per-cell allele counts onto pre-computed BBC blocks.
 
 1. Sample sheet with non-bulk samples.
-2. Set `workflow_mode: copytyping_preprocess`. Provide `het_snp_vcf`, `seg_ucn`, `bbc_ucn`, and `bbc_phases` in config.
+2. Set `workflow_mode: copytyping_preprocess`. Provide `het_snp_vcf` and `bbc_phases` in config.
 3. Outputs in `bb_dir/{assay_type}/`:
-   - `cnv_segments.tsv` — CNV segment annotations.
-   - `{X,Y,D}_count.npz` — per-segment count matrices.
+   - `cnv_segments.tsv` — BBC block annotations.
+   - `{X,Y,D}_count.npz` — per-block count matrices.
    - `barcodes.tsv.gz` — cell barcode list.
    - `sample_ids.tsv` — sample metadata.
 
