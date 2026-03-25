@@ -86,9 +86,10 @@ logging.info(f"#BBC blocks={num_bbcs}")
 
 snps["RAW_SNP_IDX"] = np.arange(len(snps))
 snps = snp_to_region(snps, bbcs_df, assay_type, region_id="bbc_id")
+_bbc_phases = bbcs_df[["bbc_id", "PHASE"]].rename(columns={"PHASE": "PHASE_BBC"})
 phases = pd.merge(
-    left=snps, right=bbcs_df[["bbc_id", "PHASE"]], on="bbc_id", how="left"
-)["PHASE"].to_numpy()
+    left=snps, right=_bbc_phases, on="bbc_id", how="left"
+)["PHASE_BBC"].to_numpy()
 
 raw_snp_ids = snps["RAW_SNP_IDX"].to_numpy()
 tot_mtx = tot_mtx[raw_snp_ids, :]
