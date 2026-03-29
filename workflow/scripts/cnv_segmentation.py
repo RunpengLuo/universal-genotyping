@@ -24,6 +24,7 @@ from scipy.sparse import issparse
 from utils import *
 from io_utils import *
 from aggregation_utils import *
+from combine_counts_utils import log_ref_mapping_bias
 from matplotlib.backends.backend_pdf import PdfPages
 from plot_utils import plot_allele_freqs
 
@@ -95,6 +96,18 @@ raw_snp_ids = snps["RAW_SNP_IDX"].to_numpy()
 tot_mtx = tot_mtx[raw_snp_ids, :]
 a_mtx = a_mtx[raw_snp_ids, :]
 b_mtx = b_mtx[raw_snp_ids, :]
+
+# Report reference mapping bias (reconstruct REF from phased A/B + SNP PHASE).
+# PHASE=0: REF=A, ALT=B; PHASE=1: REF=B, ALT=A.
+snp_phase = snps["PHASE"].to_numpy()
+_a_sum = np.asarray(a_mtx.sum(axis=1)).ravel() if issparse(a_mtx) else a_mtx.sum(axis=1)
+_b_sum = np.asarray(b_mtx.sum(axis=1)).ravel() if issparse(b_mtx) else b_mtx.sum(axis=1)
+log_ref_mapping_bias(
+    _a_sum * (1 - snp_phase) + _b_sum * snp_phase,
+    _a_sum * snp_phase + _b_sum * (1 - snp_phase),
+    label="Pseudobulk",
+)
+
 a_mtx_corr, b_mtx_corr = apply_phase_to_mat(tot_mtx, b_mtx, a_mtx, phases)
 
 logging.info(

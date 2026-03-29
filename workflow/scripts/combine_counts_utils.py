@@ -211,6 +211,29 @@ def compute_af_pseudobulk(tot_mtx, b_mtx):
     return np.divide(num, den, out=out, where=(den > 0))
 
 
+def log_ref_mapping_bias(ref_counts, alt_counts, label=""):
+    """Log REF/(REF+ALT) summary stats to detect reference mapping bias.
+
+    Parameters
+    ----------
+    ref_counts, alt_counts : np.ndarray
+        1-D arrays of per-SNP reference and alternate allele counts.
+    label : str
+        Prefix for the log message (e.g. ``"Normal"`` or ``"Pseudobulk"``).
+    """
+    total = ref_counts + alt_counts
+    pos = total > 0
+    n_pos = int(np.sum(pos))
+    logging.info(f"{label}: {n_pos}/{len(total)} SNPs with total > 0")
+    if n_pos > 0:
+        ratio = ref_counts[pos] / total[pos]
+        logging.info(
+            f"{label} REF/(REF+ALT) stats: "
+            f"min={np.min(ratio):.4f}, max={np.max(ratio):.4f}, "
+            f"median={np.median(ratio):.4f}, mean={np.mean(ratio):.4f}"
+        )
+
+
 ##################################################
 def get_mask_by_region(snps: pd.DataFrame, regions: pd.DataFrame) -> np.ndarray:
     """
