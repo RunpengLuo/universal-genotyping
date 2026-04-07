@@ -316,10 +316,19 @@ def adaptive_binning_windows(
     # 1. Assign SNPs to windows
     snps["_orig_idx"] = np.arange(len(snps))
     snps = assign_pos_to_range(snps, windows, ref_id="win_idx", pos_col="POS0")
-    n_outside = snps["win_idx"].isna().sum()
+    outside_mask = snps["win_idx"].isna()
+    n_outside = outside_mask.sum()
     logging.info(
         f"SNPs outside any window: {n_outside}/{len(snps)} ({n_outside / max(len(snps), 1):.3%})"
     )
+    if n_outside > 0:
+        off_idx = snps.loc[outside_mask, "_orig_idx"].to_numpy()
+        off_depth = tot_mtx[off_idx].sum(axis=1)
+        logging.info(
+            f"off-target SNP depth: "
+            f"min={off_depth.min()}, max={off_depth.max()}, "
+            f"mean={off_depth.mean():.1f}, median={np.median(off_depth):.1f}"
+        )
     snps = snps.dropna(subset=["win_idx"]).reset_index(drop=True)
     snps["win_idx"] = snps["win_idx"].astype(np.int64)
 
