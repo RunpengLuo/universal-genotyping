@@ -114,7 +114,7 @@ if _has_config:
         ].reset_index(drop=True)
         assert len(sample_df) > 0, "no nonbulk for single_cell_genotyping mode"
         assert config.get("het_snp_vcf") is not None
-        assert config.get("bbc_phases") is not None
+        assert config.get("bb_file") is not None
         run_genotype_snps = False
     else:
         raise ValueError(f"unknown mode: {workflow_mode}")
@@ -224,7 +224,7 @@ if _has_config:
         for assay_type in assay_types:
             final_targets += _bb_targets(
                 assay_type,
-                ["cnv_segments.tsv", "X_count.npz", "Y_count.npz", "D_count.npz"],
+                ["cnv_segments.tsv", "bb.Xcount.npz", "bb.Tallele.npz", "bb.Aallele.npz", "bb.Ballele.npz"],
             )
     else:
         common_suffixes = [

@@ -1,4 +1,4 @@
-"""Aggregate allele/feature-level matrix into BBC block-level matrix.
+"""Aggregate allele/feature-level matrix into BB block-level matrix.
 
 Input for Copy-typing.
 """
@@ -24,9 +24,10 @@ from scipy.sparse import issparse
 from utils import *
 from io_utils import *
 from aggregation_utils import *
-from combine_counts_utils import log_ref_mapping_bias
 from matplotlib.backends.backend_pdf import PdfPages
 from plot_utils import plot_allele_freqs
+
+COUNT_DTYPE = np.int32
 
 
 def _sparsity(X):
@@ -79,53 +80,38 @@ else:
     a_mtx = load_npz(a_mtx_snp)
     b_mtx = load_npz(b_mtx_snp)
 
-bbcs_df = pd.read_table(sm.input["bbc_phases"], sep="\t")
-bbcs_df = sort_df_chr(bbcs_df, pos="START")
-bbcs_df["bbc_id"] = np.arange(len(bbcs_df))
-num_bbcs = len(bbcs_df)
-logging.info(f"#BBC blocks={num_bbcs}")
+bb_df = pd.read_table(sm.input["bb_file"], sep="\t")
+bb_df = sort_df_chr(bb_df, pos="START")
+bb_df["bb_id"] = np.arange(len(bb_df))
+num_bbs = len(bb_df)
+logging.info(f"#BB blocks={num_bbs}")
 
 snps["RAW_SNP_IDX"] = np.arange(len(snps))
-snps = snp_to_region(snps, bbcs_df, assay_type, region_id="bbc_id")
-_bbc_phases = bbcs_df[["bbc_id", "PHASE"]].rename(columns={"PHASE": "PHASE_BBC"})
-phases = pd.merge(
-    left=snps, right=_bbc_phases, on="bbc_id", how="left"
-)["PHASE_BBC"].to_numpy()
+snps = snp_to_region(snps, bb_df, assay_type, region_id="bb_id")
 
 raw_snp_ids = snps["RAW_SNP_IDX"].to_numpy()
 tot_mtx = tot_mtx[raw_snp_ids, :]
 a_mtx = a_mtx[raw_snp_ids, :]
 b_mtx = b_mtx[raw_snp_ids, :]
 
-# Report reference mapping bias (reconstruct REF from phased A/B + SNP PHASE).
-# PHASE=0: REF=A, ALT=B; PHASE=1: REF=B, ALT=A.
-snp_phase = snps["PHASE"].to_numpy()
-_a_sum = np.asarray(a_mtx.sum(axis=1)).ravel() if issparse(a_mtx) else a_mtx.sum(axis=1)
-_b_sum = np.asarray(b_mtx.sum(axis=1)).ravel() if issparse(b_mtx) else b_mtx.sum(axis=1)
-log_ref_mapping_bias(
-    _a_sum * (1 - snp_phase) + _b_sum * snp_phase,
-    _a_sum * snp_phase + _b_sum * (1 - snp_phase),
-    label="Pseudobulk",
-)
-
-a_mtx_corr, b_mtx_corr = apply_phase_to_mat(tot_mtx, b_mtx, a_mtx, phases)
-
 logging.info(
     f"SNP-level matrices: shape={tot_mtx.shape}, "
     f"tot sparsity={_sparsity(tot_mtx):.4f}, "
-    f"B-corrected sparsity={_sparsity(b_mtx_corr):.4f}"
+    f"A sparsity={_sparsity(a_mtx):.4f}, "
+    f"B sparsity={_sparsity(b_mtx):.4f}"
 )
 
-bbc_ids = snps["bbc_id"].to_numpy()
-y_count = matrix_segmentation(b_mtx_corr, bbc_ids, num_bbcs)
-d_count = matrix_segmentation(tot_mtx, bbc_ids, num_bbcs)
-y_count_raw = matrix_segmentation(b_mtx, bbc_ids, num_bbcs)
-assert y_count.shape[0] == num_bbcs
+bb_ids = snps["bb_id"].to_numpy()
+tot_mtx_bb = matrix_segmentation(tot_mtx, bb_ids, num_bbs)
+a_mtx_bb = matrix_segmentation(a_mtx, bb_ids, num_bbs)
+b_mtx_bb = matrix_segmentation(b_mtx, bb_ids, num_bbs)
+assert tot_mtx_bb.shape[0] == num_bbs
 
 logging.info(
-    f"BBC-level matrices: shape={d_count.shape}, "
-    f"D sparsity={_sparsity(d_count):.4f}, "
-    f"Y sparsity={_sparsity(y_count):.4f}"
+    f"BB-level matrices: shape={tot_mtx_bb.shape}, "
+    f"T sparsity={_sparsity(tot_mtx_bb):.4f}, "
+    f"A sparsity={_sparsity(a_mtx_bb):.4f}, "
+    f"B sparsity={_sparsity(b_mtx_bb):.4f}"
 )
 
 pdf_path = stamp_path(os.path.join(qc_dir, f"af_cnv-B_{assay_type}.pdf"), run_id)
@@ -133,25 +119,15 @@ _pseudobulk = not is_bulk_assay
 with PdfPages(pdf_path) as pdf:
     plot_allele_freqs(
         snps, rep_ids, tot_mtx, b_mtx, genome_size, qc_dir,
-        apply_pseudobulk=_pseudobulk, allele="cnv-B-raw", unit="snp",
+        apply_pseudobulk=_pseudobulk, allele="cnv-B", unit="snp",
         suffix=f"_{assay_type}", run_id=run_id, pdf=pdf,
     )
     plot_allele_freqs(
-        snps, rep_ids, tot_mtx, b_mtx_corr, genome_size, qc_dir,
-        apply_pseudobulk=_pseudobulk, allele="cnv-B-corrected", unit="snp",
+        bb_df, rep_ids, tot_mtx_bb, b_mtx_bb, genome_size, qc_dir,
+        apply_pseudobulk=_pseudobulk, allele="cnv-B", unit="bb",
         suffix=f"_{assay_type}", run_id=run_id, pdf=pdf,
     )
-    plot_allele_freqs(
-        bbcs_df, rep_ids, d_count, y_count_raw, genome_size, qc_dir,
-        apply_pseudobulk=_pseudobulk, allele="cnv-B-raw", unit="bbc",
-        suffix=f"_{assay_type}", run_id=run_id, pdf=pdf,
-    )
-    plot_allele_freqs(
-        bbcs_df, rep_ids, d_count, y_count, genome_size, qc_dir,
-        apply_pseudobulk=_pseudobulk, allele="cnv-B-corrected", unit="bbc",
-        suffix=f"_{assay_type}", run_id=run_id, pdf=pdf,
-    )
-logging.info(f"saved 4-page BAF PDF to {pdf_path}")
+logging.info(f"saved 2-page BAF PDF to {pdf_path}")
 
 if not is_bulk_assay:
     adata: sc.AnnData = sc.read_h5ad(h5ad_file)
@@ -163,26 +139,28 @@ if not is_bulk_assay:
     adata = adata[barcodes, :].copy()
 
     adata = feature_to_blocks(
-        adata, bbcs_df, assay_type, block_idx="bbc_id", drop_cols=False
+        adata, bb_df, assay_type, block_idx="bb_id", drop_cols=False
     )
-    counts = adata.var["bbc_id"].value_counts()
-    bbcs_df[f"#{feature_type}"] = bbcs_df["bbc_id"].map(counts).fillna(0).astype(int)
-    x_count = matrix_segmentation(adata.X.T, adata.var["bbc_id"].to_numpy(), num_bbcs)
+    counts = adata.var["bb_id"].value_counts()
+    bb_df[f"#{feature_type}"] = bb_df["bb_id"].map(counts).fillna(0).astype(int)
+    x_count = matrix_segmentation(adata.X.T, adata.var["bb_id"].to_numpy(), num_bbs)
     logging.info(
         f"Feature-level matrix: shape={adata.X.shape}, sparsity={_sparsity(adata.X):.4f}"
     )
     logging.info(
-        f"BBC-level X matrix: shape={x_count.shape}, sparsity={_sparsity(x_count):.4f}"
+        f"BB-level X matrix: shape={x_count.shape}, sparsity={_sparsity(x_count):.4f}"
     )
 
 if not is_bulk_assay:
-    save_npz(sm.output["x_count"], x_count)
-    save_npz(sm.output["y_count"], y_count)
-    save_npz(sm.output["d_count"], d_count)
+    save_npz(sm.output["x_count"], x_count.astype(COUNT_DTYPE))
+    save_npz(sm.output["tot_mtx_bb"], tot_mtx_bb.astype(COUNT_DTYPE))
+    save_npz(sm.output["a_mtx_bb"], a_mtx_bb.astype(COUNT_DTYPE))
+    save_npz(sm.output["b_mtx_bb"], b_mtx_bb.astype(COUNT_DTYPE))
 else:
-    np.savez_compressed(sm.output["y_count"], mat=y_count)
-    np.savez_compressed(sm.output["d_count"], mat=d_count)
-bbcs_df.to_csv(sm.output["cnv_segments"], header=True, sep="\t", index=False)
+    np.savez_compressed(sm.output["tot_mtx_bb"], mat=tot_mtx_bb.astype(COUNT_DTYPE))
+    np.savez_compressed(sm.output["a_mtx_bb"], mat=a_mtx_bb.astype(COUNT_DTYPE))
+    np.savez_compressed(sm.output["b_mtx_bb"], mat=b_mtx_bb.astype(COUNT_DTYPE))
+bb_df.to_csv(sm.output["cnv_segments"], header=True, sep="\t", index=False)
 shutil.copy2(all_barcodes, sm.output["barcodes_out"])
 shutil.copy2(sm.input["sample_file"], sm.output["sample_file"])
 logging.info("finished.")

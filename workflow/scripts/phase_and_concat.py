@@ -21,6 +21,21 @@ from aggregation_utils import *
 from switchprobs import *
 
 
+def log_ref_mapping_bias(ref_counts, alt_counts, label=""):
+    """Log REF/(REF+ALT) summary stats to detect reference mapping bias."""
+    total = ref_counts + alt_counts
+    pos = total > 0
+    n_pos = int(np.sum(pos))
+    logging.info(f"{label}: {n_pos}/{len(total)} SNPs with total > 0")
+    if n_pos > 0:
+        ratio = ref_counts[pos] / total[pos]
+        logging.info(
+            f"{label} REF/(REF+ALT) stats: "
+            f"min={np.min(ratio):.4f}, max={np.max(ratio):.4f}, "
+            f"median={np.median(ratio):.4f}, mean={np.mean(ratio):.4f}"
+        )
+
+
 def annotate_feature_type(snps, gtf_file):
     """Annotate SNPs with feature_type (exon/intron/intergenic) using a GTF file.
 
