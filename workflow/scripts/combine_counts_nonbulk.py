@@ -76,7 +76,7 @@ multi_snps = adaptive_binning(
     snps,
     0,
     int(sm.params["nsnp_multi"]),
-    tot_vec[:, None],
+    tot_mtx,
     ["region_id"],
     colname="multi_id",
 )
@@ -120,7 +120,7 @@ bbs = adaptive_binning(
     snps,
     int(sm.params["min_snp_reads"]),
     int(sm.params["min_snp_per_block"]),
-    tot_vec[:, None],
+    tot_mtx,
     grp_cols,
     colname="bb_id",
 )
