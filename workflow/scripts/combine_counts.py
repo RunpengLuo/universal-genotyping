@@ -51,7 +51,7 @@ blacklist_bed = maybe_path(sm.input.get("blacklist_bed", None))
 genome_size = sm.input["genome_size"]
 gtf_file = maybe_path(sm.input["gtf_file"])
 
-qc_dir = sm.output["qc_dir"]
+qc_dir = sm.params["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 run_id = getattr(sm.params, "run_id", "")
 
@@ -97,7 +97,11 @@ grp_cols.append("PS")
 phase_flip_test = bool(sm.params["phase_flip_test"])
 if phase_flip_test:
     snps["phase_group"] = detect_phase_flips(
-        snps, a_mtx, b_mtx, grp_cols=grp_cols, tumor_sidx=tumor_sidx,
+        snps,
+        a_mtx,
+        b_mtx,
+        grp_cols=grp_cols,
+        tumor_sidx=tumor_sidx,
         epsilon=float(sm.params["phase_flip_epsilon"]),
         alpha=float(sm.params["phase_flip_alpha"]),
     )
@@ -300,7 +304,9 @@ else:
     switchprob_ps = float(sm.params["switchprob_ps"])
     bbs["switchprobs"] = estimate_switchprobs_PS(bbs, switchprob_ps)
 
-bbs[["#CHR", "START", "END", "#SNPS", "region_id", "switchprobs"]].to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
+bbs[["#CHR", "START", "END", "#SNPS", "region_id", "switchprobs"]].to_csv(
+    sm.output["bb_file"], sep="\t", header=True, index=False
+)
 np.savez_compressed(sm.output["tot_mtx_bb"], mat=tot_mtx_bb)
 np.savez_compressed(sm.output["a_mtx_bb"], mat=a_mtx_bb)
 np.savez_compressed(sm.output["b_mtx_bb"], mat=b_mtx_bb)

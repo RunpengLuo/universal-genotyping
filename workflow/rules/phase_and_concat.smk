@@ -39,10 +39,10 @@ rule phase_and_concat_bulk:
         a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
         b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
         sample_file=config["allele_dir"] + "/{assay_type}/sample_ids.tsv",
-        qc_dir=directory(config["qc_dir"] + "/{assay_type}/phase_and_concat/"),
     wildcard_constraints:
         assay_type="(bulkWGS|bulkWES)",
     params:
+        qc_dir=lambda wc: config["qc_dir"] + f"/{wc.assay_type}/phase_and_concat/",
         sample_name=SAMPLE_ID,
         assay_type=lambda wc: wc.assay_type,
         rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
@@ -101,13 +101,13 @@ rule phase_and_concat_single_cell:
         a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
         b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
         sample_file=config["allele_dir"] + "/{assay_type}/sample_ids.tsv",
-        qc_dir=directory(config["qc_dir"] + "/{assay_type}/phase_and_concat/"),
         unique_snp_ids=config["allele_dir"] + "/{assay_type}/unique_snp_ids.npy",
         cell_snp_Aallele=config["allele_dir"] + "/{assay_type}/cell_snp_Aallele.npz",
         cell_snp_Ballele=config["allele_dir"] + "/{assay_type}/cell_snp_Ballele.npz",
     wildcard_constraints:
         assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
     params:
+        qc_dir=lambda wc: config["qc_dir"] + f"/{wc.assay_type}/phase_and_concat/",
         sample_name=SAMPLE_ID,
         assay_type=lambda wc: wc.assay_type,
         rep_ids=lambda wc: assay2rep_ids[wc.assay_type],

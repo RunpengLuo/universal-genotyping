@@ -247,6 +247,8 @@ if _has_config:
                 )
 
     ##################################################
+    os.makedirs(config["qc_dir"], exist_ok=True)
+
     # entrypoint
     include: "rules/common.smk"
     include: "rules/genotype_snps.smk"

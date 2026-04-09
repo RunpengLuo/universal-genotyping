@@ -69,7 +69,7 @@ sample_tsvs = sm.input["sample_tsvs"]
 tot_mtx_files = sm.input["tot_mtxs"]
 ad_mtx_files = sm.input["ad_mtxs"]
 snp_vcf = sm.input["snp_vcf"]
-qc_dir = sm.output["qc_dir"]
+qc_dir = sm.params["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 run_id = getattr(sm.params, "run_id", "")
 
@@ -233,8 +233,12 @@ a_mtx = a_mtx[snp_mask, :]
 b_mtx = b_mtx[snp_mask, :]
 
 plot_snp_depth_histogram(
-    tot_mtx, rep_ids, qc_dir, run_id,
-    ref_mtx=ref_mtx, is_bulk=is_bulk_assay,
+    tot_mtx,
+    rep_ids,
+    qc_dir,
+    run_id,
+    ref_mtx=ref_mtx,
+    is_bulk=is_bulk_assay,
 )
 
 ##################################################

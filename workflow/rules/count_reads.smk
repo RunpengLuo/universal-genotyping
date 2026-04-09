@@ -85,10 +85,10 @@ rule rd_correct:
     output:
         dp_corrected=config["pileup_dir"] + "/{assay_type}/window.dp.npz",
         window_df=config["pileup_dir"] + "/{assay_type}/window.tsv.gz",
-        qc_dir=directory(config["qc_dir"] + "/{assay_type}/rd_correction/"),
     wildcard_constraints:
         assay_type="(bulkWGS|bulkWES)",
     params:
+        qc_dir=lambda wc: config["qc_dir"] + f"/{wc.assay_type}/rd_correction/",
         sample_name=SAMPLE_ID,
         mosdepth_dir=lambda wc: config["pileup_dir"] + f"/{wc.assay_type}/out_mosdepth",
         chromosomes=config["chromosomes"],

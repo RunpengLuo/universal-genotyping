@@ -36,7 +36,7 @@ b_mtx_snp = sm.input["b_mtx_snp"]
 
 gmap_file = maybe_path(sm.input["gmap_file"])
 all_barcodes = maybe_path(sm.input["all_barcodes"])
-qc_dir = sm.output["qc_dir"]
+qc_dir = sm.params["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 run_id = getattr(sm.params, "run_id", "")
 
@@ -50,9 +50,7 @@ rep_ids = sample_df["REP_ID"].tolist()
 assay_type = sm.params["assay_type"]
 
 ##################################################
-logging.info(
-    f"adaptive binning, sample name={sample_name}, assay_type={assay_type}"
-)
+logging.info(f"adaptive binning, sample name={sample_name}, assay_type={assay_type}")
 logging.info(f"rep_ids={rep_ids}")
 snps = pd.read_table(snp_info, sep="\t")
 
@@ -157,7 +155,9 @@ if gmap_file is not None:
 else:
     bbs["switchprobs"] = estimate_switchprobs_PS(bbs, switchprob_ps)
 
-bbs[["#CHR", "START", "END", "#SNPS", "region_id", "switchprobs"]].to_csv(sm.output["bb_file"], sep="\t", header=True, index=False)
+bbs[["#CHR", "START", "END", "#SNPS", "region_id", "switchprobs"]].to_csv(
+    sm.output["bb_file"], sep="\t", header=True, index=False
+)
 save_npz(sm.output["tot_mtx_bb"], tot_mtx_bb)
 save_npz(sm.output["a_mtx_bb"], a_mtx_bb)
 save_npz(sm.output["b_mtx_bb"], b_mtx_bb)

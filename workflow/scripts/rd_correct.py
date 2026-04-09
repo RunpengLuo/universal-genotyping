@@ -53,7 +53,7 @@ min_mappability = float(sm.params["min_mappability"])
 gc_correct = bool(sm.params["gc_correct"])
 gc_correct_method = str(sm.params.get("gc_correct_method", "median"))
 rt_correct = bool(sm.params["rt_correct"])
-qc_dir = sm.output["qc_dir"]
+qc_dir = sm.params["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 run_id = getattr(sm.params, "run_id", "")
 
@@ -100,9 +100,7 @@ snps = pd.read_table(sm.input["snp_info"], sep="\t")
 tot_mtx_snp = np.load(sm.input["tot_mtx_snp"])["mat"].astype(np.int32)
 a_mtx_snp = np.load(sm.input["a_mtx_snp"])["mat"].astype(np.int32)
 b_mtx_snp = np.load(sm.input["b_mtx_snp"])["mat"].astype(np.int32)
-logging.info(
-    f"loaded {len(snps)} SNPs, allele matrices shape={tot_mtx_snp.shape}"
-)
+logging.info(f"loaded {len(snps)} SNPs, allele matrices shape={tot_mtx_snp.shape}")
 
 gc_vals = win_df["GC"].to_numpy()
 
@@ -180,8 +178,14 @@ else:
 
 pdf = PdfPages(stamp_path(os.path.join(qc_dir, "rd_correct.pdf"), run_id))
 plot_gc_correction_pdf(
-    gc_vals, dp_raw, dp_corrected, rep_ids, pdf,
-    gc_rmse=gc_rmse_list, mappability=map_vals, repliseq=repli_vals,
+    gc_vals,
+    dp_raw,
+    dp_corrected,
+    rep_ids,
+    pdf,
+    gc_rmse=gc_rmse_list,
+    mappability=map_vals,
+    repliseq=repli_vals,
 )
 pdf.close()
 

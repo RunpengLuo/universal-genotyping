@@ -48,7 +48,7 @@ b_mtx_snp = sm.input["b_mtx_snp"]
 h5ad_file = sm.input["h5ad_file"]
 
 all_barcodes = sm.input["all_barcodes"]
-qc_dir = sm.output["qc_dir"]
+qc_dir = sm.params["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 run_id = getattr(sm.params, "run_id", "")
 
@@ -118,14 +118,32 @@ pdf_path = stamp_path(os.path.join(qc_dir, f"af_cnv-B_{assay_type}.pdf"), run_id
 _pseudobulk = not is_bulk_assay
 with PdfPages(pdf_path) as pdf:
     plot_allele_freqs(
-        snps, rep_ids, tot_mtx, b_mtx, genome_size, qc_dir,
-        apply_pseudobulk=_pseudobulk, allele="cnv-B", unit="snp",
-        suffix=f"_{assay_type}", run_id=run_id, pdf=pdf,
+        snps,
+        rep_ids,
+        tot_mtx,
+        b_mtx,
+        genome_size,
+        qc_dir,
+        apply_pseudobulk=_pseudobulk,
+        allele="cnv-B",
+        unit="snp",
+        suffix=f"_{assay_type}",
+        run_id=run_id,
+        pdf=pdf,
     )
     plot_allele_freqs(
-        bb_df, rep_ids, tot_mtx_bb, b_mtx_bb, genome_size, qc_dir,
-        apply_pseudobulk=_pseudobulk, allele="cnv-B", unit="bb",
-        suffix=f"_{assay_type}", run_id=run_id, pdf=pdf,
+        bb_df,
+        rep_ids,
+        tot_mtx_bb,
+        b_mtx_bb,
+        genome_size,
+        qc_dir,
+        apply_pseudobulk=_pseudobulk,
+        allele="cnv-B",
+        unit="bb",
+        suffix=f"_{assay_type}",
+        run_id=run_id,
+        pdf=pdf,
     )
 logging.info(f"saved 2-page BAF PDF to {pdf_path}")
 

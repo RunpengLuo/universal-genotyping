@@ -31,10 +31,10 @@ rule combine_counts:
         dp_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.depth.npz",
         rdr_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.rdr.npz",
         sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
-        qc_dir=directory(config["qc_dir"] + "/{assay_type}/combine_counts/"),
     wildcard_constraints:
         assay_type="(bulkWGS|bulkWES)",
     params:
+        qc_dir=lambda wc: config["qc_dir"] + f"/{wc.assay_type}/combine_counts/",
         assay_type=lambda wc: wc.assay_type,
         nu=config["params_combine_counts"]["nu"],
         min_switchprob=config["params_combine_counts"]["min_switchprob"],
@@ -88,10 +88,10 @@ rule combine_counts_nonbulk:
         b_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Ballele.npz",
         baf_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.baf.npz",
         sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
-        qc_dir=directory(config["qc_dir"] + "/{assay_type}/combine_counts/"),
     wildcard_constraints:
         assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
     params:
+        qc_dir=lambda wc: config["qc_dir"] + f"/{wc.assay_type}/combine_counts/",
         assay_type=lambda wc: wc.assay_type,
         nu=config["params_combine_counts"]["nu"],
         min_switchprob=config["params_combine_counts"]["min_switchprob"],
@@ -131,10 +131,10 @@ rule cnv_segmentation:
         b_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Ballele.npz",
         barcodes_out=config["bb_dir"] + "/{assay_type}/barcodes.tsv.gz",
         sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
-        qc_dir=directory(config["qc_dir"] + "/{assay_type}/cnv_segmentation/"),
     wildcard_constraints:
         assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",
     params:
+        qc_dir=lambda wc: config["qc_dir"] + f"/{wc.assay_type}/cnv_segmentation/",
         sample_name=SAMPLE_ID,
         assay_type=lambda wc: wc.assay_type,
         feature_type=lambda wc: assay_type2feature_type[wc.assay_type],
