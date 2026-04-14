@@ -63,8 +63,7 @@ feature_type = sm.params["feature_type"]
 sample_df = pd.read_table(sm.input["sample_file"])
 rep_ids = sample_df["REP_ID"].tolist()
 
-bulk_assays = {"bulkWGS", "bulkWES"}
-is_bulk_assay = assay_type in bulk_assays
+is_bulk_assay = assay_type in BULK_ASSAYS
 assert not is_bulk_assay, "bulk sample CNV segmentation unsupported yet"
 
 logging.info(f"cnv segmentation, sample name={sample_name}, assay_type={assay_type}")

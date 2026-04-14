@@ -4,12 +4,7 @@ import logging
 import pandas as pd
 import numpy as np
 
-SPOT_ASSAYS = {"VISIUM"}
-CELL_ASSAYS = {"scRNA", "scATAC", "multiome"}
-GEX_ASSAYS = {"scRNA", "multiome", "VISIUM"}
-ATAC_ASSAYS = {"scATAC", "multiome"}
-SPATIAL_ASSAYS = {"VISIUM", "VISIUM3prime"}
-ALL_ASSAYS = ["scRNA", "scATAC", "multiome", "VISIUM"]
+from const import *  # noqa: F401,F403
 
 
 def setup_logging(log):

@@ -13,7 +13,7 @@ rule pileup_snps_bulk_mode1b:
         out_dp=config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.tag.DP.mtx",
         out_ad=config["pileup_dir"] + "/{assay_type}_{rep_id}/cellSNP.tag.AD.mtx",
     wildcard_constraints:
-        assay_type="(bulkWGS|bulkWES)",
+        assay_type="(bulkWGS|bulkWGS-lr|bulkWES)",
     threads: config["threads"]["pileup"]
     params:
         minMAF=config["params_cellsnp_lite"]["minMAF_pileup"],

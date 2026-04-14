@@ -4,28 +4,16 @@ from datetime import datetime
 
 import pandas as pd
 
+sys.path.insert(0, os.path.join(workflow.basedir, "scripts"))
+from const import (
+    NONBULK_ASSAYS as nonbulk_assays,
+    BULK_ASSAYS as bulk_assays,
+    ALLOWED_ASSAY_TYPES as allowed_assay_types,
+    ASSAY_TYPE2MODALITY as assay_type2modality,
+    ASSAY_TYPE2FEATURE_TYPE as assay_type2feature_type,
+)
+
 _run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-nonbulk_assays = {"scATAC", "scRNA", "VISIUM", "VISIUM3prime"}
-bulk_assays = {"bulkWGS", "bulkWES"}
-allowed_assay_types = list(bulk_assays) + list(nonbulk_assays)
-
-assay_type2modality = {
-    "bulkWGS": "DNA",
-    "bulkWES": "DNA",
-    "scATAC": "DNA",
-    "scRNA": "RNA",
-    "VISIUM": "RNA",
-    "VISIUM3prime": "RNA",
-}
-assay_type2feature_type = {
-    "bulkWGS": "unknown",
-    "bulkWES": "exon",
-    "scATAC": "tile",
-    "scRNA": "gene",
-    "VISIUM": "gene",
-    "VISIUM3prime": "gene",
-}
 
 # Skip validation when no real config is provided (e.g., --conda-create-envs-only).
 # Detected by checking that sample_file points to an existing file.
@@ -81,8 +69,8 @@ if _has_config:
         ].reset_index(drop=True)
         assert len(sample_df) > 0, "no samples for bulk_genotyping mode"
         assert sample_df["assay_type"].nunique() == 1, (
-            "bulk_genotyping mode requires all samples to have the same assay_type "
-            f"(bulkWGS or bulkWES), got: {sample_df['assay_type'].unique().tolist()}"
+            "bulk_genotyping mode requires all samples to have the same assay_type, "
+            f"got: {sample_df['assay_type'].unique().tolist()}"
         )
         assert sample_df["REP_ID"].nunique() == len(
             sample_df

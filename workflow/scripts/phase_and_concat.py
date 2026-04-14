@@ -83,8 +83,7 @@ assay_type = sm.params["assay_type"]
 rep_ids = sm.params["rep_ids"]
 sample_types = sm.params["sample_types"]
 
-bulk_assays = {"bulkWGS", "bulkWES"}
-is_bulk_assay = assay_type in bulk_assays
+is_bulk_assay = assay_type in BULK_ASSAYS
 
 ##################################################
 logging.info(

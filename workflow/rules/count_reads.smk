@@ -46,7 +46,7 @@ rule run_mosdepth:
         + "/{assay_type}/out_mosdepth/{rep_id}.regions.bed.gz",
     threads: config["threads"]["mosdepth"]
     wildcard_constraints:
-        assay_type="(bulkWGS|bulkWES)",
+        assay_type="(bulkWGS|bulkWGS-lr|bulkWES)",
     params:
         out_prefix=config["pileup_dir"] + "/{assay_type}/out_mosdepth/{rep_id}",
         read_quality=config["params_mosdepth"]["read_quality"],
@@ -86,7 +86,7 @@ rule rd_correct:
         dp_corrected=config["pileup_dir"] + "/{assay_type}/window.dp.npz",
         window_df=config["pileup_dir"] + "/{assay_type}/window.tsv.gz",
     wildcard_constraints:
-        assay_type="(bulkWGS|bulkWES)",
+        assay_type="(bulkWGS|bulkWGS-lr|bulkWES)",
     params:
         qc_dir=lambda wc: config["qc_dir"] + f"/{wc.assay_type}/rd_correction/",
         sample_name=SAMPLE_ID,

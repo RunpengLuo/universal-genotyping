@@ -13,7 +13,7 @@ log_dir: "logs"
 
 # bulk_genotyping | single_cell_genotyping | copytyping_preprocess
 workflow_mode: "bulk_genotyping"
-# bulkWGS | bulkWES | scRNA | scATAC | VISIUM | VISIUM3prime
+# bulkWGS | bulkWGS-lr | bulkWES | scRNA | scATAC | VISIUM | VISIUM3prime
 assay_types: ["bulkWGS"]
 
 ##################################################

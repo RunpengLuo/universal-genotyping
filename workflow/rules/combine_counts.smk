@@ -32,7 +32,7 @@ rule combine_counts:
         rdr_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.rdr.npz",
         sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
     wildcard_constraints:
-        assay_type="(bulkWGS|bulkWES)",
+        assay_type="(bulkWGS|bulkWGS-lr|bulkWES)",
     params:
         qc_dir=lambda wc: config["qc_dir"] + f"/{wc.assay_type}/combine_counts/",
         assay_type=lambda wc: wc.assay_type,

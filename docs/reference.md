@@ -8,7 +8,7 @@ TSV with one row per replicate. Template at `config/samples.tsv`.
 |--------|----------|-------------|
 | `SAMPLE` | Yes | Patient ID (matched by `sample_id` in config). |
 | `REP_ID` | Yes | Unique per row; multiome pairs share a `REP_ID`. |
-| `assay_type` | Yes | `bulkWGS`, `bulkWES`, `scATAC`, `scRNA`, `VISIUM`, or `VISIUM3prime`. |
+| `assay_type` | Yes | `bulkWGS`, `bulkWGS-lr`, `bulkWES`, `scATAC`, `scRNA`, `VISIUM`, or `VISIUM3prime`. |
 | `sample_type` | Yes | `normal` or `tumor`. |
 | `PATH_to_bam` | Yes | Path to `.bam` file. |
 | `PATH_to_barcodes` | Non-bulk | Path to `barcodes.tsv.gz`. |
@@ -42,6 +42,8 @@ One subdirectory per `{assay_type}_{rep_id}` with cellsnp-lite output.
 - `snp.{Tallele,Aallele,Ballele}.npz` — sparse allele count matrices (SNPs x samples/cells).
 - `sample_ids.tsv` — sample metadata.
 - `barcodes.tsv.gz` — cell barcode list (single-cell only).
+- `unique_snp_ids.npy` — SNP identifiers as `{chr}_{pos}` (single-cell only).
+- `cell_snp_Aallele.npz`, `cell_snp_Ballele.npz` — per-cell allele count matrices (single-cell only).
 
 ### AnnData (`bb_dir/{assay_type}/`)
 
@@ -59,7 +61,7 @@ Common outputs across all modes:
 
 **Single-cell (`single_cell_genotyping`):**
 - `bb.tsv.gz` — bin annotations.
-- `bb.{Tallele,Aallele,Ballele,baf}.npz` — allele count and BAF matrices.
+- `bb.{Tallele,Aallele,Ballele}.npz` — allele count matrices.
 - `multi_snp.tsv.gz` — multi-SNP group annotations.
 - `multi_snp.{Tallele,Aallele,Ballele}.npz` — multi-SNP allele count matrices.
 
@@ -73,8 +75,8 @@ Common outputs across all modes:
 Plots from bias correction and binning steps:
 - `rd_correction/` — GC/mappability/RT bias correction plots (bulk WGS/WES).
 - `phase_and_concat/` — SNP depth histogram QC.
-- `combine_counts/` — adaptive binning QC (`combine_counts.pdf`: bin-level BAF + per-sample RDR/BAF).
-- `cnv_segmentation/` — BB block QC (`af_cnv-B_{assay_type}.pdf`: SNP and BB-level BAF; copytyping only).
+- `combine_counts/` — adaptive binning QC (`combine_counts.{run_id}.pdf`: bin-level BAF + per-sample RDR/BAF).
+- `cnv_segmentation/` — BB block QC (`af_cnv-B_{assay_type}.{run_id}.pdf`: SNP and BB-level BAF; copytyping only).
 
 ---
 

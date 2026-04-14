@@ -42,7 +42,7 @@ snakemake --profile /path/to/workflow/profile/ \
 
 Bulk WGS/WES. Genotypes SNPs (bcftools), phases, computes allele counts and bias-corrected RDR.
 
-1. Sample sheet with `assay_type` = `bulkWGS` or `bulkWES`, including normal and tumor.
+1. Sample sheet with `assay_type` = `bulkWGS`, `bulkWGS-lr`, or `bulkWES`, including normal and tumor.
 2. Set `workflow_mode: bulk_genotyping` in config.
 3. **WGS:** Set `window_bed` to a pre-filtered window BED (e.g., build using `resources/scripts/build_wgs_window_bed.py` or use pre-built `resources/data/windows.1kbp.hg38.bed.gz`).
 4. **WES:** Set `window_bed` to a WES window BED built using `resources/scripts/build_wes_window_bed.py` (requires `--wes_targets_bed` pointing to vendor capture targets). The pipeline uses the same mosdepth + rd_correct path as WGS.
@@ -61,7 +61,7 @@ scRNA, scATAC, VISIUM, or VISIUM3prime. Pseudobulk genotyping via cellsnp-lite, 
 2. Set `workflow_mode: single_cell_genotyping` in config.
 3. Outputs in `bb_dir/{assay_type}/`:
    - `bb.tsv.gz` — bin annotations.
-   - `bb.{Tallele,Aallele,Ballele,baf}.npz` — allele count and BAF matrices.
+   - `bb.{Tallele,Aallele,Ballele}.npz` — allele count matrices.
    - `multi_snp.tsv.gz` — multi-SNP group annotations.
    - `multi_snp.{Tallele,Aallele,Ballele}.npz` — multi-SNP allele count matrices.
    - `sample_ids.tsv` — sample metadata.

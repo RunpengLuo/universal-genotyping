@@ -40,7 +40,7 @@ rule phase_and_concat_bulk:
         b_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Ballele.npz",
         sample_file=config["allele_dir"] + "/{assay_type}/sample_ids.tsv",
     wildcard_constraints:
-        assay_type="(bulkWGS|bulkWES)",
+        assay_type="(bulkWGS|bulkWGS-lr|bulkWES)",
     params:
         qc_dir=lambda wc: config["qc_dir"] + f"/{wc.assay_type}/phase_and_concat/",
         sample_name=SAMPLE_ID,
