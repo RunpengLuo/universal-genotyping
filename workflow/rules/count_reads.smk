@@ -87,6 +87,7 @@ rule rd_correct:
     output:
         dp_corrected=config["pileup_dir"] + "/{assay_type}/window.dp.npz",
         window_df=config["pileup_dir"] + "/{assay_type}/window.tsv.gz",
+        depth_stats=config["pileup_dir"] + "/{assay_type}/depth_statistics.tsv",
     wildcard_constraints:
         assay_type="(bulkWGS|bulkWGS-lr|bulkWES)",
     params:

@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 from utils import setup_logging, maybe_path, stamp_path
+from io_utils import compute_depth_statistics
 from count_reads_utils import compute_gc_rd_stats
 from rd_correct_utils import (
     correct_readcount_lowess,
@@ -95,6 +96,12 @@ logging.info(
 dp_raw = np.zeros((n_windows, nsamples), dtype=np.float32)
 for i, mos_df in enumerate(mos_dfs):
     dp_raw[:, i] = mos_df["DEPTH"].to_numpy(dtype=np.float32)
+
+depth_stats = compute_depth_statistics(dp_raw, win_df, rep_ids)
+depth_stats.to_csv(sm.output["depth_stats"], sep="\t", index=False)
+logging.info(f"wrote depth statistics to {sm.output['depth_stats']}")
+for _, row in depth_stats[depth_stats["#CHR"] == "TOTAL"].iterrows():
+    logging.info(f"  {row['REP_ID']}: mean={row['mean_depth']:.2f}, median={row['median_depth']:.2f}")
 
 snps = pd.read_table(sm.input["snp_info"], sep="\t")
 tot_mtx_snp = np.load(sm.input["tot_mtx_snp"])["mat"].astype(np.int32)

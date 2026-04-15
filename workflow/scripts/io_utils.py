@@ -192,6 +192,29 @@ def read_barcodes(bc_file: str):
     return barcodes
 
 
+def compute_depth_statistics(dp_raw, win_df, rep_ids):
+    """Compute per-chromosome and whole-genome mean/median depth per sample.
+
+    Returns a DataFrame with columns: #CHR, REP_ID, mean_depth, median_depth.
+    """
+    chroms = win_df["#CHR"].to_numpy()
+    chrom_order = {c: i for i, c in enumerate(CHROM_ORDER)}
+    sorted_chroms = sorted(
+        win_df["#CHR"].unique(),
+        key=lambda c: chrom_order.get(c, len(chrom_order)),
+    )
+    rows = []
+    for chrom in sorted_chroms:
+        mask = chroms == chrom
+        for s, rep_id in enumerate(rep_ids):
+            vals = dp_raw[mask, s]
+            rows.append([chrom, rep_id, float(np.mean(vals)), float(np.median(vals))])
+    for s, rep_id in enumerate(rep_ids):
+        vals = dp_raw[:, s]
+        rows.append(["TOTAL", rep_id, float(np.mean(vals)), float(np.median(vals))])
+    return pd.DataFrame(rows, columns=["#CHR", "REP_ID", "mean_depth", "median_depth"])
+
+
 def read_genes_gtf_file(gtf_file: str, id_col="gene_ids"):
     """Parse a GTF file and return gene-level records with genomic coordinates.
 
