@@ -80,6 +80,7 @@ params_annotate_snps:
 phaser: "eagle"
 eagle_dir:
 shapeit_dir:
+gmap_dir: null
 params_longphase:
   min_mapq: 20
   extra_params: "--pb"

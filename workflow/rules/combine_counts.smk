@@ -67,7 +67,7 @@ rule combine_counts_nonbulk:
         b_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Ballele.npz",
         sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
         all_barcodes=lambda wc: branch(
-            wc.assay_type in nonbulk_assays,
+            wc.assay_type in NONBULK_ASSAYS,
             then=config["allele_dir"] + f"/{wc.assay_type}/barcodes.tsv.gz",
             otherwise=[],
         ),
@@ -137,7 +137,7 @@ rule cnv_segmentation:
         qc_dir=lambda wc: config["qc_dir"] + f"/{wc.assay_type}/cnv_segmentation/",
         sample_name=SAMPLE_ID,
         assay_type=lambda wc: wc.assay_type,
-        feature_type=lambda wc: assay_type2feature_type[wc.assay_type],
+        feature_type=lambda wc: ASSAY_TYPE2FEATURE_TYPE[wc.assay_type],
         run_id=_run_id,
     threads: 1
     log:

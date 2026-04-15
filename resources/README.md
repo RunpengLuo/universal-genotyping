@@ -12,9 +12,9 @@ VCF format. Set via `snp_panel` or `snp_targets` in config.
 |-------|------|
 | 1kGP phase3 AF>=5e-2 (~92 MB) | [download](https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf.gz) |
 | 1kGP phase3 AF>=5e-4 (~568 MB) | [download](https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e4.chr1toX.hg38.vcf.gz) |
-| 1kGP n=3,202 (high-coverage) | [FTP](https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/) — use [`scripts/process_1kGP_3202_panel.sh`](scripts/process_1kGP_3202_panel.sh) to prepare |
+| 1kGP n=3,202 (hg38) | [FTP](https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/) — use [`scripts/process_1kGP_3202_panel.sh --ref hg38`](scripts/process_1kGP_3202_panel.sh) |
 | 1kGP n=2,504 (chm13v2.0, biallelic) | [S3](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/variants/1000_Genomes_Project/chm13v2.0/Phased_SHAPEIT5_v1.1/) — `...native_maps.biallelic.2504.bcf.gz` |
-| 1kGP n=3,202 (chm13v2.0, biallelic) | [S3](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/variants/1000_Genomes_Project/chm13v2.0/Phased_SHAPEIT5_v1.1/) — `...native_maps.biallelic.3202.bcf.gz` |
+| 1kGP n=3,202 (chm13v2.0, biallelic) | [S3](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/variants/1000_Genomes_Project/chm13v2.0/Phased_SHAPEIT5_v1.1/) — use [`scripts/process_1kGP_3202_panel.sh --ref chm13v2`](scripts/process_1kGP_3202_panel.sh) |
 
 ### Building `snp_targets` from any panel VCF
 
