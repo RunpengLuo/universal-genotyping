@@ -50,6 +50,7 @@ phasing_panel: null
 params_cellsnp_lite:
   # Auto | None | <tag>
   UMItag: "Auto"
+  # CB | None | <tag>
   cellTAG: "CB"
   minMAF_genotype: 0
   minCOUNT_genotype: 2
@@ -83,6 +84,7 @@ shapeit_dir:
 gmap_dir: null
 params_longphase:
   min_mapq: 20
+  # --pb (PacBio) | --ont (ONT)
   extra_params: "--pb"
 
 ##################################################
@@ -105,7 +107,7 @@ params_count_reads:
   # true | false
   gc_correct: true
   # lowess | median
-  gc_correct_method: median
+  gc_correct_method: "median"
   # true | false
   rt_correct: true
   samplesize: 50000
@@ -121,9 +123,10 @@ params_combine_counts:
   min_snp_reads: 1000
   min_snp_per_block: 10
   max_blocksize: 500000
-  # true = median-center (ignore matched normal)
-  skip_normal_normalization: false  
+  # true | false — true = median-center (ignore matched normal)
+  skip_normal_normalization: false
   rdr_outlier_quantile: 0.002
+  # true | false
   phase_flip_test: false
   phase_flip_epsilon: 0.05
   phase_flip_alpha: 0.05
