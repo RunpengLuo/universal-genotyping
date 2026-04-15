@@ -34,6 +34,8 @@ reference: /path/to/reference.fa
 genome_size: /path/to/genome.sizes
 region_bed: /path/to/regions.bed
 window_bed: /path/to/windows.bed.gz
+blacklist_bed: null
+gene_blacklist_file: null
 gtf_file: /path/to/genes.gtf.gz
 
 ##################################################
