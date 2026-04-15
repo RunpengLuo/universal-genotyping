@@ -97,7 +97,8 @@ dp_raw = np.zeros((n_windows, nsamples), dtype=np.float32)
 for i, mos_df in enumerate(mos_dfs):
     dp_raw[:, i] = mos_df["DEPTH"].to_numpy(dtype=np.float32)
 
-depth_stats = compute_depth_statistics(dp_raw, win_df, rep_ids)
+sample_ids = sample_df["SAMPLE"].astype(str).tolist()
+depth_stats = compute_depth_statistics(dp_raw, win_df, sample_ids, rep_ids)
 depth_stats.to_csv(sm.output["depth_stats"], sep="\t", index=False)
 logging.info(f"wrote depth statistics to {sm.output['depth_stats']}")
 for _, row in depth_stats[depth_stats["#CHR"] == "TOTAL"].iterrows():
