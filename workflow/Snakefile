@@ -167,16 +167,15 @@ if _has_config:
     # population-based phasing required to estimate switchprobs
     require_genetic_map = run_genotype_snps and phaser not in ["longphase"]
     if run_genotype_snps:
+        phaser_dir = config.get("phaser_dir")
         if phaser == "eagle":
-            assert config.get("eagle_dir") is not None
-            gmap_dir, get_genetic_map = get_eagle_gmap_path(
-                config["eagle_dir"], refvers
-            )
+            assert phaser_dir is not None, "phaser_dir required for eagle phasing"
+            gmap_dir, get_genetic_map = get_eagle_gmap_path(phaser_dir, refvers)
             assert os.path.isdir(gmap_dir), "failed to locate gmap directory"
         elif phaser == "shapeit":
-            assert config.get("shapeit_dir") is not None
+            assert phaser_dir is not None, "phaser_dir required for shapeit phasing"
             gmap_dir, get_genetic_map = get_shapeit_gmap_path(
-                config["shapeit_dir"],
+                phaser_dir,
                 refvers,
                 gmap_dir=config.get("gmap_dir"),
             )

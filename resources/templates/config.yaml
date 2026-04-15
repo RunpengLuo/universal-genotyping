@@ -1,7 +1,5 @@
 ##################################################
-# User config — only run-specific values needed.
-# Defaults are loaded from config/config.yaml.
-# Override any default by specifying it here.
+# Genotyping YAML configuration file (user)
 ##################################################
 
 # bulk_genotyping | single_cell_genotyping | copytyping_preprocess
@@ -34,4 +32,4 @@ phasing_panel: /path/to/phasing_panel
 # Phasing
 # eagle | shapeit | longphase
 phaser: "shapeit"
-shapeit_dir: /path/to/shapeit5
+phaser_dir: /path/to/shapeit5

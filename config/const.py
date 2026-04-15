@@ -30,15 +30,15 @@ ASSAY_TYPE2FEATURE_TYPE = {
 ALLOWED_REFVERS = ["hg19", "hg38", "chm13v2"]
 
 
-def get_eagle_gmap_path(eagle_dir, refvers):
+def get_eagle_gmap_path(phaser_dir, refvers):
     """Return the genetic map path for Eagle2."""
-    gmap_dir = os.path.join(eagle_dir, "tables")
+    gmap_dir = os.path.join(phaser_dir, "tables")
     return gmap_dir, lambda chrname: os.path.join(
         gmap_dir, f"genetic_map_{refvers}_withX.txt.gz"
     )
 
 
-def get_shapeit_gmap_path(shapeit_dir, refvers, gmap_dir=None):
+def get_shapeit_gmap_path(phaser_dir, refvers, gmap_dir=None):
     """Return the genetic map directory and per-chromosome path function for SHAPEIT5."""
     if refvers == "chm13v2":
         assert gmap_dir is not None, "gmap_dir required for chm13v2 shapeit phasing"
@@ -47,7 +47,7 @@ def get_shapeit_gmap_path(shapeit_dir, refvers, gmap_dir=None):
         )
     _refvers2 = {"hg19": "b37", "hg38": "b38"}
     refvers2 = _refvers2[refvers]
-    gmap_dir = os.path.join(shapeit_dir, "resources/maps")
+    gmap_dir = os.path.join(phaser_dir, "resources/maps")
     return gmap_dir, lambda chrname: os.path.join(
         gmap_dir, f"{refvers2}/chr{chrname}.{refvers2}.gmap.gz"
     )

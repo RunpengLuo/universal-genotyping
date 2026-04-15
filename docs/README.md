@@ -90,8 +90,8 @@ Set `phaser` in config to one of:
 
 | Phaser | Config keys needed |
 |--------|--------------------|
-| `eagle` | `eagle_dir` — path to Eagle2 directory (must contain `tables/` with genetic map files) |
-| `shapeit` | `shapeit_dir` — path to SHAPEIT5 directory (must contain `resources/maps/` for hg19/hg38) |
+| `eagle` | `phaser_dir` — path to Eagle2 directory (must contain `tables/` with genetic map files) |
+| `shapeit` | `phaser_dir` — path to SHAPEIT5 directory (must contain `resources/maps/` for hg19/hg38) |
 | `longphase` | `params_longphase` — `min_mapq`, `extra_params` (e.g., `"--pb"` for PacBio) |
 
 Eagle and shapeit require a phasing reference panel (`phasing_panel` in config). Longphase does not use a genetic map or phasing panel.

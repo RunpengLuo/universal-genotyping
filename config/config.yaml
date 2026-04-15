@@ -1,5 +1,5 @@
 ##################################################
-# Genotyping YAML configuration file
+# Genotyping YAML configuration file (default)
 ##################################################
 
 # Output paths, relative to snakemake --directory
@@ -78,8 +78,7 @@ params_annotate_snps:
 # Phasing
 # eagle | shapeit | longphase
 phaser: "eagle"
-eagle_dir:
-shapeit_dir:
+phaser_dir: null
 gmap_dir: null
 params_longphase:
   min_mapq: 20
