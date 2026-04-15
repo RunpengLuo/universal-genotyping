@@ -77,7 +77,6 @@ params_annotate_snps:
 # eagle | shapeit | longphase
 phaser: "eagle"
 phaser_dir: null
-gmap_dir: null
 params_longphase:
   min_mapq: 20
   # --pb (PacBio) | --ont (ONT)

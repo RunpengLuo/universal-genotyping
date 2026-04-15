@@ -39,18 +39,17 @@ def get_eagle_gmap_path(phaser_dir, refvers):
     )
 
 
-def get_shapeit_gmap_path(phaser_dir, refvers, gmap_dir=None):
+def get_shapeit_gmap_path(phaser_dir, refvers):
     """Return the genetic map directory and per-chromosome path function for SHAPEIT5."""
-    if refvers == "chm13v2":
-        assert gmap_dir is not None, "gmap_dir required for chm13v2 shapeit phasing"
-        return gmap_dir, lambda chrname: os.path.join(
-            gmap_dir, f"chr{chrname}.t2t.scaled.gmap.gz"
-        )
-    _refvers2 = {"hg19": "b37", "hg38": "b38"}
-    refvers2 = _refvers2[refvers]
-    gmap_dir = os.path.join(phaser_dir, "resources/maps")
+    _gmap_patterns = {
+        "hg19": ("b37", "b37/chr{chrname}.b37.gmap.gz"),
+        "hg38": ("b38", "b38/chr{chrname}.b38.gmap.gz"),
+        "chm13v2": ("chm13v2", "chm13v2/chr{chrname}.t2t.scaled.gmap.gz"),
+    }
+    subdir, pattern = _gmap_patterns[refvers]
+    gmap_dir = os.path.join(phaser_dir, "resources/maps", subdir)
     return gmap_dir, lambda chrname: os.path.join(
-        gmap_dir, f"{refvers2}/chr{chrname}.{refvers2}.gmap.gz"
+        phaser_dir, "resources/maps", pattern.format(chrname=chrname)
     )
 
 

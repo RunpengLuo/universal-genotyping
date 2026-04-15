@@ -41,8 +41,10 @@ BCF format, one per chromosome. Set via `phasing_panel` in config.
 
 ### Genetic Maps
 
-- **hg38:** bundled with Eagle2 (`tables/`) and SHAPEIT5 (`resources/maps/`). Just set `phaser_dir`.
-- **chm13v2:** download [T2T-native scaled maps](https://github.com/JosephLalli/phasing_T2T/tree/main/resources/recombination_maps/t2t_native_scaled_maps). For SHAPEIT5, set `gmap_dir` to the map directory. For Eagle2, convert with [`scripts/convert_gmap_to_eagle.py`](scripts/convert_gmap_to_eagle.py) and place output at `{phaser_dir}/tables/genetic_map_chm13v2_withX.txt.gz`.
+- **hg38:** bundled with Eagle2 (`tables/`) and SHAPEIT5 (`resources/maps/`). Set `phaser_dir` to the phasing program root directory.
+- **chm13v2:** download [T2T-native scaled maps](https://github.com/JosephLalli/phasing_T2T/tree/main/resources/recombination_maps/t2t_native_scaled_maps) and place under `{phaser_dir}`:
+  - **SHAPEIT5:** copy maps to `{phaser_dir}/resources/maps/chm13v2/` (files named `chr{N}.t2t.scaled.gmap.gz`)
+  - **Eagle2:** convert with [`scripts/convert_gmap_to_eagle.py`](scripts/convert_gmap_to_eagle.py) and place output at `{phaser_dir}/tables/genetic_map_chm13v2_withX.txt.gz`
 
 ---
 

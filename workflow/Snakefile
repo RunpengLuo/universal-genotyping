@@ -180,9 +180,7 @@ if _has_config:
         elif phaser == "shapeit":
             assert phaser_dir is not None, "phaser_dir required for shapeit phasing"
             gmap_dir, get_genetic_map = get_shapeit_gmap_path(
-                phaser_dir,
-                refvers,
-                gmap_dir=config.get("gmap_dir"),
+                phaser_dir, refvers,
             )
             assert os.path.isdir(gmap_dir), "failed to locate gmap directory"
         elif phaser == "longphase":
