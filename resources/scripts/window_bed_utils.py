@@ -47,7 +47,7 @@ REPLISEQ_BIGWIG_FILES = [
     "wgEncodeUwRepliSeqSknshWaveSignalRep1.bigWig",
 ]
 
-LIFTOVER_LIFTOVER_CHAIN_URL = (
+LIFTOVER_CHAIN_URL = (
     "https://hgdownload.cse.ucsc.edu/goldenpath/hg19/liftOver/hg19ToHg38.over.chain.gz"
 )
 
