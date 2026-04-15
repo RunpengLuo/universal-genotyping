@@ -15,7 +15,7 @@ Output is a gzipped TSV:
   #CHR  START  END  region_id  GC  [MAP]  [REPLI]
 
 Dependencies:
-  - pybedtools, pyranges, pandas, numpy
+  - pybedtools, pandas, numpy
   - bigWigToBedGraph, liftOver (UCSC tools) -- only if --repliseq
 """
 
@@ -25,7 +25,7 @@ import sys
 import time
 
 import pandas as pd
-import pyranges as pr
+from pybedtools import BedTool
 
 from window_bed_utils import (
     REPLISEQ_REFVERS,
@@ -45,19 +45,27 @@ from window_bed_utils import (
 # ---------------------------------------------------------------------------
 
 
-def generate_wgs_windows(genome_size_file, window_size, standard_chroms,
-                         region_bed, blacklist_bed):
+def generate_wgs_windows(
+    genome_size_file, window_size, standard_chroms, region_bed, blacklist_bed
+):
     """Tile windows directly within accessible regions.
 
     Reads the region BED, subtracts the blacklist, then tiles each remaining
     interval into fixed-size windows (merging undersized trailing windows).
     Every output window is fully contained in a blacklist-subtracted region.
     """
-    regions = pr.read_bed(region_bed)
+    regions_bt = BedTool(region_bed)
     if blacklist_bed:
-        regions = regions.subtract(pr.read_bed(blacklist_bed))
+        regions_bt = regions_bt.subtract(BedTool(blacklist_bed))
 
-    reg_df = regions.df
+    reg_df = pd.read_csv(
+        regions_bt.fn,
+        sep="\t",
+        header=None,
+        usecols=[0, 1, 2],
+        names=["Chromosome", "Start", "End"],
+        dtype={"Chromosome": str},
+    )
     reg_df = reg_df[reg_df["Chromosome"].isin(standard_chroms)].reset_index(drop=True)
 
     rows = []
@@ -98,33 +106,67 @@ def parse_args():
         ),
     )
     # Required
-    parser.add_argument("--reference_version", required=True,
-                        help="Reference genome version (hg19, hg38, chm13v2).")
-    parser.add_argument("--reference", required=True,
-                        help="Path to reference FASTA (must have .fai index).")
-    parser.add_argument("--genome_size", required=True,
-                        help="Path to chromosome sizes file (tab-separated: chrom, size).")
-    parser.add_argument("--region_bed", required=True,
-                        help="Accessible regions BED -- keep only windows overlapping these regions.")
-    parser.add_argument("--out_file", required=True,
-                        help="Output gzipped TSV path (e.g. windows.1kbp.hg38.bed.gz).")
+    parser.add_argument(
+        "--reference_version",
+        required=True,
+        help="Reference genome version (hg19, hg38, chm13v2).",
+    )
+    parser.add_argument(
+        "--reference",
+        required=True,
+        help="Path to reference FASTA (must have .fai index).",
+    )
+    parser.add_argument(
+        "--genome_size",
+        required=True,
+        help="Path to chromosome sizes file (tab-separated: chrom, size).",
+    )
+    parser.add_argument(
+        "--region_bed",
+        required=True,
+        help="Accessible regions BED -- keep only windows overlapping these regions.",
+    )
+    parser.add_argument(
+        "--out_file",
+        required=True,
+        help="Output gzipped TSV path (e.g. windows.1kbp.hg38.bed.gz).",
+    )
     # Optional filtering
-    parser.add_argument("--blacklist_bed", default=None,
-                        help="Optional blacklist BED -- subtract these regions.")
+    parser.add_argument(
+        "--blacklist_bed",
+        default=None,
+        help="Optional blacklist BED -- subtract these regions.",
+    )
     # WGS options
-    parser.add_argument("--window", type=int, default=1000,
-                        help="Window size in bp (default: 1000).")
+    parser.add_argument(
+        "--window", type=int, default=1000, help="Window size in bp (default: 1000)."
+    )
     # Covariate options
-    parser.add_argument("--mappability_bed", default=None,
-                        help="Optional BED-format mappability track (4th column = score).")
-    parser.add_argument("--repliseq", action="store_true",
-                        help="Enable replication timing from ENCODE Repli-seq bigWigs.")
-    parser.add_argument("--chain", default=None,
-                        help="hg19-to-hg38 liftOver chain file (downloaded if omitted with --repliseq).")
-    parser.add_argument("--bigwig_dir", default=None,
-                        help="Directory for pre-downloaded WaveSignal bigWig files.")
-    parser.add_argument("--work_dir", default=None,
-                        help="Working directory for intermediate files (default: temp dir).")
+    parser.add_argument(
+        "--mappability_bed",
+        default=None,
+        help="Optional BED-format mappability track (4th column = score).",
+    )
+    parser.add_argument(
+        "--repliseq",
+        action="store_true",
+        help="Enable replication timing from ENCODE Repli-seq bigWigs.",
+    )
+    parser.add_argument(
+        "--chain",
+        default=None,
+        help="hg19-to-hg38 liftOver chain file (downloaded if omitted with --repliseq).",
+    )
+    parser.add_argument(
+        "--bigwig_dir",
+        default=None,
+        help="Directory for pre-downloaded WaveSignal bigWig files.",
+    )
+    parser.add_argument(
+        "--work_dir",
+        default=None,
+        help="Working directory for intermediate files (default: temp dir).",
+    )
     return parser.parse_args()
 
 
@@ -167,7 +209,10 @@ def main():
     # --- Step 1: Generate windows ---
     print("[1/6] WGS: tiling windows within regions ...")
     windows = generate_wgs_windows(
-        args.genome_size, args.window, standard_chroms, args.region_bed,
+        args.genome_size,
+        args.window,
+        standard_chroms,
+        args.region_bed,
         args.blacklist_bed,
     )
 
@@ -192,7 +237,9 @@ def main():
     if args.mappability_bed:
         print("[4/6] Computing mappability ...")
         windows["MAP"] = compute_mappability(
-            windows, args.mappability_bed, args.genome_size,
+            windows,
+            args.mappability_bed,
+            args.genome_size,
         )
         out_cols.append("MAP")
     else:
@@ -201,7 +248,9 @@ def main():
     # --- Step 5: Compute replication timing (optional) ---
     if args.repliseq:
         if args.reference_version not in REPLISEQ_REFVERS:
-            print(f"[5/6] Skipping repli-seq (unsupported for {args.reference_version})")
+            print(
+                f"[5/6] Skipping repli-seq (unsupported for {args.reference_version})"
+            )
         else:
             print("[5/6] Computing replication timing ...")
             windows["REPLI"] = compute_repliseq(windows, standard_chroms, args)

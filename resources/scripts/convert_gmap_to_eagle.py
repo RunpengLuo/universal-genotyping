@@ -28,10 +28,13 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Convert per-chromosome SHAPEIT genetic maps to Eagle2 format."
     )
-    parser.add_argument("input_dir", help="Directory with per-chr gmap files (chr{N}.*.gmap.gz)")
+    parser.add_argument(
+        "input_dir", help="Directory with per-chr gmap files (chr{N}.*.gmap.gz)"
+    )
     parser.add_argument("output_file", help="Output gzipped Eagle-format genetic map")
     parser.add_argument(
-        "--pattern", default="{chrom}.t2t.scaled.gmap.gz",
+        "--pattern",
+        default="{chrom}.t2t.scaled.gmap.gz",
         help="Filename pattern with {chrom} placeholder (default: {chrom}.t2t.scaled.gmap.gz)",
     )
     return parser.parse_args()

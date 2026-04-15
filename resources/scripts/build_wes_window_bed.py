@@ -6,7 +6,7 @@ tiles each target into windows of at least ``--window`` bp, then computes
 per-window GC content with optional mappability and replication timing columns.
 
 Pipeline:
-  1. Read & merge overlapping targets (PyRanges), filter to standard chroms
+  1. Read & merge overlapping targets, filter to standard chroms
   2. Tile each merged target into windows via _tile_region()
   3. Assign gene name from parent target to each tiled window
   4. Filter blacklist + outside regions (subtract_blacklist)
@@ -17,7 +17,7 @@ Output is a gzipped TSV:
   #CHR  START  END  region_id  GC  [MAP]  [REPLI]  gene
 
 Dependencies:
-  - pybedtools, pyranges, pandas, numpy
+  - pybedtools, pandas, numpy
   - bigWigToBedGraph, liftOver (UCSC tools) -- only if --repliseq
 """
 
@@ -28,7 +28,6 @@ import time
 
 import numpy as np
 import pandas as pd
-import pyranges as pr
 
 from window_bed_utils import (
     REPLISEQ_REFVERS,
@@ -53,14 +52,17 @@ def generate_wes_windows(wes_targets_bed, window_size, standard_chroms, blacklis
     """Generate target windows for WES by merging and tiling capture targets.
 
     1. Read WES targets BED (BED4: chr/start/end/gene).
-    2. Merge overlapping intervals with PyRanges, concatenating gene names.
+    2. Merge overlapping intervals, concatenating gene names.
     3. Filter to standard chromosomes.
     4. Tile each merged target into windows of at least ``window_size`` bp.
     5. Subtract blacklist regions.
     """
     # Read targets BED — support BED3 or BED4+
     targets = pd.read_csv(
-        wes_targets_bed, sep="\t", header=None, comment="#",
+        wes_targets_bed,
+        sep="\t",
+        header=None,
+        comment="#",
     )
     if targets.shape[1] >= 4:
         targets = targets.iloc[:, :4]
@@ -69,7 +71,9 @@ def generate_wes_windows(wes_targets_bed, window_size, standard_chroms, blacklis
         targets.columns = ["Chromosome", "Start", "End"]
         targets["Name"] = "."
 
-    targets = targets[targets["Chromosome"].isin(standard_chroms)].reset_index(drop=True)
+    targets = targets[targets["Chromosome"].isin(standard_chroms)].reset_index(
+        drop=True
+    )
     n_raw = len(targets)
     raw_sizes = targets["End"] - targets["Start"]
     print(f"  {n_raw} raw target intervals on standard chromosomes")
@@ -78,20 +82,37 @@ def generate_wes_windows(wes_targets_bed, window_size, standard_chroms, blacklis
         f"median={int(raw_sizes.median())}, max={raw_sizes.max()}"
     )
 
-    targets_pr = pr.PyRanges(targets)
-    merged = targets_pr.merge(count_col="count")
-    merged_df = merged.df.copy()
-    merged_df["_midx"] = np.arange(len(merged_df))
-
-    # Vectorized gene-name mapping via interval join
-    merged_pr = pr.PyRanges(merged_df)
-    joined = merged_pr.join(targets_pr, how="left").df
-    gene_by_midx = (
-        joined.groupby("_midx")["Name"]
-        .apply(lambda s: ",".join(sorted(set(g for g in s if g != "." and pd.notna(g)))) or ".")
-        .to_dict()
+    # Merge overlapping intervals and collect gene names per merged interval
+    targets = targets.sort_values(["Chromosome", "Start"]).reset_index(drop=True)
+    merged_rows = []
+    for chrom, grp in targets.groupby("Chromosome", sort=False):
+        starts = grp["Start"].values
+        ends = grp["End"].values
+        names = grp["Name"].values
+        cur_start, cur_end = starts[0], ends[0]
+        cur_names = [names[0]]
+        for i in range(1, len(starts)):
+            if starts[i] <= cur_end:
+                cur_end = max(cur_end, ends[i])
+                cur_names.append(names[i])
+            else:
+                gene_str = (
+                    ",".join(
+                        sorted(set(n for n in cur_names if n != "." and pd.notna(n)))
+                    )
+                    or "."
+                )
+                merged_rows.append([chrom, cur_start, cur_end, gene_str])
+                cur_start, cur_end = starts[i], ends[i]
+                cur_names = [names[i]]
+        gene_str = (
+            ",".join(sorted(set(n for n in cur_names if n != "." and pd.notna(n))))
+            or "."
+        )
+        merged_rows.append([chrom, cur_start, cur_end, gene_str])
+    merged_df = pd.DataFrame(
+        merged_rows, columns=["Chromosome", "Start", "End", "gene"]
     )
-    merged_df["gene"] = merged_df["_midx"].map(gene_by_midx).fillna(".")
 
     merged_sizes = merged_df["End"] - merged_df["Start"]
     print(f"  {len(merged_df)} merged target intervals")
@@ -120,7 +141,9 @@ def generate_wes_windows(wes_targets_bed, window_size, standard_chroms, blacklis
         n_before = len(windows)
         windows = subtract_blacklist(windows, blacklist_bed)
         n_removed = n_before - len(windows)
-        print(f"  {len(windows)} windows after blacklist subtraction (removed {n_removed})")
+        print(
+            f"  {len(windows)} windows after blacklist subtraction (removed {n_removed})"
+        )
 
     sizes = windows["END"] - windows["START"]
     print(f"  {len(windows)} windows across {windows['#CHR'].nunique()} chromosomes")
@@ -157,35 +180,72 @@ def parse_args():
         ),
     )
     # Required
-    parser.add_argument("--reference_version", required=True,
-                        help="Reference genome version (hg19, hg38, chm13v2).")
-    parser.add_argument("--reference", required=True,
-                        help="Path to reference FASTA (must have .fai index).")
-    parser.add_argument("--genome_size", required=True,
-                        help="Path to chromosome sizes file (tab-separated: chrom, size).")
-    parser.add_argument("--region_bed", required=True,
-                        help="Accessible regions BED -- keep only windows overlapping these regions.")
-    parser.add_argument("--out_file", required=True,
-                        help="Output gzipped TSV path (e.g. gc_map.wes.bed.gz).")
+    parser.add_argument(
+        "--reference_version",
+        required=True,
+        help="Reference genome version (hg19, hg38, chm13v2).",
+    )
+    parser.add_argument(
+        "--reference",
+        required=True,
+        help="Path to reference FASTA (must have .fai index).",
+    )
+    parser.add_argument(
+        "--genome_size",
+        required=True,
+        help="Path to chromosome sizes file (tab-separated: chrom, size).",
+    )
+    parser.add_argument(
+        "--region_bed",
+        required=True,
+        help="Accessible regions BED -- keep only windows overlapping these regions.",
+    )
+    parser.add_argument(
+        "--out_file",
+        required=True,
+        help="Output gzipped TSV path (e.g. gc_map.wes.bed.gz).",
+    )
     # Optional filtering
-    parser.add_argument("--blacklist_bed", default=None,
-                        help="Optional blacklist BED -- subtract these regions.")
+    parser.add_argument(
+        "--blacklist_bed",
+        default=None,
+        help="Optional blacklist BED -- subtract these regions.",
+    )
     # WES options
-    parser.add_argument("--wes_targets_bed", required=True,
-                        help="Vendor exon capture targets BED (BED3 or BED4 with gene name).")
-    parser.add_argument("--window", type=int, default=267,
-                        help="Window size in bp (default: 267).")
+    parser.add_argument(
+        "--wes_targets_bed",
+        required=True,
+        help="Vendor exon capture targets BED (BED3 or BED4 with gene name).",
+    )
+    parser.add_argument(
+        "--window", type=int, default=267, help="Window size in bp (default: 267)."
+    )
     # Covariate options
-    parser.add_argument("--mappability_bed", default=None,
-                        help="Optional BED-format mappability track (4th column = score).")
-    parser.add_argument("--repliseq", action="store_true",
-                        help="Enable replication timing from ENCODE Repli-seq bigWigs.")
-    parser.add_argument("--chain", default=None,
-                        help="hg19-to-hg38 liftOver chain file (downloaded if omitted with --repliseq).")
-    parser.add_argument("--bigwig_dir", default=None,
-                        help="Directory for pre-downloaded WaveSignal bigWig files.")
-    parser.add_argument("--work_dir", default=None,
-                        help="Working directory for intermediate files (default: temp dir).")
+    parser.add_argument(
+        "--mappability_bed",
+        default=None,
+        help="Optional BED-format mappability track (4th column = score).",
+    )
+    parser.add_argument(
+        "--repliseq",
+        action="store_true",
+        help="Enable replication timing from ENCODE Repli-seq bigWigs.",
+    )
+    parser.add_argument(
+        "--chain",
+        default=None,
+        help="hg19-to-hg38 liftOver chain file (downloaded if omitted with --repliseq).",
+    )
+    parser.add_argument(
+        "--bigwig_dir",
+        default=None,
+        help="Directory for pre-downloaded WaveSignal bigWig files.",
+    )
+    parser.add_argument(
+        "--work_dir",
+        default=None,
+        help="Working directory for intermediate files (default: temp dir).",
+    )
     return parser.parse_args()
 
 
@@ -230,7 +290,10 @@ def main():
     # --- Step 1: Generate windows via adaptive tiling ---
     print("[1/6] WES: merging targets and tiling windows ...")
     windows = generate_wes_windows(
-        args.wes_targets_bed, args.window, standard_chroms, args.blacklist_bed,
+        args.wes_targets_bed,
+        args.window,
+        standard_chroms,
+        args.blacklist_bed,
     )
 
     # --- Step 2: Assign region_id, drop windows outside regions ---
@@ -240,7 +303,9 @@ def main():
     unassigned_mask = windows["region_id"].isna()
     n_dropped = int(unassigned_mask.sum())
     if n_dropped > 0:
-        print(f"  WARNING: {n_dropped}/{n_before} windows could not be assigned a region_id")
+        print(
+            f"  WARNING: {n_dropped}/{n_before} windows could not be assigned a region_id"
+        )
         print(windows.loc[unassigned_mask].head(30).to_string(index=False))
         windows = windows[~unassigned_mask].reset_index(drop=True)
     print(f"  {len(windows)} assigned")
@@ -255,7 +320,9 @@ def main():
     if args.mappability_bed:
         print("[4/6] Computing mappability ...")
         windows["MAP"] = compute_mappability(
-            windows, args.mappability_bed, args.genome_size,
+            windows,
+            args.mappability_bed,
+            args.genome_size,
         )
         out_cols.append("MAP")
     else:
@@ -264,7 +331,9 @@ def main():
     # --- Step 5: Compute replication timing (optional) ---
     if args.repliseq:
         if args.reference_version not in REPLISEQ_REFVERS:
-            print(f"[5/6] Skipping repli-seq (unsupported for {args.reference_version})")
+            print(
+                f"[5/6] Skipping repli-seq (unsupported for {args.reference_version})"
+            )
         else:
             print("[5/6] Computing replication timing ...")
             windows["REPLI"] = compute_repliseq(windows, standard_chroms, args)

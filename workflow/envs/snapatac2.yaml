@@ -7,4 +7,3 @@ dependencies:
   - snapatac2>=2.3
   - scanpy>=1.9
   - anndata>=0.8
-  - pyranges>=0.0.120,<1.0

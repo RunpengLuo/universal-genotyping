@@ -102,7 +102,9 @@ depth_stats = compute_depth_statistics(dp_raw, win_df, sample_ids)
 depth_stats.to_csv(sm.output["depth_stats"], sep="\t", index=False)
 logging.info(f"wrote depth statistics to {sm.output['depth_stats']}")
 for _, row in depth_stats[depth_stats["#CHR"] == "TOTAL"].iterrows():
-    logging.info(f"  {row['SAMPLE']}: mean={row['mean_depth']:.2f}, median={row['median_depth']:.2f}")
+    logging.info(
+        f"  {row['SAMPLE']}: mean={row['mean_depth']:.2f}, median={row['median_depth']:.2f}"
+    )
 
 snps = pd.read_table(sm.input["snp_info"], sep="\t")
 tot_mtx_snp = np.load(sm.input["tot_mtx_snp"])["mat"].astype(np.int32)

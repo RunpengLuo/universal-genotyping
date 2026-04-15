@@ -3,7 +3,6 @@ from collections import OrderedDict
 
 import pandas as pd
 import numpy as np
-import pyranges as pr
 
 from utils import *
 
@@ -127,7 +126,7 @@ def read_region_file(region_bed_file: str, addchr=True):
     Returns
     -------
     pd.DataFrame
-        DataFrame with ``#CHR``, ``START``, ``END`` (and pyranges-compatible aliases).
+        DataFrame with ``#CHR``, ``START``, ``END`` (and legacy aliases ``Chromosome``, ``Start``, ``End``).
     """
     regions = pd.read_table(
         region_bed_file,
@@ -143,34 +142,6 @@ def read_region_file(region_bed_file: str, addchr=True):
     regions["START"] = regions["Start"]
     regions["END"] = regions["End"]
     return regions
-
-
-def read_ucn_file(seg_ucn_file: str):
-    """Read a HATCHet-style UCN segment file and derive CNP and PROPS columns.
-
-    Parameters
-    ----------
-    seg_ucn_file : str
-        Path to a tab-separated UCN file with per-clone copy-number columns.
-
-    Returns
-    -------
-    tuple[pd.DataFrame, list[str]]
-        Sorted segment DataFrame with ``CNP`` and ``PROPS`` columns, and
-        the list of clone names.
-    """
-    segs_df = pd.read_table(seg_ucn_file, sep="\t")
-    segs_df = sort_df_chr(segs_df, pos="START")
-
-    n_clones = len([cname for cname in segs_df.columns if cname.startswith("cn_")])
-    clones = ["normal"] + [f"clone{c}" for c in range(1, n_clones)]
-    segs_df["CNP"] = segs_df.apply(
-        func=lambda r: ";".join(r[f"cn_{c}"] for c in clones), axis=1
-    )
-    segs_df["PROPS"] = segs_df.apply(
-        func=lambda r: ";".join(str(r[f"u_{c}"]) for c in clones), axis=1
-    )
-    return segs_df, clones
 
 
 def read_barcodes(bc_file: str):
@@ -208,15 +179,23 @@ def compute_depth_statistics(dp_raw, win_df, sample_ids):
         mask = chroms == chrom
         for s in range(len(sample_ids)):
             vals = dp_raw[mask, s]
-            rows.append([sample_ids[s], chrom, float(np.mean(vals)), float(np.median(vals))])
+            rows.append(
+                [sample_ids[s], chrom, float(np.mean(vals)), float(np.median(vals))]
+            )
     for s in range(len(sample_ids)):
         vals = dp_raw[:, s]
-        rows.append([sample_ids[s], "TOTAL", float(np.mean(vals)), float(np.median(vals))])
+        rows.append(
+            [sample_ids[s], "TOTAL", float(np.mean(vals)), float(np.median(vals))]
+        )
     return pd.DataFrame(rows, columns=["SAMPLE", "#CHR", "mean_depth", "median_depth"])
 
 
 def compute_snp_statistics(
-    raw_snps_list, modalities, base_snps, chrom_sizes, chroms,
+    raw_snps_list,
+    modalities,
+    base_snps,
+    chrom_sizes,
+    chroms,
 ):
     """Compute per-chromosome SNP genotyping statistics.
 
@@ -244,9 +223,13 @@ def compute_snp_statistics(
         n_dna = 0
         n_rna = 0
         if has_dna:
-            n_dna = int((raw_snps_list[modalities.index("DNA")]["#CHROM"] == chrom).sum())
+            n_dna = int(
+                (raw_snps_list[modalities.index("DNA")]["#CHROM"] == chrom).sum()
+            )
         if has_rna:
-            n_rna = int((raw_snps_list[modalities.index("RNA")]["#CHROM"] == chrom).sum())
+            n_rna = int(
+                (raw_snps_list[modalities.index("RNA")]["#CHROM"] == chrom).sum()
+            )
 
         ch_keys = set(base_snps.loc[ch_mask, "KEY"])
         n_shared = len(ch_keys & shared_keys)
@@ -259,8 +242,21 @@ def compute_snp_statistics(
         n_dropped = n_union - n_het - n_hom_alt - n_hom_ref
         n_kept = n_het + n_hom_alt
 
-        rows.append([chrom, length, n_dna, n_rna, n_shared, n_union,
-                      n_het, n_hom_alt, n_hom_ref, n_dropped, n_kept])
+        rows.append(
+            [
+                chrom,
+                length,
+                n_dna,
+                n_rna,
+                n_shared,
+                n_union,
+                n_het,
+                n_hom_alt,
+                n_hom_ref,
+                n_dropped,
+                n_kept,
+            ]
+        )
 
     # TOTAL row
     total_len = sum(chrom_sizes.get(c, 0) for c in chrom_list)
@@ -273,13 +269,65 @@ def compute_snp_statistics(
     total_hom_ref = sum(r[8] for r in rows)
     total_dropped = sum(r[9] for r in rows)
     total_kept = sum(r[10] for r in rows)
-    rows.append(["TOTAL", total_len, total_dna, total_rna, total_shared, total_union,
-                  total_het, total_hom_alt, total_hom_ref, total_dropped, total_kept])
+    rows.append(
+        [
+            "TOTAL",
+            total_len,
+            total_dna,
+            total_rna,
+            total_shared,
+            total_union,
+            total_het,
+            total_hom_alt,
+            total_hom_ref,
+            total_dropped,
+            total_kept,
+        ]
+    )
 
-    columns = ["#CHR", "LENGTH", "#SNPS-DNA", "#SNPS-RNA", "#SNPS-shared",
-               "#SNPS-union", "#SNPS-het", "#SNPS-hom_alt", "#SNPS-hom_ref",
-               "#SNPS-dropped", "#SNPS-kept"]
+    columns = [
+        "#CHR",
+        "LENGTH",
+        "#SNPS-DNA",
+        "#SNPS-RNA",
+        "#SNPS-shared",
+        "#SNPS-union",
+        "#SNPS-het",
+        "#SNPS-hom_alt",
+        "#SNPS-hom_ref",
+        "#SNPS-dropped",
+        "#SNPS-kept",
+    ]
     return pd.DataFrame(rows, columns=columns)
+
+
+def _read_gtf(gtf_file: str, feature_type: str) -> pd.DataFrame:
+    """Parse a GTF file and return records of the requested feature type.
+
+    Returns a DataFrame with ``#CHR``, ``START`` (0-based), ``END``,
+    and ``gene_id`` columns.
+    """
+    gtf = pd.read_csv(
+        gtf_file,
+        sep="\t",
+        comment="#",
+        header=None,
+        names=GTF_COLUMNS,
+        dtype={"seqname": str},
+        low_memory=False,
+    )
+    gtf = gtf.loc[
+        gtf["feature"] == feature_type, ["seqname", "start", "end", "attributes"]
+    ]
+    gene_ids = gtf["attributes"].str.extract(r'gene_id "([^"]+)"', expand=False)
+    return pd.DataFrame(
+        {
+            "#CHR": gtf["seqname"].values,
+            "START": gtf["start"].values - 1,  # GTF is 1-based → 0-based
+            "END": gtf["end"].values,  # GTF end is inclusive → half-open
+            "gene_id": gene_ids.values,
+        }
+    )
 
 
 def read_genes_gtf_file(gtf_file: str, id_col="gene_ids"):
@@ -300,22 +348,10 @@ def read_genes_gtf_file(gtf_file: str, id_col="gene_ids"):
     pd.DataFrame
         DataFrame with ``#CHR``, ``START`` (0-based), ``END``, and *id_col*.
     """
-    gr = pr.read_gtf(gtf_file, rename_attr=True)
-    genes = (
-        gr.df.query("Feature == 'gene'")[["Chromosome", "Start", "End", "gene_id"]]
-        .drop_duplicates("gene_id", keep="first")
-        .rename(
-            columns={
-                "gene_id": id_col,
-                "Chromosome": "#CHR",
-                "Start": "START1",
-                "End": "END",
-            }
-        )
-    )
-    # convert to 0-based BED format
-    genes["START"] = genes["START1"] - 1
-
+    genes = _read_gtf(gtf_file, "gene")
+    genes = genes.drop_duplicates("gene_id", keep="first")
+    if id_col != "gene_id":
+        genes = genes.rename(columns={"gene_id": id_col})
     return genes
 
 
@@ -334,46 +370,4 @@ def read_exons_gtf_file(gtf_file: str):
     pd.DataFrame
         DataFrame with ``#CHR``, ``START`` (0-based), ``END``, and ``gene_id``.
     """
-    gr = pr.read_gtf(gtf_file, rename_attr=True)
-    exons = gr.df.query("Feature == 'exon'")[
-        ["Chromosome", "Start", "End", "gene_id"]
-    ].rename(
-        columns={
-            "Chromosome": "#CHR",
-            "Start": "START1",
-            "End": "END",
-        }
-    )
-    exons["START"] = exons["START1"] - 1
-    return exons[["#CHR", "START", "END", "gene_id"]]
-
-
-def read_genes_bed_file(bed_file: str, id_col="gene_id"):
-    """Read a BED file and return deduplicated gene-level records.
-
-    Parameters
-    ----------
-    bed_file : str
-        Path to a BED file with gene names in the Name column.
-    id_col : str
-        Column name for the gene identifier in the output.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with ``#CHR``, ``START``, ``END``, and *id_col*.
-    """
-    gr = pr.read_bed(bed_file, as_df=True)
-    genes = (
-        gr[["Chromosome", "Start", "End", "Name"]]
-        .drop_duplicates("Name", keep="first")
-        .rename(
-            columns={
-                "Name": id_col,
-                "Chromosome": "#CHR",
-                "Start": "START",
-                "End": "END",
-            }
-        )
-    )
-    return genes
+    return _read_gtf(gtf_file, "exon")

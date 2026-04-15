@@ -140,7 +140,11 @@ base_snps["SAMPLE"] = base_snps.apply(get_genotype, axis=1)
 
 chrom_sizes = get_chr_sizes(sm.input["genome_size"])
 snp_stats = compute_snp_statistics(
-    raw_snps_list, modalities, base_snps, chrom_sizes, chroms,
+    raw_snps_list,
+    modalities,
+    base_snps,
+    chrom_sizes,
+    chroms,
 )
 snp_stats.to_csv(sm.output["snp_stats"], sep="\t", index=False)
 logging.info(f"wrote SNP statistics to {sm.output['snp_stats']}")

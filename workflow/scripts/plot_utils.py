@@ -1,5 +1,4 @@
-"""Plotting utilities for QC and diagnostic visualizations.
-"""
+"""Plotting utilities for QC and diagnostic visualizations."""
 
 import os
 import logging
@@ -26,8 +25,18 @@ from combine_counts_utils import compute_af_pseudobulk, compute_af_per_sample
 # ---------------------------------------------------------------------------
 
 
-def _plot_cov_panel(ax, covariate, reads, xlabel, show_ylabel, rep_id,
-                    rmse=None, is_before=False, xlim=None, xticks=None):
+def _plot_cov_panel(
+    ax,
+    covariate,
+    reads,
+    xlabel,
+    show_ylabel,
+    rep_id,
+    rmse=None,
+    is_before=False,
+    xlim=None,
+    xticks=None,
+):
     """KDE density scatter of readcov vs a covariate on a single axes."""
     valid = (reads > 0) & np.isfinite(covariate)
     if valid.sum() < 20:
@@ -53,9 +62,7 @@ def _plot_cov_panel(ax, covariate, reads, xlabel, show_ylabel, rep_id,
     zz = kde(positions).reshape(xx.shape)
 
     ax.pcolormesh(xx, yy, zz, shading="gouraud", cmap="Blues", rasterized=True)
-    ax.contour(
-        xx, yy, zz, levels=6, colors="steelblue", linewidths=0.5, alpha=0.5
-    )
+    ax.contour(xx, yy, zz, levels=6, colors="steelblue", linewidths=0.5, alpha=0.5)
 
     mad = np.median(np.abs(y - np.median(y)))
     r_pearson, _ = pearsonr(x, y)
@@ -77,8 +84,17 @@ def _plot_cov_panel(ax, covariate, reads, xlabel, show_ylabel, rep_id,
     ax.set_ylim(0, ylim * 1.1)
 
 
-def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf, gc_rmse=None,
-                           mappability=None, repliseq=None, title_prefix=""):
+def plot_gc_correction_pdf(
+    gc,
+    dp_before,
+    dp_after,
+    rep_ids,
+    pdf,
+    gc_rmse=None,
+    mappability=None,
+    repliseq=None,
+    title_prefix="",
+):
     """Two-page PDF: before/after correction KDE density plots.
 
     Each page has up to 3 rows (GC, MAP, RT) x nsamples columns.
@@ -112,11 +128,16 @@ def plot_gc_correction_pdf(gc, dp_before, dp_after, rep_ids, pdf, gc_rmse=None,
     ]:
         logging.info(f"====={title}=====")
         fig, axes = plt.subplots(
-            nrows, nsamples, figsize=(panel_w, 5 * nrows), squeeze=False,
+            nrows,
+            nsamples,
+            figsize=(panel_w, 5 * nrows),
+            squeeze=False,
         )
         for ri, (row_label, covariate, xlabel) in enumerate(rows):
             for si, rep_id in enumerate(rep_ids):
-                rmse = gc_rmse[si] if (gc_rmse is not None and row_label == "GC") else None
+                rmse = (
+                    gc_rmse[si] if (gc_rmse is not None and row_label == "GC") else None
+                )
                 kw = {}
                 if row_label == "MAP":
                     kw = {"xlim": (-0.2, 1.2), "xticks": np.arange(0, 1.1, 0.2)}
@@ -205,23 +226,38 @@ def _genome_coords(pos_df, genome_size):
         chrom_bounds.append((c, cum, sz))
         cum += sz
 
-    genome_x = np.array([offsets.get(c, 0) + p for c, p in zip(ch, pos)], dtype=np.float64)
+    genome_x = np.array(
+        [offsets.get(c, 0) + p for c, p in zip(ch, pos)], dtype=np.float64
+    )
     return genome_x, chrom_bounds, cum
 
 
-def _add_chrom_decorations(ax, chrom_bounds, total_len, region_by_chr, blacklist_by_chr):
+def _add_chrom_decorations(
+    ax, chrom_bounds, total_len, region_by_chr, blacklist_by_chr
+):
     """Add chromosome boundaries, labels, and region/blacklist shading to an axis."""
     for chrom, offset, sz in chrom_bounds:
         ax.axvline(offset, color="black", linewidth=0.5, alpha=0.3)
         if chrom in region_by_chr:
             for s, e in region_by_chr[chrom]:
-                ax.axvspan(offset + s, offset + e, color="lightblue", alpha=0.15, zorder=0)
+                ax.axvspan(
+                    offset + s, offset + e, color="lightblue", alpha=0.15, zorder=0
+                )
         if chrom in blacklist_by_chr:
             for s, e in blacklist_by_chr[chrom]:
-                ax.axvspan(offset + s, offset + e, color="lightcoral", alpha=0.2, zorder=0)
+                ax.axvspan(
+                    offset + s, offset + e, color="lightcoral", alpha=0.2, zorder=0
+                )
         label = chrom.replace("chr", "")
-        ax.text(offset + sz / 2, -0.06, label, ha="center", va="top", fontsize=7,
-                transform=ax.get_xaxis_transform())
+        ax.text(
+            offset + sz / 2,
+            -0.06,
+            label,
+            ha="center",
+            va="top",
+            fontsize=7,
+            transform=ax.get_xaxis_transform(),
+        )
     ax.set_xlim(0, total_len)
     ax.set_xticks([])
 
@@ -287,7 +323,9 @@ def plot_1d_multi_sample(
         y = mat[:, si] if mat.ndim == 2 else mat
         m = np.isfinite(y)
 
-        _add_chrom_decorations(ax, chrom_bounds, total_len, region_by_chr, blacklist_by_chr)
+        _add_chrom_decorations(
+            ax, chrom_bounds, total_len, region_by_chr, blacklist_by_chr
+        )
 
         if m.any():
             ax.scatter(genome_x[m], y[m], s=s_plot, alpha=alpha, rasterized=True)
@@ -348,13 +386,23 @@ def plot_1d_sample(
         filt = m & ~mask
         if filt.any():
             ax.scatter(
-                genome_x[filt], val[filt], s=s_plot, alpha=0.8, color="red",
-                rasterized=True, label=f"filtered ({filt.sum()})",
+                genome_x[filt],
+                val[filt],
+                s=s_plot,
+                alpha=0.8,
+                color="red",
+                rasterized=True,
+                label=f"filtered ({filt.sum()})",
             )
         if kept.any():
             ax.scatter(
-                genome_x[kept], val[kept], s=s_plot, alpha=0.8, color="blue",
-                rasterized=True, label=f"kept ({kept.sum()})",
+                genome_x[kept],
+                val[kept],
+                s=s_plot,
+                alpha=0.8,
+                color="blue",
+                rasterized=True,
+                label=f"kept ({kept.sum()})",
             )
         ax.legend(loc="upper right", fontsize=8, markerscale=2)
     else:
@@ -435,9 +483,13 @@ def plot_rdr_baf(
         ax_rdr = axes[0]
         y_rdr = rdr_mat[:, si] if rdr_mat.ndim == 2 else rdr_mat
         m_rdr = np.isfinite(y_rdr)
-        _add_chrom_decorations(ax_rdr, chrom_bounds, total_len, region_by_chr, blacklist_by_chr)
+        _add_chrom_decorations(
+            ax_rdr, chrom_bounds, total_len, region_by_chr, blacklist_by_chr
+        )
         if m_rdr.any():
-            ax_rdr.scatter(genome_x[m_rdr], y_rdr[m_rdr], s=s_plot, alpha=alpha, rasterized=True)
+            ax_rdr.scatter(
+                genome_x[m_rdr], y_rdr[m_rdr], s=s_plot, alpha=alpha, rasterized=True
+            )
         if rdr_ylim is not None:
             ax_rdr.set_ylim(0, rdr_ylim)
         ax_rdr.set_ylabel("RDR")
@@ -448,9 +500,13 @@ def plot_rdr_baf(
         ax_baf = axes[1]
         y_baf = baf_mat[:, si] if baf_mat.ndim == 2 else baf_mat
         m_baf = np.isfinite(y_baf)
-        _add_chrom_decorations(ax_baf, chrom_bounds, total_len, region_by_chr, blacklist_by_chr)
+        _add_chrom_decorations(
+            ax_baf, chrom_bounds, total_len, region_by_chr, blacklist_by_chr
+        )
         if m_baf.any():
-            ax_baf.scatter(genome_x[m_baf], y_baf[m_baf], s=s_plot, alpha=alpha, rasterized=True)
+            ax_baf.scatter(
+                genome_x[m_baf], y_baf[m_baf], s=s_plot, alpha=alpha, rasterized=True
+            )
         ax_baf.axhline(0.5, color="grey", linestyle=":", linewidth=1)
         ax_baf.set_ylim(-0.05, 1.05)
         ax_baf.set_ylabel("BAF")
@@ -628,7 +684,9 @@ def plot_allele_freqs(
     )
     if apply_pseudobulk:
         af = compute_af_pseudobulk(tot_mtx, b_mtx)
-        plot_file = stamp_path(os.path.join(plot_dir, f"af_{allele}_{unit}.pseudobulk{suffix}.pdf"), run_id)
+        plot_file = stamp_path(
+            os.path.join(plot_dir, f"af_{allele}_{unit}.pseudobulk{suffix}.pdf"), run_id
+        )
         plot_1d_sample(
             pos_df,
             af,
@@ -647,7 +705,9 @@ def plot_allele_freqs(
         af_mat = np.column_stack(
             [compute_af_per_sample(_tot_mtx, _b_mtx, i) for i in range(len(rep_ids))]
         )
-        plot_file = stamp_path(os.path.join(plot_dir, f"af_{allele}_{unit}{suffix}.pdf"), run_id)
+        plot_file = stamp_path(
+            os.path.join(plot_dir, f"af_{allele}_{unit}{suffix}.pdf"), run_id
+        )
         plot_1d_multi_sample(
             pos_df,
             af_mat,

@@ -12,8 +12,6 @@ from scipy.io import mmread
 from scipy.sparse import csr_matrix, hstack, issparse
 from scipy.stats import beta
 
-import pyranges as pr
-
 from io_utils import read_VCF
 from utils import stamp_path
 
@@ -102,24 +100,6 @@ def merge_mats(tot_list: list, ad_list: list):
     alt_mtx = hstack(ad_list, format="csr")
     ref_mtx = tot_mtx - alt_mtx
     return tot_mtx, ref_mtx, alt_mtx
-
-
-def hstack_mtx_list(mtx_list: list):
-    """Horizontally stack a list of sparse matrices into a single CSR matrix.
-
-    Parameters
-    ----------
-    mtx_list : list of csr_matrix
-        Matrices with the same number of rows.
-
-    Returns
-    -------
-    csr_matrix
-        Concatenated matrix.
-    """
-    if len(mtx_list) == 1:
-        return mtx_list[0]
-    return hstack(mtx_list, format="csr")
 
 
 def apply_phase_to_mat(tot_mtx, ref_mtx, alt_mtx, phases):
@@ -214,25 +194,38 @@ def compute_af_pseudobulk(tot_mtx, b_mtx):
 def get_mask_by_region(snps: pd.DataFrame, regions: pd.DataFrame) -> np.ndarray:
     """
     Return a boolean mask (len == len(snps)) indicating whether each SNP (CHR, POS)
-    overlaps any interval in a BED-like file (Chromosome, Start, End), using 0-based
-    half-open intervals [Start, End).
+    overlaps any interval in a BED-like file, using 0-based half-open intervals
+    [Start, End).
 
-    Assumes SNP POS is 1-based. Converts each SNP to an interval [POS-1, POS).
+    Assumes SNP POS is 1-based.
     """
     n = len(snps)
-    snp_positions = snps[["#CHR", "POS"]].copy()
-    snp_positions["Start"] = snp_positions["POS"].astype(np.int64) - 1
-    snp_positions["End"] = snp_positions["POS"].astype(np.int64)
-    snp_positions["_idx"] = np.arange(n)
+    r_chr = regions["#CHR"] if "#CHR" in regions.columns else regions["Chromosome"]
+    r_start = (
+        regions["START"] if "START" in regions.columns else regions["Start"]
+    ).to_numpy()
+    r_end = (regions["END"] if "END" in regions.columns else regions["End"]).to_numpy()
 
-    pr_snps = pr.PyRanges(snp_positions.rename(columns={"#CHR": "Chromosome"}))
-    pr_regions = pr.PyRanges(regions)
-
-    overlapping = pr_snps.overlap(pr_regions)
-    if overlapping.empty:
-        return np.zeros(n, dtype=bool)
-    keep_idx = set(overlapping.df["_idx"].unique())
-    return np.isin(np.arange(n), list(keep_idx))
+    keep = np.zeros(n, dtype=bool)
+    for chrom in snps["#CHR"].unique():
+        sm = (snps["#CHR"] == chrom).to_numpy()
+        rm = (r_chr == chrom).to_numpy()
+        if not rm.any():
+            continue
+        positions = snps.loc[sm, "POS"].to_numpy().astype(np.int64) - 1
+        reg_starts = r_start[rm]
+        reg_ends = r_end[rm]
+        sort_idx = np.argsort(reg_starts)
+        reg_starts, reg_ends = reg_starts[sort_idx], reg_ends[sort_idx]
+        right_bounds = np.searchsorted(reg_starts, positions, side="right")
+        overlaps = np.array(
+            [
+                np.any(reg_ends[: right_bounds[i]] > positions[i])
+                for i in range(len(positions))
+            ]
+        )
+        keep[np.where(sm)[0]] = overlaps
+    return keep
 
 
 def get_mask_by_depth(snps: pd.DataFrame, tot_mtx: csr_matrix, min_dp=1):
@@ -253,30 +246,6 @@ def get_mask_by_depth(snps: pd.DataFrame, tot_mtx: csr_matrix, min_dp=1):
         Boolean mask of length ``len(snps)``.
     """
     mask = np.all(tot_mtx >= min_dp, axis=1)
-    logging.info(
-        f"filter by depth, min_dp={min_dp}, #passed SNPs={np.sum(mask)}/{len(snps)}"
-    )
-    return mask
-
-
-def get_mask_by_depth_pseudobulk(snps: pd.DataFrame, tot_mtx: csr_matrix, min_dp=1):
-    """Return a boolean mask keeping SNPs whose pseudobulk (row-summed) depth meets the threshold.
-
-    Parameters
-    ----------
-    snps : pd.DataFrame
-        SNP info DataFrame (used only for logging).
-    tot_mtx : csr_matrix
-        Total depth matrix (SNPs x cells).
-    min_dp : int
-        Minimum pseudobulk depth threshold.
-
-    Returns
-    -------
-    np.ndarray
-        Boolean mask of length ``len(snps)``.
-    """
-    mask = np.asarray(tot_mtx.sum(axis=1)).ravel() >= min_dp
     logging.info(
         f"filter by depth, min_dp={min_dp}, #passed SNPs={np.sum(mask)}/{len(snps)}"
     )
@@ -391,5 +360,3 @@ def assign_snp_bounderies(
 
     snps["BLOCKSIZE"] = snps["END"] - snps["START"]
     return snps
-
-

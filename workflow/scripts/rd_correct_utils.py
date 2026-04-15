@@ -9,6 +9,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
+
 def correct_readcount_lowess(
     reads,
     gc,
@@ -151,7 +152,11 @@ def correct_readcount_lowess(
         # RMSE between raw values and LOWESS prediction (valid bins only)
         valid_pred = (predicted > 0) & (prev > 0)
         n_valid_pred = int(valid_pred.sum())
-        rmse = float(np.sqrt(np.mean((prev[valid_pred] - predicted[valid_pred]) ** 2))) if n_valid_pred > 0 else 0.0
+        rmse = (
+            float(np.sqrt(np.mean((prev[valid_pred] - predicted[valid_pred]) ** 2)))
+            if n_valid_pred > 0
+            else 0.0
+        )
 
         with np.errstate(invalid="ignore", divide="ignore"):
             corrected = np.where(
@@ -261,7 +266,9 @@ def correct_readcount_quadreg(
         valid &= np.isfinite(repliseq)
 
     if repliseq is not None:
-        fit_df = pd.DataFrame({"RD": reads[valid], "GC": gc[valid], "RT": repliseq[valid]})
+        fit_df = pd.DataFrame(
+            {"RD": reads[valid], "GC": gc[valid], "RT": repliseq[valid]}
+        )
         pred_df = pd.DataFrame({"GC": gc, "RT": np.nan_to_num(repliseq, nan=0.0)})
         formula = "RD ~ GC + I(GC**2) + RT + I(RT**2)"
     else:
@@ -281,7 +288,11 @@ def correct_readcount_quadreg(
 
     all_valid = (reads > 0) & np.isfinite(gc)
     n_all_valid = int(all_valid.sum())
-    rmse = float(np.sqrt(np.mean((reads[all_valid] - predicted[all_valid]) ** 2))) if n_all_valid > 0 else 0.0
+    rmse = (
+        float(np.sqrt(np.mean((reads[all_valid] - predicted[all_valid]) ** 2)))
+        if n_all_valid > 0
+        else 0.0
+    )
 
     eps = (
         np.nanquantile(predicted[predicted > 0], eps_quantile)
@@ -305,5 +316,3 @@ def correct_readcount_quadreg(
     logging.info(f"    MEDIAN  {n_nan:>8d}/{n} ({n_nan / max(n, 1) * 100:5.1f}%) NaN")
 
     return corrected.astype(np.float32), rmse
-
-

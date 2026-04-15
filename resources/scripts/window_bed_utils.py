@@ -12,7 +12,6 @@ import tempfile
 
 import numpy as np
 import pandas as pd
-import pyranges as pr
 from pybedtools import BedTool
 
 # ---------------------------------------------------------------------------
@@ -68,19 +67,17 @@ def _read_chrom_sizes(genome_size_file):
     )
 
 
-def _df_to_pyranges(df):
-    """Convert a DataFrame with #CHR/START/END to PyRanges with _idx.
-
-    Uses a DataFrame constructor so that _idx values are preserved through
-    pyranges' internal chromosome reordering (insert() renumbers them).
-    """
-    pr_df = pd.DataFrame({
-        "Chromosome": df["#CHR"].values,
-        "Start": df["START"].values,
-        "End": df["END"].values,
-        "_idx": np.arange(len(df)),
-    })
-    return pr.PyRanges(pr_df)
+def _read_bed3(bed_file):
+    """Read a BED file and return a DataFrame with #CHR, START, END."""
+    return pd.read_csv(
+        bed_file,
+        sep="\t",
+        header=None,
+        comment="#",
+        usecols=[0, 1, 2],
+        names=["#CHR", "START", "END"],
+        dtype={"#CHR": str, "START": np.int64, "END": np.int64},
+    )
 
 
 def _tile_region(chrom, start, end, window_size):
@@ -133,14 +130,28 @@ def get_standard_chroms(reference_version, genome_size_file):
 
 def subtract_blacklist(windows, blacklist_bed_file):
     """Remove windows overlapping blacklisted regions."""
-    bl_idx = (
-        _df_to_pyranges(windows)
-        .overlap(pr.read_bed(blacklist_bed_file))
-        .df["_idx"]
-        .unique()
-    )
-    keep_mask = ~np.isin(np.arange(len(windows)), bl_idx)
-    return windows.loc[keep_mask].reset_index(drop=True)
+    bl = _read_bed3(blacklist_bed_file)
+    keep = np.ones(len(windows), dtype=bool)
+    for chrom in windows["#CHR"].unique():
+        wm = (windows["#CHR"] == chrom).to_numpy()
+        rm = (bl["#CHR"] == chrom).to_numpy()
+        if not rm.any():
+            continue
+        w_starts = windows.loc[wm, "START"].to_numpy()
+        w_ends = windows.loc[wm, "END"].to_numpy()
+        bl_starts = bl.loc[rm, "START"].to_numpy()
+        bl_ends = bl.loc[rm, "END"].to_numpy()
+        sort_idx = np.argsort(bl_starts)
+        bl_starts, bl_ends = bl_starts[sort_idx], bl_ends[sort_idx]
+        right_bounds = np.searchsorted(bl_starts, w_ends, side="left")
+        overlaps = np.array(
+            [
+                np.any(bl_ends[: right_bounds[i]] > w_starts[i])
+                for i in range(len(w_starts))
+            ]
+        )
+        keep[np.where(wm)[0]] = ~overlaps
+    return windows.loc[keep].reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
@@ -153,10 +164,7 @@ def assign_region_id(windows, region_bed_file):
 
     Returns region_id as strings in ``CHR:START-END`` format, or NaN.
     """
-    regions = pr.read_bed(region_bed_file).df
-    regions = regions.rename(
-        columns={"Chromosome": "#CHR", "Start": "START", "End": "END"}
-    )
+    regions = _read_bed3(region_bed_file)
     regions["region_id"] = (
         regions["#CHR"].astype(str)
         + ":"
@@ -211,11 +219,15 @@ def compute_mappability(windows_df, mappability_file, genome_size_file):
     result_bt = bt.map(b=map_bt, c=4, o="mean", g=genome_size_file)
     # Read raw TSV instead of to_dataframe() which can silently drop rows
     map_cov = pd.read_csv(
-        result_bt.fn, sep="\t", header=None,
+        result_bt.fn,
+        sep="\t",
+        header=None,
         names=["#CHR", "START", "END", "_idx", "MAP"],
         dtype={"#CHR": str, "START": int, "END": int, "_idx": int, "MAP": str},
     )
-    map_cov["MAP"] = pd.to_numeric(map_cov["MAP"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
+    map_cov["MAP"] = (
+        pd.to_numeric(map_cov["MAP"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
+    )
     assert len(map_cov) == n_windows, (
         f"bedtools map returned {len(map_cov)} rows, expected {n_windows}"
     )
@@ -290,9 +302,16 @@ def _bin_bedgraph_signals(windows_df, lifted_files, standard_chroms):
     for i, lf in enumerate(lifted_files, 1):
         print(f"\r  binning repli-seq [{i}/{len(lifted_files)}]", end="", flush=True)
         bg = pd.read_csv(
-            lf, sep="\t", header=None,
+            lf,
+            sep="\t",
+            header=None,
             names=["chrom", "start", "end", "signal"],
-            dtype={"chrom": str, "start": np.int64, "end": np.int64, "signal": np.float64},
+            dtype={
+                "chrom": str,
+                "start": np.int64,
+                "end": np.int64,
+                "signal": np.float64,
+            },
         )
         bg = bg[bg["chrom"].isin(standard_chroms)].reset_index(drop=True)
 
@@ -351,6 +370,7 @@ def compute_repliseq(windows_df, standard_chroms, args):
 
     if cleanup:
         import shutil
+
         shutil.rmtree(work_dir)
 
     return result

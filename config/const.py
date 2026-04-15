@@ -30,6 +30,18 @@ ASSAY_TYPE2FEATURE_TYPE = {
 
 ALLOWED_REFVERS = ["hg19", "hg38", "chm13v2"]
 
+GTF_COLUMNS = [
+    "seqname",
+    "source",
+    "feature",
+    "start",
+    "end",
+    "score",
+    "strand",
+    "frame",
+    "attributes",
+]
+
 
 def get_eagle_gmap_path(phaser_dir, refvers):
     """Return the genetic map path for Eagle2."""
@@ -55,6 +67,4 @@ def get_shapeit_gmap_path(phaser_dir, refvers):
 
 def get_phasing_panel_path(phasing_panel):
     """Return a per-chromosome phasing panel path function."""
-    return lambda chrname: os.path.join(
-        phasing_panel, f"chr{chrname}.genotypes.bcf"
-    )
+    return lambda chrname: os.path.join(phasing_panel, f"chr{chrname}.genotypes.bcf")

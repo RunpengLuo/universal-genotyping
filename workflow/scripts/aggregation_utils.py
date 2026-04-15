@@ -8,7 +8,6 @@ import numba
 from scipy.sparse import csr_matrix, hstack, issparse
 from scipy.stats import beta as beta_dist
 
-import pyranges as pr
 import scanpy as sc
 
 from io_utils import *
@@ -16,8 +15,9 @@ from combine_counts_utils import *
 from count_reads_utils import *
 
 
-def detect_phase_flips(snps, a_mtx, b_mtx, grp_cols, tumor_sidx=0,
-                       epsilon=0.05, alpha=0.05):
+def detect_phase_flips(
+    snps, a_mtx, b_mtx, grp_cols, tumor_sidx=0, epsilon=0.05, alpha=0.05
+):
     """Detect phase flips between consecutive SNPs using Beta credible intervals.
 
     For each pair of consecutive SNPs within a group, compute a 95% Beta(b+1, a+1)
@@ -46,18 +46,21 @@ def detect_phase_flips(snps, a_mtx, b_mtx, grp_cols, tumor_sidx=0,
     pd.Series
         Globally unique phase_group IDs aligned to snps index.
     """
-    a_tumor = (a_mtx[:, tumor_sidx:].toarray() if issparse(a_mtx)
-               else a_mtx[:, tumor_sidx:]).astype(np.float64)
-    b_tumor = (b_mtx[:, tumor_sidx:].toarray() if issparse(b_mtx)
-               else b_mtx[:, tumor_sidx:]).astype(np.float64)
+    a_tumor = (
+        a_mtx[:, tumor_sidx:].toarray() if issparse(a_mtx) else a_mtx[:, tumor_sidx:]
+    ).astype(np.float64)
+    b_tumor = (
+        b_mtx[:, tumor_sidx:].toarray() if issparse(b_mtx) else b_mtx[:, tumor_sidx:]
+    ).astype(np.float64)
 
     ci_lo = beta_dist.ppf(alpha / 2, b_tumor + 1, a_tumor + 1)
     ci_hi = beta_dist.ppf(1 - alpha / 2, b_tumor + 1, a_tumor + 1)
 
     # Observed BAF for logging
     tot_tumor = a_tumor + b_tumor
-    baf = np.divide(b_tumor, tot_tumor,
-                    out=np.full_like(b_tumor, np.nan), where=tot_tumor > 0)
+    baf = np.divide(
+        b_tumor, tot_tumor, out=np.full_like(b_tumor, np.nan), where=tot_tumor > 0
+    )
 
     phase_group = np.zeros(len(snps), dtype=np.int64)
     global_pg = 0
@@ -76,8 +79,8 @@ def detect_phase_flips(snps, a_mtx, b_mtx, grp_cols, tumor_sidx=0,
         hi_prev, lo_curr = ci_hi[idx[:-1]], ci_lo[idx[1:]]
         lo_prev, hi_curr = ci_lo[idx[:-1]], ci_hi[idx[1:]]
         is_flip = (
-            ((hi_prev < 0.5 - epsilon) & (lo_curr > 0.5 + epsilon)) |
-            ((lo_prev > 0.5 + epsilon) & (hi_curr < 0.5 - epsilon))
+            ((hi_prev < 0.5 - epsilon) & (lo_curr > 0.5 + epsilon))
+            | ((lo_prev > 0.5 + epsilon) & (hi_curr < 0.5 - epsilon))
         ).any(axis=1)
 
         local_pg = np.concatenate([[0], np.cumsum(is_flip)])
@@ -90,12 +93,16 @@ def detect_phase_flips(snps, a_mtx, b_mtx, grp_cols, tumor_sidx=0,
             for fp in np.where(is_flip)[0]:
                 pi, ci = idx[fp], idx[fp + 1]
                 mean_diff = np.nanmean(np.abs(baf[pi] - baf[ci]))
-                flip_records.append((
-                    snps.iat[pi, snps.columns.get_loc("#CHR")],
-                    snps.iat[pi, snps.columns.get_loc("POS0")],
-                    snps.iat[ci, snps.columns.get_loc("POS0")],
-                    baf[pi], baf[ci], mean_diff,
-                ))
+                flip_records.append(
+                    (
+                        snps.iat[pi, snps.columns.get_loc("#CHR")],
+                        snps.iat[pi, snps.columns.get_loc("POS0")],
+                        snps.iat[ci, snps.columns.get_loc("POS0")],
+                        baf[pi],
+                        baf[ci],
+                        mean_diff,
+                    )
+                )
 
         global_pg += int(local_pg[-1]) + 1
 
@@ -189,8 +196,15 @@ def _bin_snps_numba(read_counts, min_snp_reads, min_snp_per_block):
 
 
 @numba.njit
-def _bin_windows_numba(win_reads, win_nsnps, min_snp_reads, min_snp_per_block,
-                       win_starts, win_ends, max_blocksize):
+def _bin_windows_numba(
+    win_reads,
+    win_nsnps,
+    min_snp_reads,
+    min_snp_per_block,
+    win_starts,
+    win_ends,
+    max_blocksize,
+):
     """Greedy adaptive binning over consecutive windows.
 
     Parameters
@@ -257,7 +271,9 @@ def _bin_windows_numba(win_reads, win_nsnps, min_snp_reads, min_snp_per_block,
                 break
     last_span = win_ends[W - 1] - win_starts[prev_start]
     last_exceeds_size = max_blocksize > 0 and last_span >= max_blocksize
-    if (last_meets_reads and acc_n >= min_snp_per_block and prev_start > 0) or (last_exceeds_size and prev_start > 0):
+    if (last_meets_reads and acc_n >= min_snp_per_block and prev_start > 0) or (
+        last_exceeds_size and prev_start > 0
+    ):
         bin_ids[prev_start:] = bin_id
         bin_id += 1
     else:
@@ -367,8 +383,13 @@ def adaptive_binning_windows(
         grp_ends = np.ascontiguousarray(all_win_ends[grp_idxs])
 
         local_bin_ids, n_bins = _bin_windows_numba(
-            grp_reads, grp_nsnps, min_snp_reads, min_snp_per_block,
-            grp_starts, grp_ends, max_blocksize,
+            grp_reads,
+            grp_nsnps,
+            min_snp_reads,
+            min_snp_per_block,
+            grp_starts,
+            grp_ends,
+            max_blocksize,
         )
 
         local_bin_ids += bin_id
@@ -423,22 +444,26 @@ def adaptive_binning_windows(
     return bbs, snps
 
 
-def _pyranges_assign_chrom(qry, qry_mask, ref_chrom, ref_id, pos_col):
-    """PyRanges fallback for assigning positions to overlapping intervals on one chromosome."""
-    qry_sub = qry.loc[qry_mask]
-    qry_pr = pr.PyRanges(
-        chromosomes=qry_sub["#CHR"], starts=qry_sub[pos_col], ends=qry_sub[pos_col] + 1
-    )
-    qry_pr = qry_pr.insert(pd.Series(data=qry_sub.index.to_numpy(), name="qry_index"))
-    ref_pr = pr.PyRanges(
-        chromosomes=ref_chrom["#CHR"],
-        starts=ref_chrom["START"],
-        ends=ref_chrom["END"],
-    )
-    ref_pr = ref_pr.insert(ref_chrom[ref_id])
-    joined = qry_pr.join(ref_pr)
-    if len(joined) > 0:
-        qry.loc[joined.df["qry_index"], ref_id] = joined.df[ref_id].to_numpy()
+def _assign_chrom_overlapping(qry, qry_mask, ref_chrom, ref_id, pos_col):
+    """Assign positions to overlapping intervals on one chromosome using numpy."""
+    positions = qry.loc[qry_mask, pos_col].to_numpy()
+    qry_indices = qry.index[qry_mask]
+    starts = ref_chrom["START"].to_numpy()
+    ends = ref_chrom["END"].to_numpy()
+    ids = ref_chrom[ref_id].to_numpy()
+
+    sort_idx = np.argsort(starts)
+    starts = starts[sort_idx]
+    ends = ends[sort_idx]
+    ids = ids[sort_idx]
+
+    right_bounds = np.searchsorted(starts, positions, side="right")
+    for i in range(len(positions)):
+        pos = positions[i]
+        cands = slice(0, right_bounds[i])
+        mask = ends[cands] > pos
+        if mask.any():
+            qry.loc[qry_indices[i], ref_id] = ids[cands][mask][0]
 
 
 def assign_pos_to_range(
@@ -451,7 +476,7 @@ def assign_pos_to_range(
     """Assign each query position to the reference interval it falls within.
 
     Uses ``np.searchsorted`` for non-overlapping intervals (fast path) and
-    falls back to PyRanges for chromosomes with overlapping intervals.
+    falls back to a loop for chromosomes with overlapping intervals.
 
     Parameters
     ----------
@@ -474,21 +499,26 @@ def assign_pos_to_range(
         DataFrame (if ``nodup=False``).
     """
     if not nodup:
-        qry_pr = pr.PyRanges(
-            chromosomes=qry["#CHR"], starts=qry[pos_col], ends=qry[pos_col] + 1
-        )
-        qry_pr = qry_pr.insert(pd.Series(data=qry.index.to_numpy(), name="qry_index"))
-        ref_pr = pr.PyRanges(
-            chromosomes=ref["#CHR"],
-            starts=ref["START"],
-            ends=ref["END"],
-        )
-        ref_pr = ref_pr.insert(ref[ref_id])
-        hits = (
-            qry_pr.join(ref_pr)
-            .df[["Chromosome", "Start", "qry_index", ref_id]]
-            .rename(columns={"Chromosome": "#CHR", "Start": "POS0"})
-        )
+        rows = []
+        for chrom in ref["#CHR"].unique():
+            qm = (qry["#CHR"] == chrom).to_numpy()
+            if not qm.any():
+                continue
+            positions = qry.loc[qm, pos_col].to_numpy()
+            q_indices = qry.index[qm].to_numpy()
+            starts = ref.loc[ref["#CHR"] == chrom, "START"].to_numpy()
+            ends = ref.loc[ref["#CHR"] == chrom, "END"].to_numpy()
+            ids = ref.loc[ref["#CHR"] == chrom, ref_id].to_numpy()
+            sort_idx = np.argsort(starts)
+            starts, ends, ids = starts[sort_idx], ends[sort_idx], ids[sort_idx]
+            right_bounds = np.searchsorted(starts, positions, side="right")
+            for i in range(len(positions)):
+                pos = positions[i]
+                cands = slice(0, right_bounds[i])
+                mask = ends[cands] > pos
+                for rid in ids[cands][mask]:
+                    rows.append((chrom, pos, q_indices[i], rid))
+        hits = pd.DataFrame(rows, columns=["#CHR", "POS0", "qry_index", ref_id])
         hits["POS"] = hits["POS0"] + 1
         return hits
 
@@ -516,8 +546,7 @@ def assign_pos_to_range(
             qry_indices = qry.index[qry_mask]
             qry.loc[qry_indices[valid], ref_id] = ids[idx[valid]]
         else:
-            # Fallback: PyRanges join for overlapping intervals on this chromosome
-            _pyranges_assign_chrom(qry, qry_mask, ref_chrom, ref_id, pos_col)
+            _assign_chrom_overlapping(qry, qry_mask, ref_chrom, ref_id, pos_col)
 
     return qry
 
@@ -661,40 +690,51 @@ def matrix_segmentation(X, bin_ids, K):
 def assign_largest_overlap(
     qry: pd.DataFrame, ref: pd.DataFrame, qry_id: str, ref_id: str
 ) -> pd.DataFrame:
+    """For each row in qry, assign the ID of the overlapping ref interval
+    with the largest overlap length.
+
+    Both *qry* and *ref* must have ``#CHR``, ``START``, ``END`` columns
+    (0-based half-open).
     """
-    for each row in qry, assign the ID of the overlapping interval in ref
-    that has largest overlap length
-    """
+    qry = qry.copy()
+    qry[ref_id] = pd.NA
 
-    _rename = {
-        k: v
-        for k, v in {"#CHR": "Chromosome", "START": "Start", "END": "End"}.items()
-        if k in qry.columns and v not in qry.columns
-    }
-    qry_gr = pr.PyRanges(qry.rename(columns=_rename))
-    _rename = {
-        k: v
-        for k, v in {"#CHR": "Chromosome", "START": "Start", "END": "End"}.items()
-        if k in ref.columns and v not in ref.columns
-    }
-    ref_gr = pr.PyRanges(ref.rename(columns=_rename))
+    for chrom in ref["#CHR"].unique():
+        qm = qry["#CHR"] == chrom
+        rm = ref["#CHR"] == chrom
+        if not qm.any():
+            continue
 
-    joined = qry_gr.join(ref_gr, suffix="_REF").as_df()
-    joined["overlap_len"] = (
-        np.minimum(joined["End"], joined["End_REF"])
-        - np.maximum(joined["Start"], joined["Start_REF"])
-    ).clip(lower=0)
+        q_starts = qry.loc[qm, "START"].to_numpy()
+        q_ends = qry.loc[qm, "END"].to_numpy()
+        r_starts = ref.loc[rm, "START"].to_numpy()
+        r_ends = ref.loc[rm, "END"].to_numpy()
+        r_ids = ref.loc[rm, ref_id].to_numpy()
 
-    best = joined.loc[joined.groupby(joined.index)["overlap_len"].idxmax()].copy()
+        sort_idx = np.argsort(r_starts)
+        r_starts = r_starts[sort_idx]
+        r_ends = r_ends[sort_idx]
+        r_ids = r_ids[sort_idx]
 
-    best = best[[qry_id, ref_id, "overlap_len"]]
-    qry = qry.merge(best, on=[qry_id], how="left", sort=False)
-    max_ovlp_idx = qry.groupby(by=qry_id, sort=False)["overlap_len"].apply(
-        lambda s: s.idxmax() if s.notna().any() else s.index[0]
-    )
-    qry_out = qry.loc[max_ovlp_idx].sort_values(by=qry_id).reset_index(drop=True)
-    qry_out = qry_out.drop(columns="overlap_len")
-    return qry_out
+        right_bounds = np.searchsorted(r_starts, q_ends, side="left")
+
+        best_ids = np.empty(len(q_starts), dtype=object)
+        best_ids[:] = pd.NA
+        for i in range(len(q_starts)):
+            qs, qe = q_starts[i], q_ends[i]
+            cands = slice(0, right_bounds[i])
+            mask = r_ends[cands] > qs
+            if not mask.any():
+                continue
+            c_starts = r_starts[cands][mask]
+            c_ends = r_ends[cands][mask]
+            c_ids = r_ids[cands][mask]
+            overlap = np.minimum(qe, c_ends) - np.maximum(qs, c_starts)
+            best_ids[i] = c_ids[np.argmax(overlap)]
+
+        qry.loc[qm, ref_id] = best_ids
+
+    return qry
 
 
 def feature_to_blocks(
