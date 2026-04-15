@@ -107,7 +107,7 @@ def parse_args():
     parser.add_argument("--region_bed", required=True,
                         help="Accessible regions BED -- keep only windows overlapping these regions.")
     parser.add_argument("--out_file", required=True,
-                        help="Output gzipped TSV path (e.g. gc_map_repli.1kbp.hg38.bed.gz).")
+                        help="Output gzipped TSV path (e.g. windows.1kbp.hg38.bed.gz).")
     # Optional filtering
     parser.add_argument("--blacklist_bed", default=None,
                         help="Optional blacklist BED -- subtract these regions.")
