@@ -30,6 +30,7 @@ All output directories (`snp_dir`, `phase_dir`, `pileup_dir`, `allele_dir`, `bb_
 
 - `chr{chrname}.vcf.gz` — per-chromosome phased VCF.
 - `phased_het_snps.vcf.gz(.tbi)` — genome-wide phased het SNPs.
+- `germline_snp_statistics.tsv` — per-chromosome counts of het_phased, het_unphased, hom_alt, hom_ref SNPs.
 - `genetic_map.tsv.gz` — cM positions per SNP (eagle/shapeit only).
 
 ### Pileup (`pileup_dir/`)

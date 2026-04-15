@@ -91,7 +91,11 @@ Set `phaser` in config to one of:
 | Phaser | Config keys needed |
 |--------|--------------------|
 | `eagle` | `eagle_dir` — path to Eagle2 directory (must contain `tables/` with genetic map files) |
-| `shapeit` | `shapeit_dir` — path to SHAPEIT5 directory (must contain `resources/maps/`) |
+| `shapeit` | `shapeit_dir` — path to SHAPEIT5 directory (must contain `resources/maps/` for hg19/hg38) |
 | `longphase` | `params_longphase` — `min_mapq`, `extra_params` (e.g., `"--pb"` for PacBio) |
 
 Eagle and shapeit require a phasing reference panel (`phasing_panel` in config). Longphase does not use a genetic map or phasing panel.
+
+**CHM13v2.0 (T2T):** For shapeit with `reference_version: chm13v2`, set `gmap_dir` to the directory containing T2T-native recombination maps (e.g., from [phasing_T2T](https://github.com/JosephLalli/phasing_T2T/tree/main/resources/recombination_maps/t2t_native_scaled_maps)). Files must be named `chr{N}.t2t.scaled.gmap.gz`. The standard SHAPEIT5 `resources/maps/` directory does not contain T2T maps.
+
+Supported `reference_version` values: `hg19`, `hg38`, `chm13v2`.

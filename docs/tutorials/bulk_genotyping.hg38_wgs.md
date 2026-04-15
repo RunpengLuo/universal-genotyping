@@ -60,7 +60,7 @@ gtf_file: /path/to/gencode.v38.annotation.gtf.gz
 We recommend the [1kGP n=3,202 high-coverage](https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/) panel. Download and prepare the 1kGP n=3,202 panel (requires bcftools, bgzip, tabix):
 
 ```bash
-bash resources/scripts/process_1kGP_3202_panel.sh /path/to/1kGP_3202
+bash resources/scripts/process_1kGP_3202_panel.sh --ref hg38 /path/to/1kGP_3202
 ```
 
 This script will produce three directories under the output path:
