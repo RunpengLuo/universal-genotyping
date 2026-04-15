@@ -54,7 +54,22 @@ To convert T2T SHAPEIT maps to Eagle2 format (single file, space-separated, with
 ```bash
 python resources/scripts/convert_gmap_to_eagle.py \
   /path/to/t2t_native_scaled_maps \
-  /path/to/genetic_map_chm13v2_withX.txt.gz
+  /path/to/phaser_dir/tables/genetic_map_chm13v2_withX.txt.gz
+```
+
+Place the output under `{phaser_dir}/tables/` — Eagle2 expects the file at `{phaser_dir}/tables/genetic_map_{reference_version}_withX.txt.gz`.
+
+Config for Eagle2 with chm13v2:
+```yaml
+phaser: "eagle"
+phaser_dir: /path/to/phaser_dir
+```
+
+Config for SHAPEIT5 with chm13v2:
+```yaml
+phaser: "shapeit"
+phaser_dir: /path/to/shapeit5
+gmap_dir: /path/to/t2t_native_scaled_maps
 ```
 
 ---
