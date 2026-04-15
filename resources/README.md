@@ -51,7 +51,10 @@ Set via `gtf_file` in config.
 |--------|----------|
 | GENCODE v38 | `wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz` |
 | 10x GRCh38-2024-A | `curl -O https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2024-A.tar.gz` → `genes/genes.gtf.gz` |
-| NCBI RefSeq (chm13v2.0) | [NCBI FTP](https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/009/914/755/GCF_009914755.1_T2T-CHM13v2.0/) — `GCF_009914755.1_T2T-CHM13v2.0_genomic.gtf.gz`. Build 10x reference with [`scripts/build_cellranger_arc_ref_chm13v2.sh`](scripts/build_cellranger_arc_ref_chm13v2.sh) ([10x guide](https://kb.10xgenomics.com/s/article/29207065679501-Building-a-Custom-T2T-reference-for-Cell-Ranger-ARC)). |
+| UCSC ncbiRefSeq (chm13v2.0, chr-style) | `wget https://hgdownload.soe.ucsc.edu/goldenPath/hs1/bigZips/genes/hs1.ncbiRefSeq.gtf.gz` |
+| NCBI RefSeq (chm13v2.0, accession-style) | [NCBI FTP](https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/009/914/755/GCF_009914755.1_T2T-CHM13v2.0/) — `GCF_009914755.1_T2T-CHM13v2.0_genomic.gtf.gz` |
+
+Build 10x Cell Ranger ARC reference with [`scripts/build_cellranger_arc_ref_chm13v2.sh`](scripts/build_cellranger_arc_ref_chm13v2.sh) ([10x guide](https://kb.10xgenomics.com/s/article/29207065679501-Building-a-Custom-T2T-reference-for-Cell-Ranger-ARC)).
 
 ---
 
