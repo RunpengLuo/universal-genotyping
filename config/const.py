@@ -6,6 +6,7 @@ NONBULK_ASSAYS = {"scATAC", "scRNA", "VISIUM", "VISIUM3prime"}
 BULK_ASSAYS = {"bulkWGS", "bulkWGS-lr", "bulkWES"}
 ALLOWED_ASSAY_TYPES = list(BULK_ASSAYS) + list(NONBULK_ASSAYS)
 SPATIAL_ASSAYS = {"VISIUM", "VISIUM3prime"}
+CHROM_ORDER = [f"chr{c}" for c in list(range(1, 23)) + ["X", "Y"]]
 
 ASSAY_TYPE2MODALITY = {
     "bulkWGS": "DNA",
