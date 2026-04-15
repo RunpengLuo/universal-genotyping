@@ -128,7 +128,7 @@ rule cnv_segmentation:
         region_bed=lambda wc: config["region_bed"],
         genome_size=lambda wc: config["genome_size"],
         gtf_file=lambda wc: config["gtf_file"],
-        bb_file=lambda wc: config["bb_file"],
+        bb_file=lambda wc: config.get("bb_file") or [],
     output:
         cnv_segments=config["bb_dir"] + "/{assay_type}/cnv_segments.tsv",
         x_count=config["bb_dir"] + "/{assay_type}/bb.Xcount.npz",
