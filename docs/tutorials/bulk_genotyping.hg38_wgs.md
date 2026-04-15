@@ -18,9 +18,9 @@ HT001	T1	bulkWGS	tumor	/data/HT001/tumor.bam
 
 You may specify data from multiple patients in same sample sheet, but the workflow will only process one patient at a time depends on specified `sample_id` in config file. See [docs/reference.md](../reference.md) for detailed format.
 
-## 3. Config (`config/config.yaml`)
+## 3. Config
 
-Copy the template config and edit the sections below. Only the fields that need changing from defaults are shown.
+Copy `templates/config.yaml` and edit the sections below. Defaults are auto-loaded from `config/config.yaml`; only the fields that need changing are shown.
 
 ### Workflow mode
 
@@ -123,12 +123,12 @@ snakemake --profile /path/to/profile/ \
 ```bash
 snakemake --profile /path/to/profile/ \
     -s /path/to/workflow/Snakefile \
-    --configfile /path/to/config/config.yaml \
+    --configfile /path/to/my_config.yaml \
     --directory /path/to/output_dir \
     --config sample_file=/path/to/samples.tsv sample_id=HT001
 ```
 
-The `--config` flags on the command line override values in `config.yaml`, so you can reuse the same config for different patients.
+Defaults are auto-loaded from `config/config.yaml`. The `--configfile` and `--config` flags override specific values, so you can reuse the same config for different patients.
 
 ## 5. Results
 
@@ -141,7 +141,7 @@ Snakemake automatically skips rules whose outputs already exist. To resume after
 ```bash
 snakemake --profile /path/to/profile/ \
     -s /path/to/workflow/Snakefile \
-    --configfile /path/to/config/config.yaml \
+    --configfile /path/to/my_config.yaml \
     --directory /path/to/output_dir \
     --config sample_file=/path/to/samples.tsv sample_id=HT001 \
     --rerun-incomplete

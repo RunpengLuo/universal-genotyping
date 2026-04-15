@@ -1,9 +1,11 @@
 import os
+import sys
 import logging
 
 import pandas as pd
 import numpy as np
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../config"))
 from const import *  # noqa: F401,F403
 
 

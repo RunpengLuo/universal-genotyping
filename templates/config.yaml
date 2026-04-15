@@ -1,0 +1,37 @@
+##################################################
+# User config — only run-specific values needed.
+# Defaults are loaded from config/config.yaml.
+# Override any default by specifying it here.
+##################################################
+
+# bulk_genotyping | single_cell_genotyping | copytyping_preprocess
+workflow_mode: "bulk_genotyping"
+# bulkWGS | bulkWGS-lr | bulkWES | scRNA | scATAC | VISIUM | VISIUM3prime
+assay_types: ["bulkWGS"]
+
+##################################################
+# Input
+sample_id: PATIENT_ID
+sample_file: /path/to/samples.tsv
+
+##################################################
+# Reference
+# hg19 | hg38 | chm13v2
+reference_version: "hg38"
+reference: /path/to/reference.fa
+genome_size: /path/to/genome.sizes
+region_bed: /path/to/regions.bed
+window_bed: /path/to/windows.bed.gz
+gtf_file: /path/to/genes.gtf.gz
+
+##################################################
+# Population Panel
+snp_panel: /path/to/snps.vcf.gz
+snp_targets: /path/to/target_positions
+phasing_panel: /path/to/phasing_panel
+
+##################################################
+# Phasing
+# eagle | shapeit | longphase
+phaser: "shapeit"
+shapeit_dir: /path/to/shapeit5

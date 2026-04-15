@@ -29,12 +29,12 @@ snakemake --profile /path/to/workflow/profile/ \
 ```sh
 snakemake --profile /path/to/workflow/profile/ \
     -s /path/to/workflow/Snakefile \
-    --configfile config/config.yaml \
+    --configfile /path/to/my_config.yaml \
     --directory <output_dir> \
     --config sample_file=/path/to/samples.tsv sample_id=<PATIENT_ID>
 ```
 
-`sample_id` must match a `SAMPLE` value in the sample sheet. `--profile profile/` enables per-rule conda envs.
+Defaults are auto-loaded from `config/config.yaml`. Pass `--configfile` with your run-specific config (see `templates/config.yaml`) to override paths and settings. `--config` flags override individual keys. `sample_id` must match a `SAMPLE` value in the sample sheet.
 
 ---
 
