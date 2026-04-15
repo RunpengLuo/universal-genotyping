@@ -33,6 +33,11 @@ _has_config = (
 
 if _has_config:
     ##################################################
+    print("=== Resolved config ===")
+    for key, val in config.items():
+        print(f"  {key}: {val}")
+    print()
+
     workflow_mode = config["workflow_mode"]
     assert workflow_mode in {
         "bulk_genotyping",
