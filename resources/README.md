@@ -49,6 +49,14 @@ For chm13v2 shapeit phasing, set `gmap_dir` in config to a directory with T2T-na
 
 For hg38, genetic maps are bundled with Eagle2 (`tables/`) and SHAPEIT5 (`resources/maps/`).
 
+To convert T2T SHAPEIT maps to Eagle2 format (single file, space-separated, with `chr` column):
+
+```bash
+python resources/scripts/convert_gmap_to_eagle.py \
+  /path/to/t2t_native_scaled_maps \
+  /path/to/genetic_map_chm13v2_withX.txt.gz
+```
+
 ---
 
 ## Gene Annotation (GTF)
