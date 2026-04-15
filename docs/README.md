@@ -34,7 +34,7 @@ snakemake --profile /path/to/workflow/profile/ \
     --config sample_file=/path/to/samples.tsv sample_id=<PATIENT_ID>
 ```
 
-Defaults are auto-loaded from `config/config.yaml`. Pass `--configfile` with your run-specific config (see `templates/config.yaml`) to override paths and settings. `--config` flags override individual keys. `sample_id` must match a `SAMPLE` value in the sample sheet.
+Defaults are auto-loaded from `config/config.yaml`. Pass `--configfile` with your run-specific config (see `resources/templates/config.yaml`) to override paths and settings. `--config` flags override individual keys. `sample_id` must match a `SAMPLE` value in the sample sheet.
 
 ---
 

@@ -20,7 +20,7 @@ You may specify data from multiple patients in same sample sheet, but the workfl
 
 ## 3. Config
 
-Copy `templates/config.yaml` and edit the sections below. Defaults are auto-loaded from `config/config.yaml`; only the fields that need changing are shown.
+Copy `resources/templates/config.yaml` and edit the sections below. Defaults are auto-loaded from `config/config.yaml`; only the fields that need changing are shown.
 
 ### Workflow mode
 

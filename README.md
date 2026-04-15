@@ -9,8 +9,8 @@ Unified Genotyping pipeline inputs BAMs from various assay types (bulk WGS/WES, 
 | Document | Description |
 |----------|-------------|
 | [config/config.yaml](config/config.yaml) | Default configuration (auto-loaded by Snakefile). |
-| [templates/config.yaml](templates/config.yaml) | Minimal user config template (run-specific overrides). |
-| [templates/samples.tsv](templates/samples.tsv) | Template sample sheet. |
+| [resources/templates/config.yaml](resources/templates/config.yaml) | Minimal user config template (run-specific overrides). |
+| [resources/templates/samples.tsv](resources/templates/samples.tsv) | Template sample sheet. |
 | [docs/README.md](docs/README.md) | Step-by-step guide for running all three workflow modes. |
 | [docs/tutorials/bulk_genotyping.hg38_wgs.md](docs/tutorials/bulk_genotyping.hg38_wgs.md) | Tutorial: bulk WGS genotyping on hg38. |
 | [docs/reference.md](docs/reference.md) | Input/output reference. |

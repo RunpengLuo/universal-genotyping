@@ -2,7 +2,7 @@
 
 ## Sample File
 
-TSV with one row per replicate. Template at `templates/samples.tsv`.
+TSV with one row per replicate. Template at `resources/templates/samples.tsv`.
 
 | Column | Required | Description |
 |--------|----------|-------------|
