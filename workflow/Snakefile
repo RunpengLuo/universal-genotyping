@@ -39,7 +39,7 @@ if _has_config:
     # parse sample file
     sample_df = pd.read_table(config["sample_file"])
     required = ["SAMPLE", "REP_ID", "assay_type", "sample_type", "PATH_to_bam"]
-    optional = ["PATH_to_barcodes", "PATH_to_10x_ranger", "PATH_to_ref_annotations"]
+    optional = ["PATH_to_barcodes", "PATH_to_10x_ranger"]
     missing = [c for c in required if c not in sample_df.columns]
     assert not missing, f"missing columns: {missing}"
     for c in optional:
@@ -138,13 +138,9 @@ if _has_config:
 
     get_data = {}
     rep2modalities = {}
-    rep2ref_annotation = {}
     rep2isMultiome = {}
     for rep_id, rep_df in sample_df.groupby(by="REP_ID", sort=False):
         rep2modalities[rep_id] = rep_df["modality"].tolist()
-        ref_annotation_file = rep_df["PATH_to_ref_annotations"].tolist()[0]
-        if not pd.isna(ref_annotation_file):
-            rep2ref_annotation[rep_id] = str(ref_annotation_file)
         rep2isMultiome[rep_id] = len(rep_df) > 1
         for _, row in rep_df.iterrows():
             assay_type = row["assay_type"]

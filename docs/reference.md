@@ -13,7 +13,6 @@ TSV with one row per replicate. Template at `config/samples.tsv`.
 | `PATH_to_bam` | Yes | Path to `.bam` file. |
 | `PATH_to_barcodes` | Non-bulk | Path to `barcodes.tsv.gz`. |
 | `PATH_to_10x_ranger` | Non-bulk | Path to Cell Ranger / Space Ranger `outs/` directory. |
-| `PATH_to_ref_annotations` | Optional | Annotation TSV with `BARCODE` and `<ref_label>` columns. |
 
 ---
 
@@ -49,7 +48,6 @@ One subdirectory per `{assay_type}_{rep_id}` with cellsnp-lite output.
 ### AnnData (`bb_dir/{assay_type}/`)
 
 - `{assay_type}.h5ad` — AnnData with cells x features (single-cell only; produced by `process_anndata`).
-- `cell_types.tsv.gz` — cell type annotations (single-cell only).
 
 ### Final Bins (`bb_dir/{assay_type}/`)
 

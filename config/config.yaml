@@ -37,7 +37,6 @@ window_bed: null
 blacklist_bed: null
 gene_blacklist_file: null
 gtf_file: null
-ref_label: "cell_type"
 
 ##################################################
 # Population Panel

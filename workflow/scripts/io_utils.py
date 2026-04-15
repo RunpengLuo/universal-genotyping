@@ -192,27 +192,6 @@ def read_barcodes(bc_file: str):
     return barcodes
 
 
-def read_ref_annotation(ref_annotation_file: str, ref_label):
-    """Read a TSV annotation file and return only the BARCODE and the specified label column.
-
-    Parameters
-    ----------
-    ref_annotation_file : str
-        Path to a tab-separated annotation file.
-    ref_label : str
-        Name of the label column to extract alongside ``BARCODE``.
-
-    Returns
-    -------
-    pd.DataFrame
-        Two-column DataFrame with ``BARCODE`` and *ref_label*.
-    """
-    ref_annotations = pd.read_table(ref_annotation_file, sep="\t")[
-        ["BARCODE", ref_label]
-    ].reset_index(drop=True)
-    return ref_annotations
-
-
 def read_genes_gtf_file(gtf_file: str, id_col="gene_ids"):
     """Parse a GTF file and return gene-level records with genomic coordinates.
 

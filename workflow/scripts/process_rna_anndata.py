@@ -28,7 +28,7 @@ Input:
 5. genome regions whitelist
 
 Output:
-single h5ad matrix covers all replicates with position and (optional) ref_annotation columns
+single h5ad matrix covers all replicates with position columns
 """
 setup_logging(sm.log[0])
 
@@ -36,8 +36,6 @@ barcode_files = sm.input["barcodes"]
 ranger_dirs = sm.input["ranger_dirs"]
 assay_type = sm.params["assay_type"]
 rep_ids = sm.params["rep_ids"]
-rep2ref_annotation = dict(sm.params["rep2ref_annotation"])
-ref_label = sm.params["ref_label"]
 logging.info(f"prepare rna anndata, assay_type={assay_type}, rep_ids={rep_ids}")
 
 adatas = {}
@@ -65,21 +63,6 @@ for idx, rep_id in enumerate(rep_ids):
         adata.var_names_make_unique()
 
     adata.obs_names = adata.obs_names.astype(str)
-    if rep_id in rep2ref_annotation:
-        ref_annotations = read_ref_annotation(rep2ref_annotation[rep_id], ref_label)
-        num_annotated_barcodes = len(
-            set(adata.obs_names) & set(ref_annotations["BARCODE"])
-        )
-        logging.info(
-            f"#barcodes with ref_annotation annotation: {num_annotated_barcodes}"
-        )
-        adata.obs[ref_label] = (
-            ref_annotations.set_index("BARCODE")
-            .reindex(adata.obs_names)[ref_label]
-            .fillna("Unknown")
-            .values.astype(str)
-        )
-
     adata = adata[adata.obs_names.isin(barcodes), :].copy()
     adata.obs_names = adata.obs_names.astype(str) + f"_{rep_id}"
     adatas[rep_id] = adata
@@ -172,20 +155,6 @@ adata.var["#CHR"] = pd.Categorical(adata.var["#CHR"], categories=chs, ordered=Tr
 assert adata.var_names.is_unique, "var_names is not unique!"
 sort_index = adata.var.sort_values(by=["#CHR", "START"]).index
 adata = adata[:, sort_index].copy()
-
-has_annotations = ref_label in adata.obs.columns
-if has_annotations:
-    ct_df = adata.obs[[ref_label]].copy()
-    ct_df.index.name = "BARCODE"
-    ct_df.to_csv(sm.output["cell_types"], sep="\t", compression="gzip")
-    logging.info(
-        f"wrote {len(ct_df)} rows to cell_types.tsv.gz with column {ref_label}"
-    )
-else:
-    header_df = pd.DataFrame(columns=[ref_label])
-    header_df.index.name = "BARCODE"
-    header_df.to_csv(sm.output["cell_types"], sep="\t", compression="gzip")
-    logging.info("no ref_annotation provided; wrote header-only cell_types.tsv.gz")
 
 adata.write_h5ad(sm.output["h5ad_file"], compression="gzip")
 

@@ -21,7 +21,6 @@ rule process_rna_anndata:
         gtf_file=lambda wc: config["gtf_file"],
     output:
         h5ad_file=config["bb_dir"] + "/{assay_type}/{assay_type}.h5ad",
-        cell_types=config["bb_dir"] + "/{assay_type}/cell_types.tsv.gz",
     params:
         assay_type=lambda wc: wc.assay_type,
         rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
@@ -30,8 +29,6 @@ rule process_rna_anndata:
             "min_frac_barcodes"
         ],
         gene_id_colname=lambda wc: config["params_process_anndata"]["gene_id_colname"],
-        rep2ref_annotation=lambda wc: rep2ref_annotation,
-        ref_label=lambda wc: config["ref_label"],
     wildcard_constraints:
         assay_type="(scRNA|VISIUM|VISIUM3prime)",
     log:
@@ -60,14 +57,11 @@ rule process_atac_fragments:
         gtf_file=lambda wc: config["gtf_file"],
     output:
         h5ad_file=config["bb_dir"] + "/{assay_type}/{assay_type}.h5ad",
-        cell_types=config["bb_dir"] + "/{assay_type}/cell_types.tsv.gz",
     params:
         assay_type=lambda wc: wc.assay_type,
         rep_ids=lambda wc: assay2rep_ids[wc.assay_type],
         sample_types=lambda wc: assay2sample_types[wc.assay_type],
         tile_width=lambda wc: config["params_process_anndata"]["tile_width"],
-        rep2ref_annotation=lambda wc: rep2ref_annotation,
-        ref_label=lambda wc: config["ref_label"],
     wildcard_constraints:
         assay_type="scATAC",
     log:
