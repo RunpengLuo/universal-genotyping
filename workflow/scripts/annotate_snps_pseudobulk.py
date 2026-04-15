@@ -11,7 +11,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = str(t)
 import numpy as np
 import pandas as pd
 
-from io_utils import read_VCF, get_chr_sizes
+from io_utils import read_VCF, get_chr_sizes, compute_snp_statistics
 
 ##################################################
 """
@@ -137,6 +137,14 @@ base_snps["is_hom_alt"] = (base_snps["AD"] == base_snps["DP"]) & (
 base_snps["is_hom_ref"] = (base_snps["AD"] == 0) & (base_snps["DP"] >= min_hom_dp)
 
 base_snps["SAMPLE"] = base_snps.apply(get_genotype, axis=1)
+
+chrom_sizes = get_chr_sizes(sm.input["genome_size"])
+snp_stats = compute_snp_statistics(
+    raw_snps_list, modalities, base_snps, chrom_sizes, chroms,
+)
+snp_stats.to_csv(sm.output["snp_stats"], sep="\t", index=False)
+logging.info(f"wrote SNP statistics to {sm.output['snp_stats']}")
+
 keep_gts = ["0/1"]
 if not filter_hom_ALT:
     keep_gts.append("1/1")
@@ -144,24 +152,13 @@ base_snps = base_snps[base_snps["SAMPLE"].isin(keep_gts)].reset_index(drop=True)
 
 nz_oth = base_snps["OTH"] > 0
 nnz_oth = np.sum(nz_oth)
-nz_oth_hom_alt = int(base_snps.loc[nz_oth, "is_hom_alt"].sum())
-nz_oth_het = int(base_snps.loc[nz_oth, "is_het"].sum())
-nz_oth_hom_ref = int(base_snps.loc[nz_oth, "is_hom_ref"].sum())
-nz_oth_other = nnz_oth - (nz_oth_hom_alt + nz_oth_het + nz_oth_hom_ref)
-logging.info(
-    f"#nz-OTH SNPs={nnz_oth}/{nsnps_before_genotyping} "
-    f"(hom_alt={nz_oth_hom_alt}, het={nz_oth_het}, hom_ref={nz_oth_hom_ref}, other={nz_oth_other})"
-)
+logging.info(f"#nz-OTH SNPs={nnz_oth}/{nsnps_before_genotyping}")
 if filter_nz_OTH:
     logging.info("SNPs with nonzero OTHs are filtered.")
     base_snps = base_snps[~nz_oth]
 
-num_het = (base_snps["SAMPLE"] == "0/1").sum()
-num_hom_ref = (base_snps["SAMPLE"] == "0/0").sum()
-num_hom_alt = (base_snps["SAMPLE"] == "1/1").sum()
-num_snp_kept = len(base_snps)
-logging.info(f"#kept SNPs={num_snp_kept}/{nsnps_before_genotyping}")
-logging.info(f"#het={num_het}, #hom_alt={num_hom_alt}, #hom_ref={num_hom_ref}")
+num_kept = len(base_snps)
+logging.info(f"#kept SNPs={num_kept}/{nsnps_before_genotyping}")
 
 final_snps = base_snps.sort_values(["#CHROM", "POS"], kind="mergesort").reset_index(
     drop=True
@@ -195,7 +192,6 @@ cols = [
 final_snps = final_snps[cols]
 
 final_snps_chs = final_snps.groupby("#CHROM", sort=False)
-chrom_sizes = get_chr_sizes(sm.input["genome_size"])
 for chrname, out_snp_vcf in zip(chroms, sm.output["snp_vcfs"]):
     chrom = f"chr{chrname}"
     chrom_length = chrom_sizes[chrom]

@@ -117,6 +117,7 @@ if workflow_mode == "single_cell_genotyping":
                 config["snp_dir"] + "/chr{chrname}.vcf.gz.tbi",
                 chrname=config["chromosomes"],
             ),
+            snp_stats=config["snp_dir"] + "/pseudobulk_snp_statistics.tsv",
         params:
             modalities=modalities,
             min_het_reads=config["params_annotate_snps"]["min_het_reads"],
