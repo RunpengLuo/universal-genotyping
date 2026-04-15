@@ -13,6 +13,8 @@ VCF format. Set via `snp_panel` or `snp_targets` in config.
 | 1kGP phase3 AF>=5e-2 (~92 MB) | [download](https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf.gz) |
 | 1kGP phase3 AF>=5e-4 (~568 MB) | [download](https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e4.chr1toX.hg38.vcf.gz) |
 | 1kGP n=3,202 (high-coverage) | [FTP](https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/) — use [`scripts/process_1kGP_3202_panel.sh`](scripts/process_1kGP_3202_panel.sh) to prepare |
+| 1kGP n=2,504 (chm13v2.0, biallelic) | [S3](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/variants/1000_Genomes_Project/chm13v2.0/Phased_SHAPEIT5_v1.1/) — `...native_maps.biallelic.2504.bcf.gz` |
+| 1kGP n=3,202 (chm13v2.0, biallelic) | [S3](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/variants/1000_Genomes_Project/chm13v2.0/Phased_SHAPEIT5_v1.1/) — `...native_maps.biallelic.3202.bcf.gz` |
 
 ### Building `snp_targets` from any panel VCF
 
@@ -36,6 +38,8 @@ BCF format, one per chromosome. Set via `phasing_panel` in config.
 | 1kGP phase3 (n=3,202) | see SNP Panels above |
 | gnomAD HGDP+1KG (n=4,099) | `gs://gcp-public-data--gnomad/resources/hgdp_1kg/phased_haplotypes` |
 | TOPMed (n=97,256) | via [imputation server](https://imputation.biodatacatalyst.nhlbi.nih.gov) |
+| 1kGP n=2,504 (chm13v2.0) | [S3](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/variants/1000_Genomes_Project/chm13v2.0/Phased_SHAPEIT5_v1.1/) — whole-genome BCF, split per-chr with `bcftools view -r` |
+| 1kGP n=3,202 (chm13v2.0) | same S3 — phased with SHAPEIT5 v1.1 + T2T-native maps ([phasing_T2T](https://github.com/JosephLalli/phasing_T2T), [maps](https://github.com/JosephLalli/phasing_T2T/tree/main/resources/recombination_maps/t2t_native_scaled_maps)) |
 
 ---
 
@@ -47,6 +51,7 @@ Set via `gtf_file` in config.
 |--------|----------|
 | GENCODE v38 | `wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz` |
 | 10x GRCh38-2024-A | `curl -O https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2024-A.tar.gz` → `genes/genes.gtf.gz` |
+| NCBI RefSeq (chm13v2.0) | [NCBI FTP](https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/009/914/755/GCF_009914755.1_T2T-CHM13v2.0/) — `GCF_009914755.1_T2T-CHM13v2.0_genomic.gtf.gz`. Build 10x reference with [`scripts/build_cellranger_arc_ref_chm13v2.sh`](scripts/build_cellranger_arc_ref_chm13v2.sh) ([10x guide](https://kb.10xgenomics.com/s/article/29207065679501-Building-a-Custom-T2T-reference-for-Cell-Ranger-ARC)). |
 
 ---
 
