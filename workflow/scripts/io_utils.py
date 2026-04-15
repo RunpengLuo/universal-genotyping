@@ -192,10 +192,10 @@ def read_barcodes(bc_file: str):
     return barcodes
 
 
-def compute_depth_statistics(dp_raw, win_df, sample_ids, rep_ids):
+def compute_depth_statistics(dp_raw, win_df, sample_ids):
     """Compute per-chromosome and whole-genome mean/median depth per sample.
 
-    Returns a DataFrame with columns: SAMPLE, #CHR, REP_ID, mean_depth, median_depth.
+    Returns a DataFrame with columns: SAMPLE, #CHR, mean_depth, median_depth.
     """
     chroms = win_df["#CHR"].to_numpy()
     chrom_order = {c: i for i, c in enumerate(CHROM_ORDER)}
@@ -206,13 +206,13 @@ def compute_depth_statistics(dp_raw, win_df, sample_ids, rep_ids):
     rows = []
     for chrom in sorted_chroms:
         mask = chroms == chrom
-        for s, rep_id in enumerate(rep_ids):
+        for s in range(len(sample_ids)):
             vals = dp_raw[mask, s]
-            rows.append([sample_ids[s], chrom, rep_id, float(np.mean(vals)), float(np.median(vals))])
-    for s, rep_id in enumerate(rep_ids):
+            rows.append([sample_ids[s], chrom, float(np.mean(vals)), float(np.median(vals))])
+    for s in range(len(sample_ids)):
         vals = dp_raw[:, s]
-        rows.append([sample_ids[s], "TOTAL", rep_id, float(np.mean(vals)), float(np.median(vals))])
-    return pd.DataFrame(rows, columns=["SAMPLE", "#CHR", "REP_ID", "mean_depth", "median_depth"])
+        rows.append([sample_ids[s], "TOTAL", float(np.mean(vals)), float(np.median(vals))])
+    return pd.DataFrame(rows, columns=["SAMPLE", "#CHR", "mean_depth", "median_depth"])
 
 
 def read_genes_gtf_file(gtf_file: str, id_col="gene_ids"):
