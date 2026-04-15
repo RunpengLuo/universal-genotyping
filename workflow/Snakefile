@@ -176,30 +176,32 @@ if _has_config:
         if phaser == "eagle":
             assert phaser_dir is not None, "phaser_dir required for eagle phasing"
             gmap_dir, get_genetic_map = get_eagle_gmap_path(phaser_dir, refvers)
-            assert os.path.isdir(gmap_dir), "failed to locate gmap directory"
+            assert os.path.isdir(gmap_dir), f"failed to locate gmap directory: {gmap_dir}"
         elif phaser == "shapeit":
             assert phaser_dir is not None, "phaser_dir required for shapeit phasing"
             gmap_dir, get_genetic_map = get_shapeit_gmap_path(
                 phaser_dir, refvers,
             )
-            assert os.path.isdir(gmap_dir), "failed to locate gmap directory"
+            assert os.path.isdir(gmap_dir), f"failed to locate gmap directory: {gmap_dir}"
         elif phaser == "longphase":
             pass  # no genetic map needed
         else:
             raise ValueError(f"unknown phaser: {phaser}")
 
         if phaser in ["eagle", "shapeit"]:
-            assert all(
-                os.path.exists(get_genetic_map(chrname))
-                for chrname in config["chromosomes"]
-            ), "failed to locate gmap files"
+            missing_gmaps = [
+                get_genetic_map(c) for c in config["chromosomes"]
+                if not os.path.exists(get_genetic_map(c))
+            ]
+            assert not missing_gmaps, f"failed to locate gmap files: {missing_gmaps[:3]}"
             phasing_panel = config["phasing_panel"]
-            assert os.path.isdir(phasing_panel), "failed to locate phasing panel"
+            assert os.path.isdir(phasing_panel), f"failed to locate phasing panel: {phasing_panel}"
             get_phasing_panel = get_phasing_panel_path(phasing_panel)
-            assert all(
-                os.path.exists(get_phasing_panel(chrname))
-                for chrname in config["chromosomes"]
-            ), "failed to locate panel files"
+            missing_panels = [
+                get_phasing_panel(c) for c in config["chromosomes"]
+                if not os.path.exists(get_phasing_panel(c))
+            ]
+            assert not missing_panels, f"failed to locate panel files: {missing_panels[:3]}"
 
     ##################################################
     # final target files
