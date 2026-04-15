@@ -8,12 +8,11 @@ External data required by the pipeline.
 
 VCF format. Set via `snp_panel` or `snp_targets` in config.
 
-| Panel | hg38 |
-|-------|------|
-| 1kGP phase3 AF>=5e-2 (~92 MB) | [download](https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf.gz) |
-| 1kGP phase3 AF>=5e-4 (~568 MB) | [download](https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e4.chr1toX.hg38.vcf.gz) |
+| Panel | Download |
+|-------|----------|
+| 1kGP phase3 AF>=5e-2 (~92 MB, hg38) | [download](https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e2.chr1toX.hg38.vcf.gz) |
+| 1kGP phase3 AF>=5e-4 (~568 MB, hg38) | [download](https://sourceforge.net/projects/cellsnp/files/SNPlist/genome1K.phase3.SNP_AF5e4.chr1toX.hg38.vcf.gz) |
 | 1kGP n=3,202 (hg38) | [FTP](https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/) — use [`scripts/process_1kGP_3202_panel.sh --ref hg38`](scripts/process_1kGP_3202_panel.sh) |
-| 1kGP n=2,504 (chm13v2.0, biallelic) | [S3](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/variants/1000_Genomes_Project/chm13v2.0/Phased_SHAPEIT5_v1.1/) — `...native_maps.biallelic.2504.bcf.gz` |
 | 1kGP n=3,202 (chm13v2.0, biallelic) | [S3](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/variants/1000_Genomes_Project/chm13v2.0/Phased_SHAPEIT5_v1.1/) — use [`scripts/process_1kGP_3202_panel.sh --ref chm13v2`](scripts/process_1kGP_3202_panel.sh) |
 
 ### Building `snp_targets` from any panel VCF
@@ -32,14 +31,23 @@ This produces `target.chr{1..22,X}.pos.gz` + `.tbi` index files. Existing chromo
 
 BCF format, one per chromosome. Set via `phasing_panel` in config.
 
-| Panel | hg38 |
-|-------|------|
-| 1kGP phase3 (n=2,504) | [download](http://pklab.med.harvard.edu/teng/data/1000G_hg38.zip) |
-| 1kGP phase3 (n=3,202) | see SNP Panels above |
-| gnomAD HGDP+1KG (n=4,099) | `gs://gcp-public-data--gnomad/resources/hgdp_1kg/phased_haplotypes` |
-| TOPMed (n=97,256) | via [imputation server](https://imputation.biodatacatalyst.nhlbi.nih.gov) |
-| 1kGP n=2,504 (chm13v2.0) | [S3](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/variants/1000_Genomes_Project/chm13v2.0/Phased_SHAPEIT5_v1.1/) — whole-genome BCF, split per-chr with `bcftools view -r` |
-| 1kGP n=3,202 (chm13v2.0) | same S3 — phased with SHAPEIT5 v1.1 + T2T-native maps ([phasing_T2T](https://github.com/JosephLalli/phasing_T2T), [maps](https://github.com/JosephLalli/phasing_T2T/tree/main/resources/recombination_maps/t2t_native_scaled_maps)) |
+| Panel | Download |
+|-------|----------|
+| 1kGP phase3 (n=2,504, hg38) | [download](http://pklab.med.harvard.edu/teng/data/1000G_hg38.zip) |
+| 1kGP phase3 (n=3,202, hg38) | produced by `process_1kGP_3202_panel.sh --ref hg38` (see SNP Panels) |
+| 1kGP n=3,202 (chm13v2.0) | produced by `process_1kGP_3202_panel.sh --ref chm13v2` (see SNP Panels). Phased with SHAPEIT5 v1.1 + T2T-native maps ([phasing_T2T](https://github.com/JosephLalli/phasing_T2T)) |
+| gnomAD HGDP+1KG (n=4,099, hg38) | `gs://gcp-public-data--gnomad/resources/hgdp_1kg/phased_haplotypes` |
+| TOPMed (n=97,256, hg38) | via [imputation server](https://imputation.biodatacatalyst.nhlbi.nih.gov) |
+
+### Genetic Maps
+
+For chm13v2 shapeit phasing, set `gmap_dir` in config to a directory with T2T-native recombination maps:
+
+| Source | Download |
+|--------|----------|
+| T2T-native scaled maps | [phasing_T2T](https://github.com/JosephLalli/phasing_T2T/tree/main/resources/recombination_maps/t2t_native_scaled_maps) — files named `chr{N}.t2t.scaled.gmap.gz` |
+
+For hg38, genetic maps are bundled with Eagle2 (`tables/`) and SHAPEIT5 (`resources/maps/`).
 
 ---
 
@@ -49,8 +57,8 @@ Set via `gtf_file` in config.
 
 | Source | Download |
 |--------|----------|
-| GENCODE v38 | `wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz` |
-| 10x GRCh38-2024-A | `curl -O https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2024-A.tar.gz` → `genes/genes.gtf.gz` |
+| GENCODE v38 (hg38) | `wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.annotation.gtf.gz` |
+| 10x GRCh38-2024-A (hg38) | `curl -O https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2024-A.tar.gz` → `genes/genes.gtf.gz` |
 | UCSC ncbiRefSeq (chm13v2.0, chr-style) | `wget https://hgdownload.soe.ucsc.edu/goldenPath/hs1/bigZips/genes/hs1.ncbiRefSeq.gtf.gz` |
 | NCBI RefSeq (chm13v2.0, accession-style) | [NCBI FTP](https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/009/914/755/GCF_009914755.1_T2T-CHM13v2.0/) — `GCF_009914755.1_T2T-CHM13v2.0_genomic.gtf.gz` |
 
