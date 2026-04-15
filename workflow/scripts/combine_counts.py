@@ -184,8 +184,8 @@ for s in range(nsamples):
     with np.errstate(invalid="ignore"):
         bb_dp[:, s] = weighted_sums / total_len_per_bin
 
-skip_normal = bool(getattr(sm.params, "skip_normal_normalization", False))
-use_normal = has_normal and not skip_normal
+median_normalization = bool(getattr(sm.params, "median_normalization", False))
+use_normal = has_normal and not median_normalization
 logging.info(f"compute bb RDR, use_normal={use_normal}")
 
 if use_normal:

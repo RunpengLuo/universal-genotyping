@@ -122,7 +122,7 @@ params_combine_counts:
   min_snp_per_block: 10
   max_blocksize: 500000
   # true | false — true = median-center (ignore matched normal)
-  skip_normal_normalization: false
+  median_normalization: false
   rdr_outlier_quantile: 0.002
   # true | false
   phase_flip_test: true

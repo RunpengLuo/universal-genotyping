@@ -69,7 +69,7 @@ params_combine_counts:
   # true | false
   phase_flip_test: true
   # true | false — true = median-center (ignore matched normal)
-  skip_normal_normalization: false
+  median_normalization: false
 
 ##################################################
 threads:
