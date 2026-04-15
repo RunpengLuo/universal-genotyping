@@ -53,7 +53,6 @@ phaser_dir: /path/to/shapeit5
 ##################################################
 # Bias correction (bulk only)
 params_count_reads:
-  # true | false
   gc_correct: true
 
 ##################################################
@@ -66,9 +65,8 @@ params_phase_and_concat:
 params_combine_counts:
   min_snp_reads: 1000
   min_snp_per_block: 10
-  # true | false
   phase_flip_test: true
-  # true | false — true = median-center (ignore matched normal)
+  # true = median-center (ignore matched normal)
   median_normalization: false
 
 ##################################################

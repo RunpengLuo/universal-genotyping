@@ -69,9 +69,7 @@ params_annotate_snps:
   min_het_reads: 2
   min_hom_dp: 10
   min_vaf_thres: 0.1
-  # true | false
   filter_nz_OTH: false
-  # true | false
   filter_hom_ALT: false
 
 ##################################################
@@ -94,7 +92,6 @@ params_process_anndata:
 params_phase_and_concat:
   min_depth: 1
   gamma: 0.05
-  # true | false
   exon_only: false
 
 params_mosdepth:
@@ -102,11 +99,9 @@ params_mosdepth:
   extra_params: "--no-per-base --fast-mode"
 
 params_count_reads:
-  # true | false
   gc_correct: true
   # lowess | median
   gc_correct_method: "median"
-  # true | false
   rt_correct: true
   samplesize: 50000
   routlier: 0.01
@@ -121,10 +116,9 @@ params_combine_counts:
   min_snp_reads: 1000
   min_snp_per_block: 10
   max_blocksize: 500000
-  # true | false — true = median-center (ignore matched normal)
+  # true = median-center (ignore matched normal)
   median_normalization: false
   rdr_outlier_quantile: 0.002
-  # true | false
   phase_flip_test: true
   phase_flip_epsilon: 0.05
   phase_flip_alpha: 0.05
