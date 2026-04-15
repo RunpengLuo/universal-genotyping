@@ -4,7 +4,9 @@ from datetime import datetime
 
 import pandas as pd
 
+
 configfile: os.path.join(workflow.basedir, "../config/config.yaml")
+
 
 sys.path.insert(0, os.path.join(workflow.basedir, "../config"))
 from const import (
@@ -174,7 +176,9 @@ if _has_config:
         elif phaser == "shapeit":
             assert config.get("shapeit_dir") is not None
             gmap_dir, get_genetic_map = get_shapeit_gmap_path(
-                config["shapeit_dir"], refvers, gmap_dir=config.get("gmap_dir"),
+                config["shapeit_dir"],
+                refvers,
+                gmap_dir=config.get("gmap_dir"),
             )
             assert os.path.isdir(gmap_dir), "failed to locate gmap directory"
         elif phaser == "longphase":
@@ -207,7 +211,13 @@ if _has_config:
         for assay_type in assay_types:
             final_targets += _bb_targets(
                 assay_type,
-                ["cnv_segments.tsv", "bb.Xcount.npz", "bb.Tallele.npz", "bb.Aallele.npz", "bb.Ballele.npz"],
+                [
+                    "cnv_segments.tsv",
+                    "bb.Xcount.npz",
+                    "bb.Tallele.npz",
+                    "bb.Aallele.npz",
+                    "bb.Ballele.npz",
+                ],
             )
     else:
         common_suffixes = [
@@ -243,8 +253,11 @@ if _has_config:
     include: "rules/combine_counts.smk"
 
     if workflow_mode == "copytyping_preprocess":
+
         ruleorder: cnv_segmentation > combine_counts_nonbulk
+
     else:
+
         ruleorder: combine_counts_nonbulk > cnv_segmentation
 
     rule all:
@@ -253,6 +266,7 @@ if _has_config:
         default_target: True
 
 else:
+
     # install conda env
     rule _conda_env_base:
         output:

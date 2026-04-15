@@ -52,7 +52,8 @@ rule run_mosdepth:
         read_quality=config["params_mosdepth"]["read_quality"],
         extra_params=config["params_mosdepth"].get("extra_params", ""),
     log:
-        config["log_dir"] + f"/run_mosdepth/run_mosdepth.{{assay_type}}_{{rep_id}}.{_run_id}.log",
+        config["log_dir"]
+        + f"/run_mosdepth/run_mosdepth.{{assay_type}}_{{rep_id}}.{_run_id}.log",
     conda:
         "../envs/tools.yaml"
     shell:
@@ -70,7 +71,8 @@ rule rd_correct:
     """Per-window LOWESS bias correction (GC/mappability/replication timing)."""
     input:
         mosdepth_files=lambda wc: [
-            config["pileup_dir"] + f"/{wc.assay_type}/out_mosdepth/{rep_id}.regions.bed.gz"
+            config["pileup_dir"]
+            + f"/{wc.assay_type}/out_mosdepth/{rep_id}.regions.bed.gz"
             for rep_id in assay2rep_ids[wc.assay_type]
         ],
         sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
@@ -107,5 +109,3 @@ rule rd_correct:
         "../envs/base.yaml"
     script:
         """../scripts/rd_correct.py"""
-
-

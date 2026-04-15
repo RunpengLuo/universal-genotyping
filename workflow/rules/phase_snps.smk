@@ -13,7 +13,8 @@ if config["phaser"] == "shapeit":
         params:
             chrom="chr{chrname}",
         log:
-            config["log_dir"] + f"/phase_snps_shapeit/phase_snps.chr{{chrname}}.{_run_id}.log",
+            config["log_dir"]
+            + f"/phase_snps_shapeit/phase_snps.chr{{chrname}}.{_run_id}.log",
         conda:
             "../envs/phase.yaml"
         shell:
@@ -45,7 +46,8 @@ if config["phaser"] == "eagle":
             chrom="chr{chrname}",
             out_prefix=config["phase_dir"] + "/chr{chrname}",
         log:
-            config["log_dir"] + f"/phase_snps_eagle/phase_snps.chr{{chrname}}.{_run_id}.log",
+            config["log_dir"]
+            + f"/phase_snps_eagle/phase_snps.chr{{chrname}}.{_run_id}.log",
         conda:
             "../envs/phase.yaml"
         shell:
@@ -79,7 +81,8 @@ if config["phaser"] == "longphase":
             out_prefix=config["phase_dir"] + "/chr{chrname}",
         threads: config["threads"]["phase"]
         log:
-            config["log_dir"] + f"/phase_snps_longphase/phase_snps.chr{{chrname}}.{_run_id}.log",
+            config["log_dir"]
+            + f"/phase_snps_longphase/phase_snps.chr{{chrname}}.{_run_id}.log",
         conda:
             "../envs/phase.yaml"
         shell:
