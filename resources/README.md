@@ -41,36 +41,8 @@ BCF format, one per chromosome. Set via `phasing_panel` in config.
 
 ### Genetic Maps
 
-For chm13v2 shapeit phasing, set `gmap_dir` in config to a directory with T2T-native recombination maps:
-
-| Source | Download |
-|--------|----------|
-| T2T-native scaled maps | [phasing_T2T](https://github.com/JosephLalli/phasing_T2T/tree/main/resources/recombination_maps/t2t_native_scaled_maps) — files named `chr{N}.t2t.scaled.gmap.gz` |
-
-For hg38, genetic maps are bundled with Eagle2 (`tables/`) and SHAPEIT5 (`resources/maps/`).
-
-To convert T2T SHAPEIT maps to Eagle2 format (single file, space-separated, with `chr` column):
-
-```bash
-python resources/scripts/convert_gmap_to_eagle.py \
-  /path/to/t2t_native_scaled_maps \
-  /path/to/phaser_dir/tables/genetic_map_chm13v2_withX.txt.gz
-```
-
-Place the output under `{phaser_dir}/tables/` — Eagle2 expects the file at `{phaser_dir}/tables/genetic_map_{reference_version}_withX.txt.gz`.
-
-Config for Eagle2 with chm13v2:
-```yaml
-phaser: "eagle"
-phaser_dir: /path/to/phaser_dir
-```
-
-Config for SHAPEIT5 with chm13v2:
-```yaml
-phaser: "shapeit"
-phaser_dir: /path/to/shapeit5
-gmap_dir: /path/to/t2t_native_scaled_maps
-```
+- **hg38:** bundled with Eagle2 (`tables/`) and SHAPEIT5 (`resources/maps/`). Just set `phaser_dir`.
+- **chm13v2:** download [T2T-native scaled maps](https://github.com/JosephLalli/phasing_T2T/tree/main/resources/recombination_maps/t2t_native_scaled_maps). For SHAPEIT5, set `gmap_dir` to the map directory. For Eagle2, convert with [`scripts/convert_gmap_to_eagle.py`](scripts/convert_gmap_to_eagle.py) and place output at `{phaser_dir}/tables/genetic_map_chm13v2_withX.txt.gz`.
 
 ---
 
