@@ -137,11 +137,16 @@ done
 bcftools concat -f "${OUT}/snp_vcfs.lst" -Oz -o "${OUT}/snps.vcf.gz"
 tabix -p vcf "${OUT}/snps.vcf.gz"
 
+##################################################
+# Cleanup intermediates
+##################################################
+echo "=== Cleaning up intermediates ==="
+rm -rf "${OUT}/raw" "${OUT}/snps" "${OUT}/snp_vcfs.lst" "${OUT}/snp_files.lst"
+
 date
 echo "=====summary====="
 echo "reference: ${REFVERS}"
-echo "per-chromosome snp panel: ${OUT}/snps/chr<*>.vcf.gz"
-echo "per-chromosome target positions: ${OUT}/target_positions/target.chr<*>.pos.gz"
-echo "per-chromosome phasing panel: ${OUT}/phasing_panel/chr<*>.genotypes.bcf"
-echo "merged snp panel: ${OUT}/snps.vcf.gz"
+echo "target positions: ${OUT}/target_positions/"
+echo "phasing panel: ${OUT}/phasing_panel/"
+echo "snp panel: ${OUT}/snps.vcf.gz"
 exit 0
