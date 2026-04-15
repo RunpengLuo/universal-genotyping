@@ -1,6 +1,16 @@
 ##################################################
-# Genotyping YAML configuration file (user)
+# User config — only run-specific values needed.
+# Defaults are auto-loaded from config/config.yaml.
+# Override any default by specifying it here.
 ##################################################
+# Output paths, relative to snakemake --directory
+snp_dir: "snps"
+phase_dir: "phase"
+pileup_dir: "pileup"
+allele_dir: "allele"
+bb_dir: "bb"
+qc_dir: "qc"
+log_dir: "logs"
 
 # bulk_genotyping | single_cell_genotyping | copytyping_preprocess
 workflow_mode: "bulk_genotyping"
@@ -11,6 +21,7 @@ assay_types: ["bulkWGS"]
 # Input
 sample_id: PATIENT_ID
 sample_file: /path/to/samples.tsv
+chromosomes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
 
 ##################################################
 # Reference
@@ -33,3 +44,31 @@ phasing_panel: /path/to/phasing_panel
 # eagle | shapeit | longphase
 phaser: "shapeit"
 phaser_dir: /path/to/shapeit5
+
+##################################################
+# Bias correction (bulk only)
+params_count_reads:
+  # true | false
+  gc_correct: true
+
+##################################################
+# SNP filtering
+params_phase_and_concat:
+  min_depth: 1
+
+##################################################
+# Adaptive binning
+params_combine_counts:
+  min_snp_reads: 1000
+  min_snp_per_block: 10
+  # true | false
+  phase_flip_test: true
+  # true | false — true = median-center (ignore matched normal)
+  skip_normal_normalization: false
+
+##################################################
+threads:
+  genotype: 4
+  phase: 4
+  pileup: 8
+  mosdepth: 4

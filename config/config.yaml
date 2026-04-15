@@ -125,7 +125,7 @@ params_combine_counts:
   skip_normal_normalization: false
   rdr_outlier_quantile: 0.002
   # true | false
-  phase_flip_test: false
+  phase_flip_test: true
   phase_flip_epsilon: 0.05
   phase_flip_alpha: 0.05
 
