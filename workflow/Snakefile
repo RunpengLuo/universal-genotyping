@@ -7,7 +7,6 @@ import pandas as pd
 configfile: os.path.join(workflow.basedir, "../config/config.yaml")
 
 sys.path.insert(0, os.path.join(workflow.basedir, "../config"))
-sys.path.insert(0, os.path.join(workflow.basedir, "scripts"))
 from const import (
     NONBULK_ASSAYS,
     BULK_ASSAYS,
