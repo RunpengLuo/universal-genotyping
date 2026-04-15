@@ -1,8 +1,7 @@
 ##################################################
-# User config — only run-specific values needed.
-# Defaults are auto-loaded from config/config.yaml.
-# Override any default by specifying it here.
+# Genotyping YAML configuration file (user)
 ##################################################
+
 # Output paths, relative to snakemake --directory
 snp_dir: "snps"
 phase_dir: "phase"
