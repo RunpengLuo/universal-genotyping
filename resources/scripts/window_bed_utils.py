@@ -19,12 +19,16 @@ from pybedtools import BedTool
 # Constants
 # ---------------------------------------------------------------------------
 
+ALLOWED_REFVERS = ("hg19", "hg38", "chm13v2")
+CHR_STYLE_REFVERS = ("hg19", "hg38", "chm13v2")
+REPLISEQ_REFVERS = ("hg19", "hg38")
+
 CHROM_ORDER = [f"chr{c}" for c in list(range(1, 23)) + ["X", "Y"]]
 
-UCSC_BASE = (
+UCSC_REPLISEQ_BASE = (
     "http://hgdownload.cse.ucsc.edu/goldenpath/hg19/encodeDCC/wgEncodeUwRepliSeq"
 )
-WAVE_SIGNAL_FILES = [
+REPLISEQ_BIGWIG_FILES = [
     "wgEncodeUwRepliSeqBg02esWaveSignalRep1.bigWig",
     "wgEncodeUwRepliSeqBjWaveSignalRep1.bigWig",
     "wgEncodeUwRepliSeqBjWaveSignalRep2.bigWig",
@@ -43,7 +47,7 @@ WAVE_SIGNAL_FILES = [
     "wgEncodeUwRepliSeqSknshWaveSignalRep1.bigWig",
 ]
 
-CHAIN_URL = (
+LIFTOVER_LIFTOVER_CHAIN_URL = (
     "https://hgdownload.cse.ucsc.edu/goldenpath/hg19/liftOver/hg19ToHg38.over.chain.gz"
 )
 
@@ -117,7 +121,7 @@ def get_standard_chroms(reference_version, genome_size_file):
     """Derive valid standard chromosomes from reference version and genome size file."""
     all_chroms = set(_read_chrom_sizes(genome_size_file)["chrom"])
     candidates = {f"chr{c}" for c in list(range(1, 23)) + ["X", "Y"]}
-    if reference_version not in ("hg19", "hg38", "chm13v2"):
+    if reference_version not in CHR_STYLE_REFVERS:
         candidates |= {str(c) for c in list(range(1, 23)) + ["X", "Y"]}
     return candidates & all_chroms
 
@@ -245,12 +249,12 @@ def _prepare_lifted_bedgraphs(bigwig_dir, work_dir, chain):
     Returns list of lifted bedGraph file paths.
     """
     os.makedirs(bigwig_dir, exist_ok=True)
-    n_files = len(WAVE_SIGNAL_FILES)
-    for i, fname in enumerate(WAVE_SIGNAL_FILES, 1):
+    n_files = len(REPLISEQ_BIGWIG_FILES)
+    for i, fname in enumerate(REPLISEQ_BIGWIG_FILES, 1):
         dest = os.path.join(bigwig_dir, fname)
         if not os.path.isfile(dest):
             print(f"\r  downloading bigWigs [{i}/{n_files}]", end="", flush=True)
-            _download(f"{UCSC_BASE}/{fname}", dest)
+            _download(f"{UCSC_REPLISEQ_BASE}/{fname}", dest)
     print()
 
     bigwig_files = sorted(glob.glob(os.path.join(bigwig_dir, "*WaveSignal*.bigWig")))
@@ -337,7 +341,7 @@ def compute_repliseq(windows_df, standard_chroms, args):
         chain = os.path.join(work_dir, "hg19ToHg38.over.chain.gz")
         if not os.path.isfile(chain):
             print("  Downloading chain file ...")
-            _download(CHAIN_URL, chain)
+            _download(LIFTOVER_CHAIN_URL, chain)
     if not os.path.isfile(chain):
         sys.exit(f"Error: chain file not found: {chain}")
 

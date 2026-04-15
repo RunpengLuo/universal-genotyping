@@ -28,6 +28,7 @@ import pandas as pd
 import pyranges as pr
 
 from window_bed_utils import (
+    REPLISEQ_REFVERS,
     _sort_windows,
     _tile_region,
     assign_region_id,
@@ -199,7 +200,7 @@ def main():
 
     # --- Step 5: Compute replication timing (optional) ---
     if args.repliseq:
-        if args.reference_version not in ("hg38", "hg19"):
+        if args.reference_version not in REPLISEQ_REFVERS:
             print(f"[5/6] Skipping repli-seq (unsupported for {args.reference_version})")
         else:
             print("[5/6] Computing replication timing ...")
