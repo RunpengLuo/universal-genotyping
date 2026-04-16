@@ -635,7 +635,7 @@ def adaptive_binning(
             )
     snp_bins.loc[:, "#SNPS"] = snp_grps.size()  # align by bin_id index, not position
     snp_bins.loc[:, "BLOCKSIZE"] = snp_bins["END"] - snp_bins["START"]
-    snp_bins[colname] = snp_bins.index
+    snp_bins = snp_bins.reset_index()
 
     bin_sizes = snp_bins["#SNPS"].to_numpy()
     block_sizes = snp_bins["BLOCKSIZE"].to_numpy()
