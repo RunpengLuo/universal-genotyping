@@ -34,7 +34,7 @@ logging.info(f"parse genetic map files, phaser={phaser}")
 required_columns = ["#CHR", "POS", "cM"]
 if phaser == "eagle":
     if len(set(gmap_files)) == 1:
-        genetic_map = pd.read_table(gmap_files[0], sep=" ", index_col=None).rename(
+        genetic_map = pd.read_table(gmap_files[0], sep=" ", index_col=None, dtype={"chr": str}).rename(
             columns={
                 "chr": "#CHR",
                 "position": "POS",
@@ -45,7 +45,7 @@ if phaser == "eagle":
     else:
         genetic_maps = []
         for chrname, gmap_file in zip(chrnames, gmap_files):
-            genetic_map = pd.read_table(gmap_file, sep=" ", index_col=None).rename(
+            genetic_map = pd.read_table(gmap_file, sep=" ", index_col=None, dtype={"chr": str}).rename(
                 columns={
                     "chr": "#CHR",
                     "position": "POS",
@@ -64,6 +64,11 @@ if phaser == "eagle":
         genetic_map["#CHR"].isin({f"chr{c}" for c in chrnames})
     ].reset_index(drop=True)
     genetic_map = sort_df_chr(genetic_map, ch="#CHR", pos="POS")
+    logging.info(
+        f"eagle: #rows={len(genetic_map)}, "
+        f"chroms={sorted(genetic_map['#CHR'].unique().tolist())}, "
+        f"cM range=[{genetic_map['cM'].min():.4f}, {genetic_map['cM'].max():.4f}]"
+    )
     genetic_map[required_columns].to_csv(
         sm.output["gmap_tsv"], sep="\t", header=True, index=False
     )
@@ -86,6 +91,11 @@ if phaser == "shapeit":
 
     genetic_map = pd.concat(genetic_maps, ignore_index=True)
     genetic_map = sort_df_chr(genetic_map, ch="#CHR", pos="POS")
+    logging.info(
+        f"shapeit: #rows={len(genetic_map)}, "
+        f"chroms={sorted(genetic_map['#CHR'].unique().tolist())}, "
+        f"cM range=[{genetic_map['cM'].min():.4f}, {genetic_map['cM'].max():.4f}]"
+    )
     genetic_map[required_columns].to_csv(
         sm.output["gmap_tsv"], sep="\t", header=True, index=False
     )

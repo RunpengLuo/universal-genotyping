@@ -749,6 +749,8 @@ def feature_to_blocks(
     filter features not in blocks, likely masked regions include centromeres
     """
     logging.info(f"assign {assay_type} features to blocks, {feature_idx}-{block_idx}")
+    if adata.is_view:
+        adata = adata.copy()
     adata.var[feature_idx] = np.arange(len(adata.var))
 
     feature_df = adata.var.reset_index(drop=True)

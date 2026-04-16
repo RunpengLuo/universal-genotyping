@@ -59,6 +59,21 @@ Set via `gtf_file` in config.
 | UCSC ncbiRefSeq (chm13v2.0, chr-style) | `wget https://hgdownload.soe.ucsc.edu/goldenPath/hs1/bigZips/genes/hs1.ncbiRefSeq.gtf.gz` |
 | NCBI RefSeq (chm13v2.0, accession-style) | [NCBI FTP](https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/009/914/755/GCF_009914755.1_T2T-CHM13v2.0/) — `GCF_009914755.1_T2T-CHM13v2.0_genomic.gtf.gz` |
 
+**Converting NCBI accession-style GTF to chr-style:** The NCBI GTF uses RefSeq accessions (e.g., `NC_060925.1`) instead of `chr1`. To rename, download the [assembly report](https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/009/914/755/GCF_009914755.1_T2T-CHM13v2.0/GCF_009914755.1_T2T-CHM13v2.0_assembly_report.txt) and run:
+
+```bash
+# 1. Build accession→chr mapping (tab-separated) from the assembly report
+grep -v '^#' GCF_009914755.1_T2T-CHM13v2.0_assembly_report.txt \
+  | tr -d '\r' \
+  | awk -F'\t' '$10 ~ /^chr([0-9]+|[XY])$/ {print $7 "\t" $10}' > accession_to_chr.tsv
+
+# 2. Rename and filter chromosomes in the GTF
+zcat GCF_009914755.1_T2T-CHM13v2.0_genomic.gtf.gz \
+  | tr -d '\r' \
+  | awk -F'\t' -v OFS='\t' 'NR==FNR{m[$1]=$2;next} /^#/{print;next} ($1 in m){$1=m[$1];print}' accession_to_chr.tsv - \
+  | gzip > GCF_009914755.1_T2T-CHM13v2.0_genomic.chr.gtf.gz
+```
+
 Build 10x Cell Ranger ARC reference with [`scripts/build_cellranger_arc_ref_chm13v2.sh`](scripts/build_cellranger_arc_ref_chm13v2.sh) ([10x guide](https://kb.10xgenomics.com/s/article/29207065679501-Building-a-Custom-T2T-reference-for-Cell-Ranger-ARC)).
 
 ---
