@@ -17,11 +17,13 @@ def setup_logging(log):
     log : str
         Path to the log file.
     """
-    logging.basicConfig(
-        filename=log,
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-    )
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.handlers.clear()
+    fh = logging.FileHandler(log)
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    root.addHandler(fh)
 
 
 def symlink_force(src, dst):
