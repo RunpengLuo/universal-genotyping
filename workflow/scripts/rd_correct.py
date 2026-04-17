@@ -29,7 +29,7 @@ from rd_correct_utils import (
     correct_readcount_lowess,
     correct_readcount_quadreg,
 )
-from plot_utils import plot_rd_gc, plot_gc_correction_pdf
+from plot_utils import plot_rd_1d_scatter, plot_rd_2d_kde
 
 import matplotlib
 
@@ -116,22 +116,6 @@ gc_vals = win_df["GC"].to_numpy()
 
 rd_raw_ylim = max(np.nanquantile(dp_raw, 0.99), 1.0) * 1.1
 gc_corr_before, gc_std_before = compute_gc_rd_stats(dp_raw, gc_vals, rep_ids)
-plot_rd_gc(
-    win_df,
-    dp_raw,
-    rep_ids,
-    genome_size,
-    qc_dir,
-    "depth_before_correction",
-    "window",
-    "RD",
-    rd_raw_ylim,
-    gc_corr=gc_corr_before,
-    gc_bin_median_std=gc_std_before,
-    run_id=run_id,
-    region_bed=region_bed,
-    blacklist_bed=blacklist_bed,
-)
 
 logging.info(f"{n_windows} windows for bias correction")
 
@@ -186,37 +170,32 @@ else:
     logging.info("gc_correct=False; skipping bias correction")
     dp_corrected = dp_raw.copy()
 
-pdf = PdfPages(stamp_path(os.path.join(qc_dir, "rd_correct.pdf"), run_id))
-plot_gc_correction_pdf(
+rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0) * 1.1
+
+rd_pdf = PdfPages(stamp_path(os.path.join(qc_dir, "rd_correct.pdf"), run_id))
+plot_rd_1d_scatter(
+    win_df,
+    dp_raw,
+    dp_corrected,
+    rep_ids,
+    genome_size,
+    rd_pdf,
+    ylim_before=rd_raw_ylim,
+    ylim_after=rd_ylim,
+    region_bed=region_bed,
+    blacklist_bed=blacklist_bed,
+)
+plot_rd_2d_kde(
     gc_vals,
     dp_raw,
     dp_corrected,
     rep_ids,
-    pdf,
+    rd_pdf,
     gc_rmse=gc_rmse_list,
     mappability=map_vals,
     repliseq=repli_vals,
 )
-pdf.close()
-
-rd_ylim = max(np.nanquantile(dp_corrected, 0.99), 1.0) * 1.1
-gc_corr_after, gc_std_after = compute_gc_rd_stats(dp_corrected, gc_vals, rep_ids)
-plot_rd_gc(
-    win_df,
-    dp_corrected,
-    rep_ids,
-    genome_size,
-    qc_dir,
-    "depth_after_correction",
-    "window",
-    "RD",
-    rd_ylim,
-    gc_corr=gc_corr_after,
-    gc_bin_median_std=gc_std_after,
-    run_id=run_id,
-    region_bed=region_bed,
-    blacklist_bed=blacklist_bed,
-)
+rd_pdf.close()
 
 nan_mask = np.isnan(dp_corrected).any(axis=1)
 n_nan_rows = int(nan_mask.sum())

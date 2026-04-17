@@ -71,11 +71,12 @@ Common outputs across all modes:
 
 ### QC (`qc_dir/{assay_type}/`)
 
-Plots from bias correction and binning steps:
-- `rd_correction/` — GC/mappability/RT bias correction plots (bulk WGS/WES).
-- `phase_and_concat/` — SNP depth histogram QC.
-- `combine_counts/` — adaptive binning QC (`combine_counts.{run_id}.pdf`: bin-level BAF + per-sample RDR/BAF).
-- `cnv_segmentation/` — BB block QC (`af_cnv-B_{assay_type}.{run_id}.pdf`: SNP and BB-level BAF; copytyping only).
+Plots from bias correction, phasing, and binning steps:
+- `rd_correct.{run_id}.pdf` — read depth bias correction (bulk WGS/WES). One page per sample with before/after correction genome-wide RD scatter, followed by GC correction diagnostic pages.
+- `snp_allele_freq.{run_id}.pdf` — SNP-level allele frequency: page 1 = unphased REF/TOTAL, page 2 = phased B-allele frequency.
+- `snp_depth_hist.{run_id}.pdf` — SNP depth histogram.
+- `combine_counts.{run_id}.pdf` — adaptive binning QC: bin-level BAF + per-sample RDR/BAF (bulk).
+- `af_cnv-B_{assay_type}.{run_id}.pdf` — SNP and BB-level BAF (copytyping only).
 
 ---
 

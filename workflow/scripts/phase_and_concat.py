@@ -16,7 +16,8 @@ from utils import *
 from io_utils import *
 from combine_counts_utils import *
 from count_reads_utils import *
-from plot_utils import plot_snp_depth_histogram
+from matplotlib.backends.backend_pdf import PdfPages
+from plot_utils import plot_allele_freqs, plot_snp_depth_histogram
 from aggregation_utils import *
 from switchprobs import *
 
@@ -239,6 +240,41 @@ plot_snp_depth_histogram(
     ref_mtx=ref_mtx,
     is_bulk=is_bulk_assay,
 )
+
+af_pdf_path = stamp_path(os.path.join(qc_dir, "snp_allele_freq.pdf"), run_id)
+with PdfPages(af_pdf_path) as pdf:
+    plot_allele_freqs(
+        snps,
+        rep_ids,
+        tot_mtx,
+        ref_mtx,
+        genome_size,
+        qc_dir,
+        apply_pseudobulk=not is_bulk_assay,
+        allele="ref",
+        unit="SNP",
+        suffix=".unphased",
+        region_bed=region_bed,
+        blacklist_bed=blacklist_bed,
+        run_id=run_id,
+        pdf=pdf,
+    )
+    plot_allele_freqs(
+        snps,
+        rep_ids,
+        tot_mtx,
+        b_mtx,
+        genome_size,
+        qc_dir,
+        apply_pseudobulk=not is_bulk_assay,
+        allele="B",
+        unit="SNP",
+        suffix=".phased",
+        region_bed=region_bed,
+        blacklist_bed=blacklist_bed,
+        run_id=run_id,
+        pdf=pdf,
+    )
 
 ##################################################
 logging.info("saving output files")

@@ -84,7 +84,7 @@ def _plot_cov_panel(
     ax.set_ylim(0, ylim * 1.1)
 
 
-def plot_gc_correction_pdf(
+def plot_rd_2d_kde(
     gc,
     dp_before,
     dp_after,
@@ -164,34 +164,51 @@ def plot_gc_correction_pdf(
 # ---------------------------------------------------------------------------
 
 
-def plot_rd_gc(
+def plot_rd_1d_scatter(
     pos_df,
-    mat,
+    dp_before,
+    dp_after,
     labels,
     genome_size,
-    qc_dir,
-    prefix,
-    unit,
-    val_type,
-    ylim,
-    gc_corr=None,
-    gc_bin_median_std=None,
-    run_id="",
-    **plot_kwargs,
+    pdf,
+    unit="window",
+    val_type="RD",
+    ylim_before=None,
+    ylim_after=None,
+    s=4,
+    dpi=72,
+    alpha=0.6,
+    region_bed=None,
+    blacklist_bed=None,
 ):
-    """Generate a genome-wide multi-sample 1-D scatter PDF."""
-    plot_file = stamp_path(os.path.join(qc_dir, f"{prefix}.pdf"), run_id)
-    plot_1d_multi_sample(
-        pos_df,
-        mat,
-        labels,
-        genome_size,
-        plot_file,
-        unit=unit,
-        val_type=val_type,
-        max_ylim=ylim,
-        **plot_kwargs,
-    )
+    """One page per sample: top = before correction, bottom = after correction."""
+    genome_x, chrom_bounds, total_len = _genome_coords(pos_df, genome_size)
+    region_by_chr = _parse_bed_by_chr(region_bed)
+    blacklist_by_chr = _parse_bed_by_chr(blacklist_bed)
+    s_plot = adaptive_dot_size(len(pos_df), s_base=s)
+
+    for si, label in enumerate(labels):
+        fig, axes = plt.subplots(2, 1, figsize=(20, 6), sharex=True)
+        for ai, (ax, mat, ylim, title) in enumerate(zip(
+            axes,
+            [dp_before, dp_after],
+            [ylim_before, ylim_after],
+            ["before correction", "after correction"],
+        )):
+            y = mat[:, si] if mat.ndim == 2 else mat
+            m = np.isfinite(y)
+            _add_chrom_decorations(ax, chrom_bounds, total_len, region_by_chr, blacklist_by_chr)
+            if m.any():
+                ax.scatter(genome_x[m], y[m], s=s_plot, alpha=alpha, rasterized=True)
+            if ylim is not None:
+                ax.set_ylim(0.0, ylim)
+            ax.grid(axis="y", alpha=0.2)
+            ax.set_title(f"{title} — {val_type} ({unit})", fontsize=10)
+            ax.set_ylabel(val_type, fontsize=10)
+        fig.suptitle(f"SAMPLE {label}", fontsize=12, y=1.0)
+        fig.tight_layout()
+        pdf.savefig(fig, dpi=dpi)
+        plt.close(fig)
 
 
 def _genome_coords(pos_df, genome_size):
