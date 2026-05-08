@@ -163,6 +163,23 @@ def read_barcodes(bc_file: str):
     return barcodes
 
 
+def read_full_barcodes(path: str):
+    """Read a 2-column REP_ID,BARCODE TSV (with header) into a DataFrame."""
+    return pd.read_table(path, sep="\t", header=0, dtype=str)
+
+
+def cell_rep_idx_from_mapping(rep2bc: pd.DataFrame, rep_ids):
+    """Convert a REP_ID,BARCODE DataFrame into an int64 array of rep indices.
+
+    Categorical mapping with explicit ``rep_ids`` order ensures the codes
+    align with the position of each rep in the caller's rep_ids list.
+    """
+    cats = pd.Categorical(rep2bc["REP_ID"], categories=list(rep_ids))
+    codes = np.asarray(cats.codes, dtype=np.int64)
+    assert (codes >= 0).all(), "barcodes.full contains REP_ID values outside rep_ids"
+    return codes
+
+
 def compute_depth_statistics(dp_raw, win_df, sample_ids):
     """Compute per-chromosome and whole-genome mean/median depth per sample.
 

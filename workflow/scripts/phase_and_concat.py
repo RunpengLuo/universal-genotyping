@@ -128,6 +128,20 @@ for idx, rep_id in enumerate(rep_ids):
     ad_mtx_list.append(ad_canon)
 
 all_barcodes = pd.concat(barcodes_list, axis=0, ignore_index=True)
+if is_bulk_assay:
+    cell_rep_idx = None
+    barcodes_full = None
+else:
+    cell_rep_idx = np.repeat(
+        np.arange(len(rep_ids), dtype=np.int64),
+        [len(b) for b in barcodes_list],
+    )
+    barcodes_full = pd.DataFrame(
+        {
+            "REP_ID": np.array(rep_ids, dtype=str)[cell_rep_idx],
+            "BARCODE": all_barcodes["BARCODE"].to_numpy(),
+        }
+    )
 tot_mtx, ref_mtx, alt_mtx = merge_mats(tot_mtx_list, ad_mtx_list)
 a_mtx, b_mtx = apply_phase_to_mat(tot_mtx, ref_mtx, alt_mtx, snps["PHASE"].to_numpy())
 
@@ -239,6 +253,7 @@ plot_snp_depth_histogram(
     run_id,
     ref_mtx=ref_mtx,
     is_bulk=is_bulk_assay,
+    cell_rep_idx=cell_rep_idx,
 )
 
 af_pdf_path = stamp_path(os.path.join(qc_dir, "snp_allele_freq.pdf"), run_id)
@@ -258,6 +273,7 @@ with PdfPages(af_pdf_path) as pdf:
         blacklist_bed=blacklist_bed,
         run_id=run_id,
         pdf=pdf,
+        cell_rep_idx=cell_rep_idx,
     )
     plot_allele_freqs(
         snps,
@@ -274,6 +290,7 @@ with PdfPages(af_pdf_path) as pdf:
         blacklist_bed=blacklist_bed,
         run_id=run_id,
         pdf=pdf,
+        cell_rep_idx=cell_rep_idx,
     )
 
 ##################################################
@@ -305,6 +322,10 @@ else:
     save_npz(sm.output["cell_snp_Aallele"], a_mtx)
     save_npz(sm.output["cell_snp_Ballele"], b_mtx)
 all_barcodes.to_csv(sm.output["all_barcodes"], sep="\t", header=False, index=False)
+if barcodes_full is not None:
+    barcodes_full.to_csv(
+        sm.output["barcodes_full"], sep="\t", header=True, index=False
+    )
 sample_df = pd.DataFrame({"SAMPLE": [f"{sample_name}_{rep_id}" for rep_id in rep_ids]})
 sample_df["SAMPLE_NAME"] = sample_name
 sample_df["REP_ID"] = rep_ids

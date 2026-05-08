@@ -17,7 +17,12 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from io_utils import get_chr_sizes, read_region_file
 from utils import adaptive_dot_size, stamp_path
-from combine_counts_utils import compute_af_pseudobulk, compute_af_per_sample
+from combine_counts_utils import (
+    compute_af_pseudobulk,
+    compute_af_per_sample,
+    compute_af_by_groups,
+    pseudobulk_by_groups,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -547,6 +552,7 @@ def plot_snp_depth_histogram(
     run_id,
     ref_mtx=None,
     is_bulk=True,
+    cell_rep_idx=None,
 ):
     """Plot per-sample histograms of total allele depth and ref-AF at SNP positions.
 
@@ -568,8 +574,13 @@ def plot_snp_depth_histogram(
         Ref-allele count matrix (same shape as *tot_mtx*). When provided, a
         second column of ref-AF histograms is added to the figure.
     is_bulk : bool
-        If True, one row per sample. If False, aggregate across cells into a
-        single pseudobulk row.
+        If True, columns of the matrices are samples — one row per sample.
+        If False, columns are cells; see *cell_rep_idx*.
+    cell_rep_idx : np.ndarray or None
+        Length-n_cells int array mapping each cell column to a rep index in
+        ``rep_ids``. Only consulted when ``is_bulk=False``. When provided,
+        cells are pseudobulked within each rep — one row per rep. When
+        ``None``, all cells collapse into a single "pseudobulk" row.
     """
     logging.info("QC analysis - plot SNP depth histogram")
 
@@ -577,11 +588,33 @@ def plot_snp_depth_histogram(
     ncols = 2 if has_af else 1
 
     if is_bulk:
-        nrows = len(rep_ids)
+        depth_mat = tot_mtx
+        ref_count_mat = ref_mtx
+        row_labels = list(rep_ids)
+    elif cell_rep_idx is not None:
+        n_groups = len(rep_ids)
+        depth_mat = pseudobulk_by_groups(tot_mtx, cell_rep_idx, n_groups)
+        ref_count_mat = (
+            pseudobulk_by_groups(ref_mtx, cell_rep_idx, n_groups)
+            if has_af
+            else None
+        )
         row_labels = list(rep_ids)
     else:
-        nrows = 1
+        # legacy global-pseudobulk path: one row aggregating all cells
+        if issparse(tot_mtx):
+            depth_mat = np.asarray(tot_mtx.sum(axis=1))
+        else:
+            depth_mat = tot_mtx.sum(axis=1, keepdims=True)
+        if has_af:
+            if issparse(ref_mtx):
+                ref_count_mat = np.asarray(ref_mtx.sum(axis=1))
+            else:
+                ref_count_mat = ref_mtx.sum(axis=1, keepdims=True)
+        else:
+            ref_count_mat = None
         row_labels = ["pseudobulk"]
+    nrows = len(row_labels)
 
     fig, axes = plt.subplots(
         nrows=nrows, ncols=ncols, figsize=(5 * ncols, 3 * nrows), squeeze=False
@@ -602,19 +635,10 @@ def plot_snp_depth_histogram(
             return np.asarray(mat[:, col_idx].toarray()).ravel()
         return np.asarray(mat[:, col_idx]).ravel()
 
-    def _pseudobulk_sum(mat):
-        """Sum across all columns (cells) to produce a 1-D pseudobulk array."""
-        if issparse(mat):
-            return np.asarray(mat.sum(axis=1)).ravel()
-        return np.asarray(mat.sum(axis=1)).ravel()
-
     for ri, label in enumerate(row_labels):
         # --- depth histogram ---
         ax_depth = axes[ri, 0]
-        if is_bulk:
-            depth = _get_col(tot_mtx, ri)
-        else:
-            depth = _pseudobulk_sum(tot_mtx)
+        depth = _get_col(depth_mat, ri)
         if len(depth) > 0:
             clip_threshold = np.percentile(depth, 99)
             ax_depth.hist(depth[depth <= clip_threshold], bins=50, alpha=0.7)
@@ -625,12 +649,8 @@ def plot_snp_depth_histogram(
         # --- ref-AF histogram ---
         if has_af:
             ax_af = axes[ri, 1]
-            if is_bulk:
-                total_depth = _get_col(tot_mtx, ri).astype(np.float64)
-                ref_depth = _get_col(ref_mtx, ri).astype(np.float64)
-            else:
-                total_depth = _pseudobulk_sum(tot_mtx).astype(np.float64)
-                ref_depth = _pseudobulk_sum(ref_mtx).astype(np.float64)
+            total_depth = _get_col(depth_mat, ri).astype(np.float64)
+            ref_depth = _get_col(ref_count_mat, ri).astype(np.float64)
             covered_mask = total_depth > 0
             ref_af = np.full(len(total_depth), np.nan)
             ref_af[covered_mask] = ref_depth[covered_mask] / total_depth[covered_mask]
@@ -666,40 +686,51 @@ def plot_allele_freqs(
     blacklist_bed=None,
     run_id="",
     pdf: PdfPages | None = None,
+    cell_rep_idx=None,
 ):
     """Generate genome-wide allele-frequency scatter plots.
 
-    Produces either a per-sample multi-row plot or a single pseudobulk plot.
+    Output mode is chosen by the combination of ``apply_pseudobulk`` and
+    ``cell_rep_idx``:
+
+    - ``apply_pseudobulk=False`` — columns of the matrices are samples;
+      multi-row scatter, one row per ``rep_ids`` entry.
+    - ``apply_pseudobulk=True`` and ``cell_rep_idx`` provided — cells are
+      pseudobulked within each rep; multi-row scatter, one row per rep.
+    - ``apply_pseudobulk=True`` and ``cell_rep_idx`` is ``None`` — all cells
+      collapse into a single pseudobulk page.
 
     Parameters
     ----------
     pos_df : pd.DataFrame
         SNP/bin position DataFrame with ``#CHR`` and ``POS`` (or ``START``/``END``).
     rep_ids : list[str]
-        Replicate identifiers.
+        Replicate identifiers; used as row labels.
     tot_mtx, b_mtx : sparse or ndarray
         Total depth and B-allele count matrices.
+    cell_rep_idx : np.ndarray or None
+        Length-n_cells int array mapping each cell column to a rep index in
+        ``rep_ids``. See behavior matrix above.
     genome_size : str
         Path to chromosome sizes file.
     plot_dir : str
         Output directory for PDF plots.
-    apply_pseudobulk : bool
-        If True, plot a single pseudobulk AF; otherwise plot per-sample.
     allele : str
         Allele label for filenames (e.g., ``"ref"``, ``"B"``).
     unit : str
         Feature unit label (e.g., ``"SNP"``, ``"bin"``).
     suffix : str
         Optional filename suffix.
-    region_bed : str or None
-        Path to whitelist region BED file for background shading.
-    blacklist_bed : str or None
-        Path to blacklist BED file for background shading.
+    region_bed, blacklist_bed : str or None
+        Optional BED files for background shading.
     """
+    per_rep_pseudobulk = apply_pseudobulk and cell_rep_idx is not None
     logging.info(
-        f"QC analysis - plot {allele}-{unit} allele frequency, {unit}={allele}, apply_pseudobulk={apply_pseudobulk}"
+        f"QC analysis - plot {allele}-{unit} allele frequency, "
+        f"apply_pseudobulk={apply_pseudobulk}, per_rep_pseudobulk={per_rep_pseudobulk}"
     )
-    if apply_pseudobulk:
+
+    if apply_pseudobulk and not per_rep_pseudobulk:
         af = compute_af_pseudobulk(tot_mtx, b_mtx)
         plot_file = stamp_path(
             os.path.join(plot_dir, f"af_{allele}_{unit}.pseudobulk{suffix}.pdf"), run_id
@@ -716,25 +747,29 @@ def plot_allele_freqs(
             blacklist_bed=blacklist_bed,
             pdf=pdf,
         )
+        return
+
+    if per_rep_pseudobulk:
+        af_mat = compute_af_by_groups(tot_mtx, b_mtx, cell_rep_idx, len(rep_ids))
     else:
         _tot_mtx = tot_mtx.tocsc() if issparse(tot_mtx) else tot_mtx
         _b_mtx = b_mtx.tocsc() if issparse(b_mtx) else b_mtx
         af_mat = np.column_stack(
             [compute_af_per_sample(_tot_mtx, _b_mtx, i) for i in range(len(rep_ids))]
         )
-        plot_file = stamp_path(
-            os.path.join(plot_dir, f"af_{allele}_{unit}{suffix}.pdf"), run_id
-        )
-        plot_1d_multi_sample(
-            pos_df,
-            af_mat,
-            list(rep_ids),
-            genome_size,
-            plot_file,
-            unit=unit,
-            val_type="AF",
-            region_bed=region_bed,
-            blacklist_bed=blacklist_bed,
-            pdf=pdf,
-        )
+    plot_file = stamp_path(
+        os.path.join(plot_dir, f"af_{allele}_{unit}{suffix}.pdf"), run_id
+    )
+    plot_1d_multi_sample(
+        pos_df,
+        af_mat,
+        list(rep_ids),
+        genome_size,
+        plot_file,
+        unit=unit,
+        val_type="AF",
+        region_bed=region_bed,
+        blacklist_bed=blacklist_bed,
+        pdf=pdf,
+    )
     return

@@ -77,6 +77,11 @@ rule combine_counts_nonbulk:
             then=config["allele_dir"] + f"/{wc.assay_type}/barcodes.tsv.gz",
             otherwise=[],
         ),
+        barcodes_full=lambda wc: branch(
+            wc.assay_type in NONBULK_ASSAYS,
+            then=config["allele_dir"] + f"/{wc.assay_type}/barcodes.full.tsv.gz",
+            otherwise=[],
+        ),
         gmap_file=lambda wc: (
             config["phase_dir"] + "/genetic_map.tsv.gz" if require_genetic_map else []
         ),
@@ -124,6 +129,7 @@ rule cnv_segmentation:
         b_mtx_snp=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/snp.Ballele.npz",
         sample_file=lambda wc: config["allele_dir"] + f"/{wc.assay_type}/sample_ids.tsv",
         all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
+        barcodes_full=config["allele_dir"] + "/{assay_type}/barcodes.full.tsv.gz",
         h5ad_file=config["bb_dir"] + "/{assay_type}/{assay_type}.h5ad",
         region_bed=lambda wc: config["region_bed"],
         genome_size=lambda wc: config["genome_size"],

@@ -48,6 +48,7 @@ b_mtx_snp = sm.input["b_mtx_snp"]
 h5ad_file = sm.input["h5ad_file"]
 
 all_barcodes = sm.input["all_barcodes"]
+barcodes_full_path = sm.input["barcodes_full"]
 qc_dir = sm.params["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 run_id = getattr(sm.params, "run_id", "")
@@ -65,6 +66,10 @@ rep_ids = sample_df["REP_ID"].tolist()
 
 is_bulk_assay = assay_type in BULK_ASSAYS
 assert not is_bulk_assay, "bulk sample CNV segmentation unsupported yet"
+
+cell_rep_idx = cell_rep_idx_from_mapping(
+    read_full_barcodes(barcodes_full_path), rep_ids
+)
 
 logging.info(f"cnv segmentation, sample name={sample_name}, assay_type={assay_type}")
 logging.info(f"rep_ids={rep_ids}")
@@ -124,6 +129,7 @@ with PdfPages(pdf_path) as pdf:
         genome_size,
         qc_dir,
         apply_pseudobulk=_pseudobulk,
+        cell_rep_idx=cell_rep_idx,
         allele="cnv-B",
         unit="snp",
         suffix=f"_{assay_type}",
@@ -138,6 +144,7 @@ with PdfPages(pdf_path) as pdf:
         genome_size,
         qc_dir,
         apply_pseudobulk=_pseudobulk,
+        cell_rep_idx=cell_rep_idx,
         allele="cnv-B",
         unit="bb",
         suffix=f"_{assay_type}",

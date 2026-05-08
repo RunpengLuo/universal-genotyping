@@ -161,6 +161,41 @@ def compute_af_per_sample(tot_mtx, b_mtx, i: int):
     return np.divide(num, den, out=out, where=(den > 0))
 
 
+def pseudobulk_by_groups(mat, group_idx, n_groups):
+    """Sum the columns of ``mat`` within each group.
+
+    Parameters
+    ----------
+    mat : sparse or ndarray
+        Feature x cell matrix.
+    group_idx : np.ndarray
+        Length-n_cells int array; ``group_idx[c]`` is the group of column c.
+    n_groups : int
+        Number of groups (output column count).
+
+    Returns
+    -------
+    np.ndarray
+        Dense (n_features, n_groups) array of summed counts.
+    """
+    n_cells = mat.shape[1]
+    assert group_idx.shape[0] == n_cells, "group_idx length must match #cells"
+    indicator = csr_matrix(
+        (np.ones(n_cells, dtype=np.float64), (np.arange(n_cells), group_idx)),
+        shape=(n_cells, n_groups),
+    )
+    out = mat @ indicator
+    return out.toarray() if issparse(out) else np.asarray(out)
+
+
+def compute_af_by_groups(tot_mtx, b_mtx, group_idx, n_groups):
+    """Per-group pseudobulk allele frequency matrix of shape (n_features, n_groups)."""
+    tot_grp = pseudobulk_by_groups(tot_mtx, group_idx, n_groups)
+    b_grp = pseudobulk_by_groups(b_mtx, group_idx, n_groups)
+    out = np.full(tot_grp.shape, np.nan, dtype=np.float32)
+    return np.divide(b_grp, tot_grp, out=out, where=(tot_grp > 0))
+
+
 def compute_af_pseudobulk(tot_mtx, b_mtx):
     """Compute per-SNP allele frequency across all cells (pseudobulk sum).
 

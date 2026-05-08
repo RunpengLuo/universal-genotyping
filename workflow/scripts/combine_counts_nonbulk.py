@@ -36,6 +36,7 @@ b_mtx_snp = sm.input["b_mtx_snp"]
 
 gmap_file = maybe_path(sm.input["gmap_file"])
 all_barcodes = maybe_path(sm.input["all_barcodes"])
+barcodes_full_path = maybe_path(sm.input["barcodes_full"])
 qc_dir = sm.params["qc_dir"]
 os.makedirs(qc_dir, exist_ok=True)
 run_id = getattr(sm.params, "run_id", "")
@@ -48,6 +49,12 @@ sample_df = pd.read_table(sm.input["sample_file"])
 sample_name = sample_df["SAMPLE"].iloc[0]
 rep_ids = sample_df["REP_ID"].tolist()
 assay_type = sm.params["assay_type"]
+
+cell_rep_idx = (
+    cell_rep_idx_from_mapping(read_full_barcodes(barcodes_full_path), rep_ids)
+    if barcodes_full_path is not None
+    else None
+)
 
 ##################################################
 logging.info(f"adaptive binning, sample name={sample_name}, assay_type={assay_type}")
@@ -91,6 +98,7 @@ plot_allele_freqs(
     genome_size,
     qc_dir,
     apply_pseudobulk=True,
+    cell_rep_idx=cell_rep_idx,
     allele="B",
     unit="multi-snp",
     run_id=run_id,
@@ -137,6 +145,7 @@ plot_allele_freqs(
     genome_size,
     qc_dir,
     apply_pseudobulk=True,
+    cell_rep_idx=cell_rep_idx,
     allele="B",
     unit="bb",
     run_id=run_id,

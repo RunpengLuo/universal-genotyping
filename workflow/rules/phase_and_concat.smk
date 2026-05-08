@@ -96,6 +96,7 @@ rule phase_and_concat_single_cell:
         ),
     output:
         all_barcodes=config["allele_dir"] + "/{assay_type}/barcodes.tsv.gz",
+        barcodes_full=config["allele_dir"] + "/{assay_type}/barcodes.full.tsv.gz",
         snp_info=config["allele_dir"] + "/{assay_type}/snps.tsv.gz",
         tot_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Tallele.npz",
         a_mtx_snp=config["allele_dir"] + "/{assay_type}/snp.Aallele.npz",
