@@ -56,4 +56,4 @@ Assays: `scRNA`, `scATAC`, `VISIUM`, `VISIUM3prime` (requires pre-computed het S
 | 4. Adaptive binning | `combine_counts_nonbulk` | `scripts/combine_counts_nonbulk.py` |
 | 5. CNV segmentation | `cnv_segmentation` | `scripts/cnv_segmentation.py` |
 
-**Outputs** (`bb_dir`): `cnv_segments.tsv`, `bb.{Tallele,Aallele,Ballele}.npz`, `{X,Y,D}_count.npz`
+**Outputs** (`bb_dir`): `cnv_segments.tsv`, `bb.{Tallele,Aallele,Ballele,Xcount}.npz`, `barcodes.tsv.gz`, `sample_ids.tsv`

@@ -16,6 +16,56 @@ TSV with one row per replicate. Template at `resources/templates/samples.tsv`.
 
 ---
 
+## Config Keys
+
+Defaults live in `config/config.yaml`. A starting template for user runs is at `resources/templates/config.yaml`. Override individual keys via `--config key=value`.
+
+### Top-level
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `workflow_mode` | Yes | `bulk_genotyping` \| `single_cell_genotyping` \| `copytyping_preprocess`. |
+| `assay_types` | Yes | List of assay types to run (e.g. `["bulkWGS"]`, `["scRNA","scATAC"]`). |
+| `sample_id` | Yes | Selects which `SAMPLE` from the sample sheet to process. |
+| `sample_file` | Yes | Path to `samples.tsv`. |
+| `chromosomes` | Yes | List of chromosomes (default `[1..22]`; X handled separately by phasing tools). |
+| `reference_version` | Yes | `hg19` \| `hg38` \| `chm13v2`. |
+| `reference` | Yes | Genome FASTA. |
+| `genome_size` | Yes | Two-column `chrom\tsize` file. |
+| `region_bed` | Yes | Whitelist regions (e.g. autosomes minus blacklist). |
+| `window_bed` | Bulk | Pre-built window BED with GC/MAP/REPLI columns. Build via `resources/scripts/build_{wgs,wes}_window_bed.py`. |
+| `blacklist_bed` | Optional | ENCODE-style blacklist; pre-built at `resources/data/hg38-blacklist.v2.bed.gz`. |
+| `gene_blacklist_file` | Optional | Genes to exclude from AnnData (single-cell). |
+| `gtf_file` | Yes | Gene annotation GTF (gzipped). |
+| `snp_panel` | Genotyping | Population SNP VCF. |
+| `snp_targets` | Bulk genotyping | Per-chromosome position files; build via `resources/scripts/build_snp_targets.sh`. |
+| `phasing_panel` | eagle/shapeit | Per-chromosome BCF reference panel directory. |
+| `phaser` | Genotyping | `eagle` \| `shapeit` \| `longphase`. |
+| `phaser_dir` | eagle/shapeit | Path to phaser install root (must contain bundled genetic maps). |
+| `het_snp_vcf` | copytyping_preprocess | Pre-computed phased het SNP VCF (e.g. from a prior bulk run). |
+| `bb_file` | copytyping_preprocess | Pre-computed BB block annotations TSV. |
+
+### Parameter blocks
+
+| Block | Used by | Keys |
+|-------|---------|------|
+| `params_cellsnp_lite` | `genotype_snps_pseudobulk_mode1b`, `pileup_snps_*` | `UMItag`, `cellTAG`, `minMAF_genotype`, `minCOUNT_genotype`, `minMAF_pileup`, `minCOUNT_pileup` |
+| `params_bcftools` | `genotype_snps_bulk` | `min_mapq`, `min_baseq`, `min_dp`, `max_depth`, `min_qual` |
+| `params_annotate_snps` | `annotate_snps_pseudobulk` | `min_het_reads`, `min_hom_dp`, `min_vaf_thres`, `filter_nz_OTH`, `filter_hom_ALT` |
+| `params_longphase` | `phase_snps_longphase` | `min_mapq`, `extra_params` (`--pb` or `--ont`) |
+| `params_process_anndata` | `process_rna_anndata`, `process_atac_fragments` | `gene_id_colname`, `min_frac_barcodes`, `tile_width` |
+| `params_phase_and_concat` | `phase_and_concat_{bulk,single_cell}` | `min_depth`, `gamma`, `exon_only` |
+| `params_mosdepth` | `run_mosdepth` | `read_quality`, `extra_params` |
+| `params_count_reads` | `rd_correct` | `gc_correct`, `gc_correct_method` (`lowess`/`median`), `rt_correct`, `samplesize`, `routlier`, `doutlier`, `min_mappability` |
+| `params_combine_counts` | `combine_counts`, `combine_counts_nonbulk` | `min_switchprob`, `nu`, `switchprob_ps`, `nsnp_multi` (sc only), `min_snp_reads`, `min_snp_per_block`, `max_blocksize` (bulk only), `median_normalization`, `rdr_outlier_quantile` (bulk only), `phase_flip_test`, `phase_flip_epsilon`, `phase_flip_alpha` |
+| `threads` | All multi-thread rules | `genotype`, `phase`, `pileup`, `mosdepth` |
+
+### Output directories
+
+`snp_dir`, `phase_dir`, `pileup_dir`, `allele_dir`, `bb_dir`, `qc_dir`, `log_dir` — all relative to `snakemake --directory`.
+
+---
+
 ## Outputs
 
 All output directories (`snp_dir`, `phase_dir`, `pileup_dir`, `allele_dir`, `bb_dir`, `qc_dir`, `log_dir`) are set in `config.yaml`.
