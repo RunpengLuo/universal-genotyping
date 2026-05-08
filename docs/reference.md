@@ -92,6 +92,7 @@ One subdirectory per `{assay_type}_{rep_id}` with cellsnp-lite output.
 - `snp.{Tallele,Aallele,Ballele}.npz` — sparse allele count matrices (SNPs x samples/cells).
 - `sample_ids.tsv` — sample metadata.
 - `barcodes.tsv.gz` — cell barcode list (single-cell only).
+- `barcodes.full.tsv.gz` — 2-col `REP_ID`/`BARCODE` mapping in matrix-column order (single-cell only).
 - `unique_snp_ids.npy` — SNP identifiers as `{chr}_{pos}` (single-cell only).
 - `cell_snp_Aallele.npz`, `cell_snp_Ballele.npz` — per-cell allele count matrices (single-cell only).
 
@@ -113,11 +114,12 @@ Common outputs across all modes:
 - `bb.{Tallele,Aallele,Ballele}.npz` — allele count matrices.
 - `multi_snp.tsv.gz` — multi-SNP group annotations.
 - `multi_snp.{Tallele,Aallele,Ballele}.npz` — multi-SNP allele count matrices.
+- `barcodes.tsv.gz`, `barcodes.full.tsv.gz` — copied from `allele_dir`.
 
 **Copytyping (`copytyping_preprocess`):**
 - `cnv_segments.tsv` — BB block annotations.
 - `bb.{Xcount,Tallele,Aallele,Ballele}.npz` — per-block count matrices.
-- `barcodes.tsv.gz` — cell barcode list.
+- `barcodes.tsv.gz`, `barcodes.full.tsv.gz` — copied from `allele_dir`.
 
 ### QC (`qc_dir/{assay_type}/`)
 
@@ -151,3 +153,7 @@ Plots from bias correction, phasing, and binning steps:
 ### `barcodes.tsv.gz`
 
 Single column, no header. Each row: `{BARCODE}_{REP_ID}`.
+
+### `barcodes.full.tsv.gz`
+
+Two columns with header: `REP_ID`, `BARCODE`. The `BARCODE` column carries the same suffixed `{BARCODE}_{REP_ID}` form as `barcodes.tsv.gz`, in matching row order. Used by QC plotters to group cells per replicate without parsing the suffix.
