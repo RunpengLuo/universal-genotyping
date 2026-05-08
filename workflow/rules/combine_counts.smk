@@ -142,6 +142,7 @@ rule cnv_segmentation:
         a_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Aallele.npz",
         b_mtx_bb=config["bb_dir"] + "/{assay_type}/bb.Ballele.npz",
         barcodes_out=config["bb_dir"] + "/{assay_type}/barcodes.tsv.gz",
+        barcodes_full_out=config["bb_dir"] + "/{assay_type}/barcodes.full.tsv.gz",
         sample_file=config["bb_dir"] + "/{assay_type}/sample_ids.tsv",
     wildcard_constraints:
         assay_type="(scRNA|scATAC|VISIUM|VISIUM3prime)",

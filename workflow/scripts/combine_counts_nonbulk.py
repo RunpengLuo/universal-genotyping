@@ -172,9 +172,11 @@ save_npz(sm.output["a_mtx_bb"], a_mtx_bb)
 save_npz(sm.output["b_mtx_bb"], b_mtx_bb)
 save_npz(sm.output["baf_mtx_bb"], csr_matrix((0, 0), dtype=np.float32))
 if all_barcodes is not None:
-    barcodes_out = os.path.join(
-        os.path.dirname(sm.output["bb_file"]), "barcodes.tsv.gz"
-    )
-    shutil.copy2(all_barcodes, barcodes_out)
+    bb_out_dir = os.path.dirname(sm.output["bb_file"])
+    shutil.copy2(all_barcodes, os.path.join(bb_out_dir, "barcodes.tsv.gz"))
+    if barcodes_full_path is not None:
+        shutil.copy2(
+            barcodes_full_path, os.path.join(bb_out_dir, "barcodes.full.tsv.gz")
+        )
 shutil.copy2(sm.input["sample_file"], sm.output["sample_file"])
 logging.info("finished.")
